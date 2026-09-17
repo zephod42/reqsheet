@@ -11,4 +11,4 @@ This is an intentionally small, reviewable starting roadmap.
 
 No roadmap item authorizes implementation of product features in this bootstrap task.
 
-The database foundation review and local MySQL development verification are complete. The initial application-domain schema is now defined in migrations for organisations, staff identities, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. Application services for validating timetable spans, generating occurrences, and editing requisitions remain future work.
+The database foundation and initial application-domain schema are complete and verified against local MySQL. The bounded occurrence-generation service now validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Teacher entry, timetable editing, exception handling, and requisition editing remain future work.

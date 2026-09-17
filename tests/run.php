@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/TimetableGenerationTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -137,5 +138,6 @@ assertThrows(
     'Duplicate migration name was accepted.',
 );
 assertSameValue('ok', HealthCheck::status(), 'Existing application health status changed.');
+\Reqsheet\Tests\TimetableGenerationTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

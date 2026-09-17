@@ -4,7 +4,7 @@ Reqsheet is a deliberately simple PHP/MySQL web application for science-departme
 
 ## Current status
 
-This repository contains the initial Reqsheet development foundation. It proves that PHP runs, Composer PSR-4 autoloading works, and the project smoke-test command can execute. The initial application-domain schema is present, but product features, authentication, application services, and deployment configuration are intentionally not implemented.
+This repository contains the initial Reqsheet development foundation. It proves that PHP runs, Composer PSR-4 autoloading works, and the project smoke-test command can execute. The initial application-domain schema and bounded timetable occurrence-generation service are present, but product features, authentication, UI, timetable editing, and deployment configuration are intentionally not implemented.
 
 ## Development commands
 
@@ -18,6 +18,12 @@ The dependency-free `composer test` command is a temporary smoke test. The datab
 
 ```sh
 php bin/migrate.php
+```
+
+After timetable data exists, bounded occurrence generation can be exercised with explicit inclusive dates:
+
+```sh
+php bin/generate-occurrences.php --organisation=1 --version=1 --start=2026-09-01 --end=2026-09-30
 ```
 
 When Composer can reach Packagist, install the local development dependency with `composer install` and run the PHPUnit suite with `composer test:phpunit`.

@@ -40,7 +40,35 @@ MySQL DDL can implicitly commit and is not fully transactional. A failed migrati
 
 The migration identity should have schema-changing privileges scoped only to the Reqsheet database, including `CREATE`, `ALTER`, and `DROP` as future migrations may need to replace or remove objects. The runtime identity should have only application DML privileges and no schema-changing privileges.
 
-The database enforces keys, foreign keys, required values, date/time ranges, allowed slot kinds, allowed requisition states, and simple organisation-local uniqueness. Service validation must enforce non-overlapping timetable-version date ranges, same-version/day slot relationships, contiguous teaching-only lesson spans, occurrence dates matching recurring lessons, cross-organisation consistency, requisition-state/content consistency, and room/teacher conflict detection.
+The database enforces keys, foreign keys, required values, date/time ranges, allowed slot kinds, allowed requisition states, and simple organisation-local uniqueness. Service validation must enforce non-overlapping timetable-version date ranges, same-version/day slot relationships, contiguous teaching-only lesson spans, occurrence dates matching recurring lessons, cross-organisation consistency, requisition-state/content consistency, and room/teacher conflict detection. Room conflict comparison trims surrounding whitespace and compares case-insensitively; the stored room code is unchanged.
+
+## Bounded occurrence generation
+
+Occurrence generation uses the runtime database environment and requires explicit IDs and dates. The end date is inclusive; timetable version `effective_to` remains exclusive. For example:
+
+```sh
+php bin/generate-occurrences.php \
+  --organisation=1 \
+  --version=1 \
+  --start=2026-09-01 \
+  --end=2026-09-30
+```
+
+The service clips generation to the timetable version’s effective range, generates only matching recurring weekdays, validates contiguous teaching-only spans and teacher/room conflicts, and reports generated versus already-existing occurrences. Existing occurrences are never rewritten. All validation runs before insertion; occurrence inserts are then performed in one DML transaction and rolled back on failure.
+
+Occurrence generation is an explicit CLI operation. No cron, scheduler, holiday handling, cancellation, or timetable-exception behaviour exists yet.
+
+## Optional MySQL integration test
+
+The integration test is separate from `composer test` and is disabled unless explicitly opted in. It accepts only the dedicated `REQSHEET_TEST_DB_*` environment variables and refuses any database name other than exactly `reqsheet_test`. It never reads `DB_*` or `MIGRATION_DB_*`, and it rejects the runtime and migration usernames.
+
+The test database must be disposable and dedicated to this harness. It refuses unexpected pre-existing tables, applies the migrations, inserts synthetic fixtures, exercises the real PDO store and generator, then removes the known test tables in cleanup. It must never be pointed at `reqsheet_dev` or production.
+
+With protected test variables exported:
+
+```sh
+REQSHEET_RUN_INTEGRATION=1 composer test:integration
+```
 
 ## Verified development setup
 
