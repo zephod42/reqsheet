@@ -6,7 +6,7 @@
 - Composer 2.x
 - MySQL 8.4 client/server access
 
-The repository includes a small PDO/database foundation and migration CLI, but no application-domain schema. It does not create MySQL users or databases and does not require privileged host changes.
+The repository includes a small PDO/database foundation, migration CLI, and initial application-domain schema. It does not create MySQL users or databases and does not require privileged host changes.
 
 ## Bootstrap
 
@@ -34,11 +34,13 @@ Runtime configuration uses `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_P
 php bin/migrate.php
 ```
 
-The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. The current migration only creates that metadata table.
+The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. The domain migration creates organisations, users, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. It does not seed data or generate occurrences.
 
 MySQL DDL can implicitly commit and is not fully transactional. A failed migration is not recorded as applied, but a migration that fails after some DDL may leave partial schema changes. Review and repair the database before rerunning such a migration; migrations should be small, forward-only, and safe to retry where practical.
 
 The migration identity should have schema-changing privileges scoped only to the Reqsheet database, including `CREATE`, `ALTER`, and `DROP` as future migrations may need to replace or remove objects. The runtime identity should have only application DML privileges and no schema-changing privileges.
+
+The database enforces keys, foreign keys, required values, date/time ranges, allowed slot kinds, allowed requisition states, and simple organisation-local uniqueness. Service validation must enforce non-overlapping timetable-version date ranges, same-version/day slot relationships, contiguous teaching-only lesson spans, occurrence dates matching recurring lessons, cross-organisation consistency, requisition-state/content consistency, and room/teacher conflict detection.
 
 ## Verified development setup
 

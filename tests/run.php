@@ -85,7 +85,34 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue(['0001', '0002'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002']), 'Applied migrations were not idempotently selectable.');
+$domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
+if ($domainMigration === false) {
+    throw new RuntimeException('Domain migration could not be read.');
+}
+foreach (['organisations', 'users', 'timetable_versions', 'timetable_slots', 'recurring_lessons', 'lesson_occurrences', 'requisitions'] as $table) {
+    if (!str_contains($domainMigration, 'CREATE TABLE ' . $table . ' ')) {
+        throw new RuntimeException('Expected domain table is missing: ' . $table);
+    }
+}
+foreach ([
+    'UNIQUE KEY lesson_occurrences_organisation_lesson',
+    'CONSTRAINT timetable_versions_date_range_valid',
+    'CONSTRAINT timetable_slots_kind_valid',
+    'CONSTRAINT timetable_slots_period_kind_consistent',
+    'CONSTRAINT requisitions_state_valid',
+    'FOREIGN KEY (organisation_id) REFERENCES organisations (id)',
+] as $expectedSchemaFragment) {
+    if (!str_contains($domainMigration, $expectedSchemaFragment)) {
+        throw new RuntimeException('Expected schema constraint is missing: ' . $expectedSchemaFragment);
+    }
+}
+foreach (['roles', 'permissions', 'rooms', 'equipment', 'stock', 'timetable_exceptions'] as $forbiddenTable) {
+    if (preg_match('/CREATE TABLE [^;]*\b' . preg_quote($forbiddenTable, '/') . '\b/i', $domainMigration) === 1) {
+        throw new RuntimeException('Deferred table was introduced: ' . $forbiddenTable);
+    }
+}
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
     new MigrationFile('0002', 'earlier', 'earlier.sql', ''),

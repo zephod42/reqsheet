@@ -11,4 +11,4 @@ This is an intentionally small, reviewable starting roadmap.
 
 No roadmap item authorizes implementation of product features in this bootstrap task.
 
-The database foundation review and local MySQL development verification are complete. It provides environment-based PDO configuration, separate runtime and migration identities, and a versioned migration runner with only its metadata table migration. Application-domain tables are still intentionally absent; the next database step is to design and review them from the confirmed department workflow.
+The database foundation review and local MySQL development verification are complete. The initial application-domain schema is now defined in migrations for organisations, staff identities, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. Application services for validating timetable spans, generating occurrences, and editing requisitions remain future work.

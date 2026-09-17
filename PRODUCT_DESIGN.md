@@ -12,6 +12,10 @@ Reqsheet will help a science department prepare, review, and print lesson requis
 - Keep data ownership, validation, and permissions explicit.
 - Avoid product scope that is not required by the department's workflow.
 
+## Current database boundary
+
+The initial application-domain schema now covers organisations, staff identities, effective-dated timetable configuration, recurring lessons, dated lesson occurrences, and requisitions. It deliberately contains no authentication, roles, timetable editing, occurrence generation service, printing implementation, or application-domain catalogues.
+
 ## Not designed yet
 
-Authentication, roles, timetable integration, requisition fields, approval workflow, reporting, and database schema remain open design work. No assumptions about those features are implemented in the bootstrap.
+Authentication, roles, timetable editing, occurrence generation, approval workflow, reporting, and detailed requisition workflow remain open design work. No assumptions about those features are implemented in the bootstrap.
