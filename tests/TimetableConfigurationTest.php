@@ -140,6 +140,13 @@ final class ConfigurationStore implements TimetableConfigurationStore
     public array $lessons = [];
     /** @var array<int, int> */
     public array $organisations = [1 => 1, 2 => 1];
+    /** @var list<array{id:int,display_name:string,staff_identifier:?string,is_active:bool}> */
+    public array $users = [
+        ['id' => 10, 'display_name' => 'Teacher A', 'staff_identifier' => 'TA', 'is_active' => true],
+        ['id' => 11, 'display_name' => 'Teacher B', 'staff_identifier' => 'TB', 'is_active' => true],
+    ];
+    /** @var array<int, int> */
+    public array $occurrences = [];
     /** @var array<int, int> */
     public array $teachers = [10 => 1, 11 => 1, 20 => 2];
     private int $nextId = 1;
@@ -147,10 +154,16 @@ final class ConfigurationStore implements TimetableConfigurationStore
     public function organisationExists(int $organisationId): bool { return isset($this->organisations[$organisationId]); }
     public function findVersion(int $versionId): ?TimetableVersion { return $this->versions[$versionId] ?? null; }
     public function versionsForOrganisation(int $organisationId): array { return array_values(array_filter($this->versions, static fn (TimetableVersion $v): bool => $v->organisationId === $organisationId)); }
+    public function usersForOrganisation(int $organisationId): array { return $this->users; }
+    public function roomCodesForVersion(int $versionId): array { return array_values(array_unique(array_map(static fn (RecurringLesson $lesson): string => $lesson->roomCode, $this->lessonsForVersion($versionId)))); }
     public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $from, ?DateTimeImmutable $to): int { $id = $this->nextId++; $this->versions[$id] = new TimetableVersion($id, $organisationId, $label, $from, $to); return $id; }
     public function slotsForVersion(int $versionId): array { return array_values(array_filter($this->slots, static fn (TimetableSlot $s): bool => $s->timetableVersionId === $versionId)); }
     public function insertSlot(int $versionId, int $day, int $sequence, string $kind, ?int $period, string $label, string $start, string $end): int { $id = $this->nextId++; $this->slots[] = new TimetableSlot($id, $versionId, $day, $sequence, $kind, $period, $label, $start, $end); return $id; }
     public function findTeacherOrganisation(int $teacherUserId): ?int { return $this->teachers[$teacherUserId] ?? null; }
     public function lessonsForVersion(int $versionId): array { return array_values(array_filter($this->lessons, static fn (RecurringLesson $l): bool => $l->timetableVersionId === $versionId)); }
+    public function findLesson(int $lessonId): ?RecurringLesson { foreach ($this->lessons as $lesson) { if ($lesson->id === $lessonId) return $lesson; } return null; }
+    public function occurrenceCountForLesson(int $lessonId): int { return $this->occurrences[$lessonId] ?? 0; }
     public function insertLesson(int $versionId, int $teacher, int $day, int $slot, int $duration, string $class, string $room): int { $id = $this->nextId++; $this->lessons[] = new RecurringLesson($id, $versionId, $teacher, $day, $slot, $duration, $class, $room); return $id; }
+    public function updateLesson(int $lessonId, int $teacher, int $day, int $slot, int $duration, string $class, string $room): void { foreach ($this->lessons as $index => $lesson) { if ($lesson->id === $lessonId) { $this->lessons[$index] = new RecurringLesson($lessonId, $lesson->timetableVersionId, $teacher, $day, $slot, $duration, $class, $room); } } }
+    public function deleteLesson(int $lessonId): void { $this->lessons = array_values(array_filter($this->lessons, static fn (RecurringLesson $lesson): bool => $lesson->id !== $lessonId)); }
 }

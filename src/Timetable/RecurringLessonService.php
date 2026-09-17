@@ -53,4 +53,48 @@ final class RecurringLessonService
 
         return $this->store->insertLesson($versionId, $teacherUserId, $dayOfWeek, $startSlotId, $durationPeriods, $classCode, $roomCode);
     }
+
+    public function update(int $lessonId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, string $classCode, string $roomCode): void
+    {
+        $existing = $this->store->findLesson($lessonId);
+        if ($existing === null) {
+            throw new TimetableValidationException(['Recurring lesson does not exist.']);
+        }
+        if ($this->store->occurrenceCountForLesson($lessonId) > 0) {
+            throw new TimetableValidationException(['This lesson cannot be changed after historical occurrences have been generated.']);
+        }
+        $version = $this->store->findVersion($existing->timetableVersionId);
+        if ($version === null) {
+            throw new TimetableValidationException(['Timetable version does not exist.']);
+        }
+        $candidate = new RecurringLesson($lessonId, $existing->timetableVersionId, $teacherUserId, $dayOfWeek, $startSlotId, $durationPeriods, $classCode, $roomCode);
+        $lessons = array_values(array_filter(
+            [...$this->store->lessonsForVersion($version->id)],
+            static fn (RecurringLesson $lesson): bool => $lesson->id !== $lessonId,
+        ));
+        $result = TimetableRules::validateLessons(
+            [...$lessons, $candidate],
+            $version,
+            $version->organisationId,
+            $this->store->slotsForVersion($version->id),
+            $this->store->findTeacherOrganisation(...),
+        );
+        $errors = array_values(array_unique($result['errors']));
+        if ($errors !== []) {
+            sort($errors);
+            throw new TimetableValidationException($errors);
+        }
+        $this->store->updateLesson($lessonId, $teacherUserId, $dayOfWeek, $startSlotId, $durationPeriods, $classCode, $roomCode);
+    }
+
+    public function remove(int $lessonId): void
+    {
+        if ($this->store->findLesson($lessonId) === null) {
+            throw new TimetableValidationException(['Recurring lesson does not exist.']);
+        }
+        if ($this->store->occurrenceCountForLesson($lessonId) > 0) {
+            throw new TimetableValidationException(['This lesson cannot be removed after historical occurrences have been generated.']);
+        }
+        $this->store->deleteLesson($lessonId);
+    }
 }

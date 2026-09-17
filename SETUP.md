@@ -112,3 +112,5 @@ php -S 127.0.0.1:8080 -t public
 Stop the development server with `Ctrl-C`. Production deployment and Apache configuration are intentionally outside this bootstrap.
 
 The public HTTPS routing has been verified by an administrator: `GET /` and `GET /health` succeed, `POST /health` returns 405, and unknown or repository-looking paths return 404. Apache continues to use `FallbackResource /index.php`; the application allowlist prevents that fallback from exposing non-public repository paths.
+
+The skeletal admin timetable editor is available only when the protected environment provides `REQSHEET_ADMIN_KEY` and `REQSHEET_ADMIN_ORGANISATION_ID`. It uses temporary HTTP Basic protection with username `admin` and the externally supplied key as the password; this is a development safeguard, not the application authentication system. It supports staff, room, and day inspection plus validated recurring-lesson creation/editing/removal. Lessons with historical occurrences are immutable.

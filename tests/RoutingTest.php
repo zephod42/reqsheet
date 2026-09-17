@@ -13,6 +13,7 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::ROOT, ApplicationRoute::match('GET', '/'), 'GET / was not routed to the root.');
         assertSameValue(ApplicationRoute::HEALTH, ApplicationRoute::match('GET', '/health'), 'GET /health was not routed to health.');
         assertSameValue(ApplicationRoute::HEALTH, ApplicationRoute::match('POST', '/health'), 'POST /health lost its method handling.');
+        assertSameValue(ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::match('GET', '/admin/timetable'), 'Admin timetable route was not recognised.');
 
         foreach ([
             '/unknown',

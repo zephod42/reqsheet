@@ -49,6 +49,33 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
         return array_map(self::version(...), $statement->fetchAll());
     }
 
+    public function usersForOrganisation(int $organisationId): array
+    {
+        $statement = $this->prepare(
+            'SELECT id, display_name, staff_identifier, is_active
+             FROM users WHERE organisation_id = :organisation_id
+             ORDER BY display_name, id',
+        );
+        $statement->execute(['organisation_id' => $organisationId]);
+        return array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'display_name' => (string) $row['display_name'],
+            'staff_identifier' => $row['staff_identifier'] === null ? null : (string) $row['staff_identifier'],
+            'is_active' => (bool) $row['is_active'],
+        ], $statement->fetchAll());
+    }
+
+    public function roomCodesForVersion(int $versionId): array
+    {
+        $statement = $this->prepare(
+            "SELECT DISTINCT room_code FROM recurring_lessons
+             WHERE timetable_version_id = :version_id AND TRIM(room_code) <> ''
+             ORDER BY room_code",
+        );
+        $statement->execute(['version_id' => $versionId]);
+        return array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $effectiveFrom, ?DateTimeImmutable $effectiveTo): int
     {
         $statement = $this->prepare(
@@ -123,6 +150,25 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
         );
     }
 
+    public function findLesson(int $lessonId): ?RecurringLesson
+    {
+        $statement = $this->prepare(
+            'SELECT id, timetable_version_id, teacher_user_id, day_of_week, start_slot_id,
+                    duration_periods, class_code, room_code
+             FROM recurring_lessons WHERE id = :id',
+        );
+        $statement->execute(['id' => $lessonId]);
+        $row = $statement->fetch();
+        return $row === false ? null : self::lesson($row);
+    }
+
+    public function occurrenceCountForLesson(int $lessonId): int
+    {
+        $statement = $this->prepare('SELECT COUNT(*) FROM lesson_occurrences WHERE recurring_lesson_id = :id');
+        $statement->execute(['id' => $lessonId]);
+        return (int) $statement->fetchColumn();
+    }
+
     public function insertLesson(int $versionId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, string $classCode, string $roomCode): int
     {
         $statement = $this->prepare(
@@ -140,6 +186,27 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
             'room_code' => $roomCode,
         ]);
         return (int) $this->pdo->lastInsertId();
+    }
+
+    public function updateLesson(int $lessonId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, string $classCode, string $roomCode): void
+    {
+        $statement = $this->prepare(
+            'UPDATE recurring_lessons
+             SET teacher_user_id = :teacher, day_of_week = :day, start_slot_id = :start_slot,
+                 duration_periods = :duration, class_code = :class_code, room_code = :room_code
+             WHERE id = :id',
+        );
+        $statement->execute([
+            'id' => $lessonId, 'teacher' => $teacherUserId, 'day' => $dayOfWeek,
+            'start_slot' => $startSlotId, 'duration' => $durationPeriods,
+            'class_code' => $classCode, 'room_code' => $roomCode,
+        ]);
+    }
+
+    public function deleteLesson(int $lessonId): void
+    {
+        $statement = $this->prepare('DELETE FROM recurring_lessons WHERE id = :id');
+        $statement->execute(['id' => $lessonId]);
     }
 
     /** @param array<string, mixed> $row */
@@ -161,6 +228,16 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
             (int) $row['sequence_number'], (string) $row['kind'],
             $row['teaching_period_number'] === null ? null : (int) $row['teaching_period_number'],
             (string) $row['label'], substr((string) $row['starts_at'], 0, 8), substr((string) $row['ends_at'], 0, 8),
+        );
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function lesson(array $row): RecurringLesson
+    {
+        return new RecurringLesson(
+            (int) $row['id'], (int) $row['timetable_version_id'], (int) $row['teacher_user_id'],
+            (int) $row['day_of_week'], (int) $row['start_slot_id'], (int) $row['duration_periods'],
+            (string) $row['class_code'], (string) $row['room_code'],
         );
     }
 

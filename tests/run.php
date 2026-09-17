@@ -5,6 +5,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 require __DIR__ . '/ExternalEnvironmentTest.php';
 require __DIR__ . '/RoutingTest.php';
+require __DIR__ . '/AdminTimetablePageTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 
@@ -145,5 +146,6 @@ assertSameValue('ok', HealthCheck::status(), 'Existing application health status
 \Reqsheet\Tests\TimetableConfigurationTest::run();
 \Reqsheet\Tests\ExternalEnvironmentTest::run();
 \Reqsheet\Tests\RoutingTest::run();
+\Reqsheet\Tests\AdminTimetablePageTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

@@ -15,6 +15,12 @@ interface TimetableConfigurationStore
     /** @return list<TimetableVersion> */
     public function versionsForOrganisation(int $organisationId): array;
 
+    /** @return list<array{id: int, display_name: string, staff_identifier: ?string, is_active: bool}> */
+    public function usersForOrganisation(int $organisationId): array;
+
+    /** @return list<string> */
+    public function roomCodesForVersion(int $versionId): array;
+
     public function insertVersion(
         int $organisationId,
         ?string $label,
@@ -41,6 +47,10 @@ interface TimetableConfigurationStore
     /** @return list<RecurringLesson> */
     public function lessonsForVersion(int $versionId): array;
 
+    public function findLesson(int $lessonId): ?RecurringLesson;
+
+    public function occurrenceCountForLesson(int $lessonId): int;
+
     public function insertLesson(
         int $versionId,
         int $teacherUserId,
@@ -50,4 +60,16 @@ interface TimetableConfigurationStore
         string $classCode,
         string $roomCode,
     ): int;
+
+    public function updateLesson(
+        int $lessonId,
+        int $teacherUserId,
+        int $dayOfWeek,
+        int $startSlotId,
+        int $durationPeriods,
+        string $classCode,
+        string $roomCode,
+    ): void;
+
+    public function deleteLesson(int $lessonId): void;
 }

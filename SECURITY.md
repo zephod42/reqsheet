@@ -1,6 +1,6 @@
 # Security
 
-Security is a design requirement from the beginning. The initial application-domain schema has staff identity records but no authentication, sessions, roles, or application behaviour. It has a lazy PDO connection, a generic database health response, and a migration CLI.
+Security is a design requirement from the beginning. The initial application-domain schema has staff identity records but no authentication, sessions, or application roles. It has a lazy PDO connection, a generic database health response, a migration CLI, and a narrowly protected skeletal admin timetable editor.
 
 Future implementation must at minimum address:
 
@@ -25,8 +25,10 @@ The local development environment has been verified with separate `reqsheet_runt
 
 An administrator has verified that Apache/PHP-FPM receives only the external configuration-file path and that the protected runtime configuration produces a healthy `/health` response. No secret values are stored in or exposed by the application.
 
-The schema does not include authentication or authorisation data. Cross-organisation relationships and timetable span rules require service-level validation in addition to the database foreign keys and checks. The timetable configuration services are the create-only validated write path: they enforce effective-date non-overlap, slot kind/time/order rules, organisation ownership, contiguous lesson spans, and teacher/room conflicts. The occurrence-generation service validates all requested lessons before its transactional DML phase and does not rewrite existing historical occurrences. No timetable update service exists until immutability rules for materialised history are designed.
+The schema does not include authentication or authorisation data. Cross-organisation relationships and timetable span rules require service-level validation in addition to the database foreign keys and checks. The timetable configuration services are the validated write path: they enforce effective-date non-overlap, slot kind/time/order rules, organisation ownership, contiguous lesson spans, and teacher/room conflicts. The current editor permits recurring-lesson edits/removals only before materialised history exists. The occurrence-generation service validates all requested lessons before its transactional DML phase and does not rewrite existing historical occurrences.
 
 The optional MySQL integration harness is deliberately destructive within its test database: it accepts only the exact database name `reqsheet_test`, requires explicit `REQSHEET_TEST_DB_*` variables and `REQSHEET_RUN_INTEGRATION=1`, rejects the runtime/migration identities, refuses unexpected tables, uses synthetic fixtures only, and cleans the known schema tables afterward. It must never receive development or production credentials.
 
-The public HTTPS route allowlist has been verified by an administrator. Only the root and health routes are handled; unknown and repository-looking paths return generic 404 responses, while Apache `FallbackResource /index.php` remains enabled.
+The public HTTPS route allowlist has been verified by an administrator. Unauthenticated public traffic is limited to the root and health routes; unknown and repository-looking paths return generic 404 responses, while Apache `FallbackResource /index.php` remains enabled. The admin timetable route is separately gated and is not part of the public route surface.
+
+The admin timetable editor is not public by default: it requires an externally supplied organisation ID and temporary admin key, and rejects requests without HTTP Basic credentials matching that key. This narrow safeguard is not a replacement for the deferred authentication/authorization system. Timetable mutations continue through the validated services; recurring lessons may be edited or removed only before materialised occurrences exist, and historical occurrences remain immutable.
