@@ -14,6 +14,9 @@ use Reqsheet\Timetable\TimetableSlotService;
 use Reqsheet\Timetable\TimetableOccurrenceGenerator;
 use Reqsheet\Timetable\TimetableVersionService;
 use Reqsheet\Timetable\TimetableValidationException;
+use Reqsheet\Http\TeacherWeekPage;
+use Reqsheet\Teacher\PdoTeacherPlanningStore;
+use Reqsheet\Teacher\TeacherPlanningService;
 
 const TEST_TABLES = [
     'requisitions',
@@ -114,13 +117,32 @@ try {
 
         $organisationId = $insert('INSERT INTO organisations (name) VALUES (:name)', ['name' => 'Reqsheet Integration School']);
         $teacherA = $insert(
-            'INSERT INTO users (organisation_id, display_name, staff_identifier) VALUES (:organisation_id, :display_name, :staff_identifier)',
-            ['organisation_id' => $organisationId, 'display_name' => 'Integration Teacher A', 'staff_identifier' => 'INT-A'],
+            'INSERT INTO users
+                (organisation_id, display_name, staff_identifier, operational_role, is_admin, password_hash, account_state)
+             VALUES (:organisation_id, :display_name, :staff_identifier, :operational_role, :is_admin, :password_hash, :account_state)',
+            [
+                'organisation_id' => $organisationId,
+                'display_name' => 'Integration Teacher A',
+                'staff_identifier' => 'INT-A',
+                'operational_role' => 'teacher',
+                'is_admin' => 1,
+                'password_hash' => password_hash('integration-password', PASSWORD_DEFAULT),
+                'account_state' => 'claimed',
+            ],
         );
         $teacherB = $insert(
             'INSERT INTO users (organisation_id, display_name, staff_identifier) VALUES (:organisation_id, :display_name, :staff_identifier)',
             ['organisation_id' => $organisationId, 'display_name' => 'Integration Teacher B', 'staff_identifier' => 'INT-B'],
         );
+        $emptyTeacherPage = new TeacherWeekPage(
+            new TeacherPlanningService(new PdoTeacherPlanningStore($pdo)),
+            $organisationId,
+            $teacherA,
+            new DateTimeImmutable('2026-09-09'),
+        );
+        $emptyTeacherView = $emptyTeacherPage->handle('GET', [], []);
+        integrationAssert(str_contains($emptyTeacherView, '<title>Teacher week · Reqsheet</title>'), 'Teacher page did not render before timetable setup.');
+        integrationAssert(!str_contains($emptyTeacherView, 'Service unavailable'), 'Teacher page returned an unavailable state before timetable setup.');
         $configurationStore = new PdoTimetableConfigurationStore($pdo);
         $versionId = (new TimetableVersionService($configurationStore))->create(
             $organisationId,

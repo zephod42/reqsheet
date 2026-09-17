@@ -29,11 +29,14 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
             'SELECT id, organisation_id, label, effective_from, effective_to
              FROM timetable_versions
              WHERE organisation_id = :organisation_id
-               AND effective_from <= :date
-               AND (effective_to IS NULL OR :date < effective_to)
+               AND effective_from <= :effective_date
+               AND (effective_to IS NULL OR :effective_date < effective_to)
              ORDER BY effective_from DESC, id DESC LIMIT 1',
         );
-        $statement->execute(['organisation_id' => $organisationId, 'date' => $date->format('Y-m-d')]);
+        $statement->execute([
+            'organisation_id' => $organisationId,
+            'effective_date' => $date->format('Y-m-d'),
+        ]);
         $row = $statement->fetch();
         if ($row === false) return null;
         return new TimetableVersion(
