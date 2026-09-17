@@ -6,15 +6,15 @@ Completed foundations:
 
 - Admin configuration foundation: people, rooms, working days, week start, and ordered timetable structure.
 - Timetable-version/admin editor UI: effective-dated versions, staff-member default view, and validated timetable editing by staff member, room, or day. Completed in `d2722f08c6cdc6af4bcd773a4b7ff30cbe5fed8a` (`Add timetable editor`). The current editor is intentionally skeletal and uses a temporary admin safeguard.
+- Documentation/code reconciliation: canonical product behaviour and the committed timetable editor have been checked for consistency in this pass.
 
 Upcoming implementation sequence:
 
-1. Documentation/code reconciliation: keep the canonical product design and committed implementation aligned.
-2. Teacher week-view skeleton and lesson editor: current week, previous/next/This week navigation, Select week navigation, clickable class codes, compact lesson tiles, and the Lesson outline/Requisitions/Risk assessment editor. **Next implementation milestone.**
-3. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
-4. Technician print/PDF workflow: future-week selection, one A4 page per day, selected-room layouts, and practical page fitting.
-5. Canonical timetable CSV import/export: Reqsheet template export, deterministic validation/preview, and confirmed import.
-6. Authentication/authorization and security hardening at the appropriate point.
-7. Pilot-driven UI iteration and polish: improve wording, layout, and workflow from real use while preserving the simple server-rendered architecture.
+1. Teacher week-view skeleton and lesson editor: current week, previous/next/This week navigation, Select week navigation, clickable class codes, compact lesson tiles, and the Lesson outline/Requisitions/Risk assessment editor. **Next implementation milestone.**
+2. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
+3. Technician print/PDF workflow: future-week selection, one A4 page per day, selected-room layouts, and practical page fitting.
+4. Canonical timetable CSV import/export: Reqsheet template export, deterministic validation/preview, and confirmed import.
+5. Authentication/authorization and security hardening at the appropriate point.
+6. Pilot-driven UI iteration and polish: improve wording, layout, and workflow from real use while preserving the simple server-rendered architecture.
 
 The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services provide the validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Product behaviour and the remaining UI/admin scope are canonical in `PRODUCT_DESIGN.md`; authentication/authorization and exception handling remain future work.
