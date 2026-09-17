@@ -19,6 +19,8 @@ Never commit credentials, `.env` files, logs, runtime data, or production config
 
 The web runtime can load configuration only when `REQSHEET_ENV_FILE` explicitly names one absolute file outside the repository. The parser accepts literal `KEY=value` entries only, preserves already-defined process variables, and supports no shell execution or interpolation. Missing or malformed configured files fail as generic unhealthy application state; contents and credentials are not exposed.
 
+The pilot onboarding design temporarily permits a new Teacher or Technician account to exist in an explicit `awaiting-first-login` state without a password. At first login the user sets the password. This is a consciously accepted pilot weakness, not a production-ready authentication design; it requires a security review and a safer activation/reset flow before broader deployment. The state must never be represented by ambiguous blank-password handling.
+
 The local development environment has been verified with separate `reqsheet_runtime` and `reqsheet_migrator` identities scoped to `reqsheet_dev`. The runtime identity has ordinary DML privileges only; the migration identity is reserved for schema changes. Protected environment files are maintained outside the repository under `/etc/reqsheet` and are not readable or writable by the application agent.
 
 An administrator has verified that Apache/PHP-FPM receives only the external configuration-file path and that the protected runtime configuration produces a healthy `/health` response. No secret values are stored in or exposed by the application.

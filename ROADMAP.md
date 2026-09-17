@@ -1,14 +1,13 @@
 # Roadmap
 
-This is an intentionally small, reviewable starting roadmap.
+This is an intentionally small, reviewable roadmap. The next implementation milestone is a deliberately skeletal UI/admin foundation for real pilot iteration, not final visual polish.
 
-1. Confirm the department workflow, requisition fields, and printable output.
-2. Define authentication, roles, ownership, and audit requirements.
-3. Review the database foundation, then design the minimal application schema and migrations.
-4. Build the server-rendered requisition workflow with validation.
-5. Add browser-printable views and focused automated tests.
-6. Document deployment and operational procedures after the application is stable.
+1. Admin configuration foundation: people, rooms, working days, week start, and ordered timetable structure.
+2. Timetable-version/admin editor UI: effective-dated versions, clone/copy, staff-member default view, and validated timetable editing by staff member, room, or day.
+3. Teacher week-view skeleton and lesson editor: current week, navigation, lesson tiles, and the Lesson outline/Requisitions/Risk assessment editor.
+4. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
+5. Print/PDF workflow: future-week selection, one A4 page per day, selected-room layouts, and practical page fitting.
+6. Canonical CSV import/export: Reqsheet template export, deterministic validation/preview, and confirmed import.
+7. Pilot-driven UI iteration: improve wording, layout, and workflow from real use while preserving the simple server-rendered architecture.
 
-No roadmap item authorizes implementation of product features in this bootstrap task.
-
-The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services now provide a create-only validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Teacher entry, timetable editing UI, exception handling, and requisition editing remain future work.
+The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services provide a create-only validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Product behaviour and the UI/admin scope for the next stages are canonical in `PRODUCT_DESIGN.md`; authentication/authorization and exception handling remain future work.

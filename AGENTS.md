@@ -47,6 +47,14 @@ Avoid unnecessary:
 
 Do not invent product requirements merely because they simplify implementation.
 
+When implementing the agreed UI/admin work:
+- keep the first UI deliberately skeletal and easy to change for pilot iteration;
+- prefer server-rendered HTML and minimal JavaScript;
+- preserve effective-dated timetable-version semantics and historical occurrence snapshots;
+- keep timetable CSV parsing deterministic and limited to the canonical Reqsheet CSV format;
+- do not invent MIS-specific importers, arbitrary-file inference, heuristic stripping, regex guessing, or an AI API for timetable import;
+- treat any external AI-assisted CSV conversion as outside the application.
+
 ## Quality
 
 Before considering a task complete:
