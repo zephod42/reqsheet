@@ -23,7 +23,7 @@ final class AdminTimetablePageTest
         $store = new ConfigurationStore();
         $store->versions[1] = new TimetableVersion(1, 1, 'Pilot timetable', new DateTimeImmutable('2026-09-01'), null);
         $store->slots = [
-            new TimetableSlot(101, 1, 1, 1, 'teaching', 1, 'P1', '09:00:00', '10:00:00'),
+            new TimetableSlot(101, 1, 1, 1, 'teaching', 1, 'Period One', '09:00:00', '10:00:00'),
             new TimetableSlot(102, 1, 1, 2, 'break', null, 'Break', '10:00:00', '10:15:00'),
             new TimetableSlot(103, 1, 1, 3, 'teaching', 2, 'P2', '10:15:00', '11:15:00'),
             new TimetableSlot(201, 1, 2, 1, 'teaching', 1, 'P1', '09:00:00', '10:00:00'),
@@ -33,6 +33,7 @@ final class AdminTimetablePageTest
         assertContains('Pilot timetable', $staff, 'Version context was not rendered.');
         assertContains('Staff member timetable', $staff, 'Staff view was not rendered.');
         assertContains('Break', $staff, 'Configured separator was not rendered.');
+        assertContains('Period One', $staff, 'Configured teaching-period label was not rendered.');
         assertContains('Empty teaching cell', $staff, 'Available teaching cell was not rendered.');
 
         $created = $page->handle('POST', [], ['action' => 'create_lesson', 'version' => 1, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 1, 'class_code' => '13PHY', 'room_code' => 'P1']);

@@ -54,6 +54,7 @@ When implementing the agreed UI/admin work:
 - keep timetable CSV parsing deterministic and limited to the canonical Reqsheet CSV format;
 - do not invent MIS-specific importers, arbitrary-file inference, heuristic stripping, regex guessing, or an AI API for timetable import;
 - treat any external AI-assisted CSV conversion as outside the application.
+- preserve the agreed primary landing views: Teacher is week-oriented and Technician is day-oriented; Admin is an additional capability, not an operational role.
 
 ## Quality
 

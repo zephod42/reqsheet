@@ -14,7 +14,7 @@ Reqsheet will help a science department prepare, review, and print lesson requis
 
 ## Current database boundary
 
-The initial application-domain schema now covers organisations, staff identities, effective-dated timetable configuration, recurring lessons, dated lesson occurrences, and requisitions. Application services now provide the validated create path for timetable versions, slots, and recurring lessons; a bounded, explicit-date occurrence-generation service validates timetable spans and conflicts before inserting historical occurrences. These services deliberately provide no UI or update workflow. The project still contains no authentication/authorization implementation, teacher UI, technician UI, printing implementation, or application-domain catalogues.
+The initial application-domain schema now covers organisations, staff identities, effective-dated timetable configuration, recurring lessons, dated lesson occurrences, and requisitions. Application services provide the validated path for timetable versions, slots, and recurring lessons; a bounded, explicit-date occurrence-generation service validates timetable spans and conflicts before inserting historical occurrences. A skeletal, temporarily protected admin timetable editor now uses those services for version creation and recurring-lesson creation/editing/removal before historical occurrences exist. The project still contains no authentication/authorization implementation, teacher UI, technician UI, printing implementation, or application-domain catalogues.
 
 ## Operational roles and landing pages
 
@@ -118,4 +118,4 @@ The existing database and service rules remain authoritative: ISO weekdays, vali
 
 ## Not designed yet
 
-Authentication, authorization, timetable editing implementation, approval workflow, reporting, and detailed requisition workflow remain open design work. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, updates, and scheduled generation remain deferred.
+Authentication, authorization, timetable cloning, approval workflow, reporting, and detailed requisition workflow remain open design work. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.

@@ -172,7 +172,7 @@ final class AdminTimetablePage
         $html = '<section class="grid-view"><h2>' . ($mode === 'staff' ? 'Staff member timetable' : 'Room timetable') . '</h2>';
         $html .= '<table><tr><th>Day</th>';
         foreach ($columns as $slot) {
-            $html .= '<th' . ($slot->isTeaching() ? '' : ' class="separator"') . '>' . $this->e($slot->isTeaching() ? ($slot->label ?: 'P' . $slot->teachingPeriodNumber) : ($slot->label ?: ucfirst($slot->kind))) . '</th>';
+            $html .= '<th' . ($slot->isTeaching() ? '' : ' class="separator"') . '>' . $this->e($slot->isTeaching() ? $this->periodLabel($slot) : ($slot->label ?: ucfirst($slot->kind))) . '</th>';
         }
         $html .= '</tr>';
         foreach ($byDay as $day => $daySlots) {
@@ -210,7 +210,7 @@ final class AdminTimetablePage
             $items = array_filter($lessons, static fn (RecurringLesson $lesson): bool => $lesson->dayOfWeek === $day && $lesson->startSlotId === $slot->id);
             $cells = [];
             foreach ($items as $lesson) $cells[] = '<a href="?version=' . $version->id . '&mode=day&day=' . $day . '&edit=' . $lesson->id . '">' . $this->e($lesson->classCode) . ' · ' . $this->e($lesson->roomCode) . '</a>';
-            $html .= '<tr><th>P' . $slot->teachingPeriodNumber . '</th><td>' . implode('<br>', $cells) . '</td></tr>';
+            $html .= '<tr><th>' . $this->e($this->periodLabel($slot)) . '</th><td>' . implode('<br>', $cells) . '</td></tr>';
         }
         return $html . '</table></section>';
     }
@@ -236,7 +236,7 @@ final class AdminTimetablePage
     private function slotSelect(array $slots, int $selected): string
     {
         $options = [];
-        foreach ($slots as $slot) $options[$slot->id] = $this->dayName($slot->dayOfWeek) . ' P' . $slot->teachingPeriodNumber;
+        foreach ($slots as $slot) $options[$slot->id] = $this->dayName($slot->dayOfWeek) . ' ' . $this->periodLabel($slot);
         return $this->select('start_slot_id', (string) $selected, $options);
     }
 
@@ -246,6 +246,7 @@ final class AdminTimetablePage
     }
 
     private function dayName(int $day): string { return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][$day - 1] ?? 'Day ' . $day; }
+    private function periodLabel(TimetableSlot $slot): string { return $slot->label !== '' ? $slot->label : 'P' . $slot->teachingPeriodNumber; }
     private function nullable(mixed $value): ?string { $value = is_string($value) ? trim($value) : ''; return $value === '' ? null : $value; }
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
     private function css(): string { return 'body{font:16px system-ui,sans-serif;margin:0;background:#f5f5f5;color:#222}main{max-width:1100px;margin:2rem auto;background:white;padding:2rem}label{display:inline-flex;flex-direction:column;gap:.25rem;margin:.4rem}select,input,button{font:inherit;padding:.4rem}button{cursor:pointer}.toolbar{padding:1rem;background:#eee}.context{background:#eef5ff;padding:.8rem}.message{background:#fff3cd;padding:.8rem}.grid-view{overflow-x:auto}table{border-collapse:collapse;width:100%;margin-bottom:1.5rem}th,td{border:1px solid #bbb;padding:.6rem;text-align:left;vertical-align:top}.separator{background:#ddd;color:#555}.editor{border:1px solid #bbb;padding:1rem;margin-top:1rem}.danger{background:#fee}.editor form+form{margin-top:.7rem}a{color:#0645ad}'; }
