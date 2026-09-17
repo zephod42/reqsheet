@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/ExternalEnvironmentTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 
@@ -141,5 +142,6 @@ assertThrows(
 assertSameValue('ok', HealthCheck::status(), 'Existing application health status changed.');
 \Reqsheet\Tests\TimetableGenerationTest::run();
 \Reqsheet\Tests\TimetableConfigurationTest::run();
+\Reqsheet\Tests\ExternalEnvironmentTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

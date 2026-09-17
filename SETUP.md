@@ -34,6 +34,14 @@ Runtime configuration uses `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_P
 php bin/migrate.php
 ```
 
+For the web runtime, the administrator may set `REQSHEET_ENV_FILE` to one explicit absolute path outside the repository. The application parses only literal `KEY=value` lines, ignores blank lines and comments, does not execute shell syntax or interpolation, and does not overwrite variables already supplied to the process. If the variable is absent, the existing process-environment behaviour is unchanged. For the protected local runtime configuration, the Apache vhost should set only the path:
+
+```apache
+SetEnv REQSHEET_ENV_FILE /etc/reqsheet/reqsheet-runtime.env
+```
+
+The application does not search for `.env` files and does not load repository environment files. A configured file that is missing, malformed, relative, or inside the repository causes database-backed requests to fail safely with the existing generic unhealthy response; file contents are never returned.
+
 The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. The domain migration creates organisations, users, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. It does not seed data or generate occurrences.
 
 MySQL DDL can implicitly commit and is not fully transactional. A failed migration is not recorded as applied, but a migration that fails after some DDL may leave partial schema changes. Review and repair the database before rerunning such a migration; migrations should be small, forward-only, and safe to retry where practical.
@@ -88,6 +96,8 @@ The local development setup has been provisioned and exercised by an administrat
 - repeat migration: `Applied 0 migrations.`;
 - `GET /health`: HTTP 200 with `{"status":"ok"}`;
 - `POST /health`: HTTP 405.
+- Apache/PHP-FPM runtime loading: verified through the Reqsheet vhost with the protected external configuration path;
+- vhost smoke checks: `/health` returns HTTP 200 with `{"status":"ok"}`, `/` returns HTTP 200 with `Reqsheet ok`, and `POST /health` returns HTTP 405.
 
 The protected environment files are administrator-managed and are intentionally unreadable by the application agent. Their secret values are not stored in this repository. Production must use separately named database identities, database names, and credentials.
 

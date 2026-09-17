@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
+use Reqsheet\Database\ExternalEnvironment;
 use Reqsheet\HealthCheck;
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -22,9 +23,8 @@ if ($path === '/health') {
 
     try {
         $environment = getenv();
-        $config = DatabaseConfig::fromEnvironment(
-            is_array($environment) ? $environment : [],
-        );
+        $environment = is_array($environment) ? $environment : [];
+        $config = DatabaseConfig::fromEnvironment(ExternalEnvironment::load($environment));
         $healthy = HealthCheck::databaseIsHealthy(new Database($config));
     } catch (\Throwable) {
         $healthy = false;
