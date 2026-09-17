@@ -31,13 +31,31 @@ Authentication and authorization are implementation work; this section describes
 
 The teacher view is week-oriented. Working days run down the left and teaching periods run across the top. Monday is the default first day of the week, with the configured working-day set controlling which days are shown.
 
-The heading is “Week beginning <Monday date>”, with previous/next navigation and a “This week” control. When viewing the current week, the current day is gently highlighted.
+The heading is “Week beginning <Monday date>”, with previous/next navigation, a “This week” control, and a “Select week” calendar/date-picker popout for jumping directly to a week. These quick navigation controls complement one another. When viewing the current week, the current day is gently highlighted.
 
 Break and lunch appear as narrow grey separator columns in the grid rather than lesson-bearing timetable cells. This is a display decision: the underlying timetable configuration may still contain non-teaching interval records so existing span validation remains authoritative.
 
 Each lesson tile has a header bar with the class code on the left and room on the right. The body displays only the free-text Requisitions content. Tiles have a fixed size; overflowing content is truncated with an ellipsis, with the full text available on click and optionally on hover.
 
 Clicking a lesson opens an editor containing Lesson outline, Requisitions, and Risk assessment. Only Requisitions is shown in normal timetable views; the other fields are available in the editor.
+
+## Teacher day view
+
+Teachers can open a dedicated day view by clicking a day/date heading in the week view or using a prominent “Today’s lessons” control. The selected day/date is shown at the top, with previous/next day navigation and a “Select day” calendar/date-picker popout for jumping directly to a date.
+
+The day view is a vertically ordered working screen. Teaching periods run down the left. Break, lunch, and other configured non-teaching intervals appear at their chronological positions as clear separator rows rather than lesson rows. Normal teacher use shows a configured period label such as P1, P2, or P3, not start/end times.
+
+Each day lesson shows Period, Room, Class code, Lesson outline, Requisitions, and Risk assessment. Lesson outline, Requisitions, and Risk assessment are directly editable from this view without opening a separate detail page. The week view remains compact and overview-oriented; this day view is the more detailed planning screen.
+
+## Teacher class planning view
+
+Class codes in teacher week and day views are clickable navigation links. Clicking one opens a chronological view of that class’s dated lesson occurrences with columns for Date, Day / Period (for example, “Mon P4”), Lesson outline, Requisitions, and Risk assessment. These three planning fields are directly editable from the class view.
+
+When opened from a particular lesson occurrence, the class view positions that occurrence approximately in the middle of the viewport. The teacher can scroll upward to earlier lessons and downward to later or future lessons, gaining historical and forward planning context without restarting at the beginning of the class history.
+
+The class view is based on dated lesson occurrences and history, not only the current recurring timetable. Week, day, and class views are complementary views of the same occurrence/requisition records, so edits are reflected across all three and historical lessons remain meaningful after timetable changes.
+
+Conceptually: week view answers “What am I teaching this week?”, day view answers “What am I teaching/preparing today?”, and class view answers “Where am I with this class, what did we do previously, and what comes next?”.
 
 ## Technician day and inspection views
 
@@ -59,7 +77,7 @@ Admin configuration should remain straightforward and editable:
 
 - Configure working days, defaulting to Monday-Friday (five days).
 - Configure the first day of the work week, defaulting to Monday.
-- Configure an ordered day structure containing teaching periods and named non-teaching separators. Prefer an ordered editor that can add, move, and rename periods and breaks.
+- Configure an ordered day structure containing teaching periods and named non-teaching separators. Prefer an ordered editor that can add, move, and rename periods and breaks. Each teaching period has a configurable label/name, order, start time, and end time; separators have configurable names, timing, and order.
 - Manage rooms/labs by adding, renaming, reordering, and deactivating/archiving them.
 - Manage people by creating a Teacher or Technician. The person’s name is used as the login name; an optional abbreviation such as JSM may be recorded; Admin is an optional additional permission.
 
@@ -69,7 +87,7 @@ The first pilot may create an account with no password until its first login, wh
 
 Timetables are effective-dated versions. Each version has a label/name and effective start date; a later version supersedes an earlier version from its start date. The design supports mid-year revisions and future academic-year timetables being entered and edited in advance. Historical versions are preserved, and dated occurrences retain their historical snapshots.
 
-An admin can copy/clone an existing timetable as the basis of a new version. “Edit timetable” opens a clickable timetable maker. Viewing and editing can be organised by staff member, room, or day, with staff-member view as the default. Lesson entry remains simple: class code, room, and period/span. The existing service-level timetable validation rules remain authoritative for all entry paths.
+An admin can copy/clone an existing timetable as the basis of a new version. “Edit timetable” opens a clickable timetable maker. Viewing and editing can be organised by staff member, room, or day, with staff-member view as the default. Lesson entry remains simple: class code, room, and period/span. The configured structure drives teacher week/day layouts, separator positioning, occurrence generation, chronological ordering, determination of true period adjacency, and double/multi-period merge eligibility. Start/end times are stored even when normal teacher day labels show only the period name. The existing service-level timetable validation rules remain authoritative for all entry paths: a multi-period lesson may cross only contiguous teaching periods and may not cross any configured break, lunch, or other non-teaching interval; periods separated by such an interval are separate lesson blocks.
 
 ## Canonical timetable CSV import/export
 
