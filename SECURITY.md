@@ -1,6 +1,6 @@
 # Security
 
-Security is a design requirement from the beginning. The initial application-domain schema has staff identity records but no authentication, sessions, or application roles. It has a lazy PDO connection, a generic database health response, a migration CLI, and a narrowly protected skeletal admin timetable editor.
+Security is a design requirement from the beginning. The initial application-domain schema has staff identity records and pilot operational-role/admin fields, but no final authentication or authorization system. It has a lazy PDO connection, a generic database health response, a migration CLI, and a narrowly protected skeletal admin timetable editor.
 
 Future implementation must at minimum address:
 
@@ -31,6 +31,10 @@ The optional MySQL integration harness is deliberately destructive within its te
 
 The public HTTPS route allowlist has been verified by an administrator. Unauthenticated public traffic is limited to the root and health routes; unknown and repository-looking paths return generic 404 responses, while Apache `FallbackResource /index.php` remains enabled. The admin timetable route is separately gated and is not part of the public route surface.
 
-The admin timetable editor is not public by default: it requires an externally supplied organisation ID and temporary admin key, and rejects requests without HTTP Basic credentials matching that key. This narrow safeguard is not a replacement for the deferred authentication/authorization system. Timetable mutations continue through the validated services; recurring lessons may be edited or removed only before materialised occurrences exist, and historical occurrences remain immutable.
+The admin timetable editor is now protected by an authenticated session with the Admin permission. Timetable mutations continue through the validated services; recurring lessons may be edited or removed only before materialised occurrences exist, and historical occurrences remain immutable. The prior environment-key admin gate remains only as test/development code and is not used by the normal browser route.
 
-The skeletal teacher week view is likewise disabled unless protected configuration supplies a teacher ID, organisation ID, and temporary teacher key. It uses HTTP Basic credentials only as a development access mechanism; this is not the deferred authentication system. Teacher planning saves are scoped through the organisation, teacher, and dated occurrence references and do not alter recurring timetable definitions.
+The skeletal teacher week view now requires a logged-in Teacher session; the temporary `REQSHEET_FIRST_DAY_OF_WEEK` environment setting only supplies week-shape scaffolding until organisation timetable settings own it. Teacher planning saves are scoped through the session’s organisation, teacher, and dated occurrence references and do not alter recurring timetable definitions.
+
+Pilot browser login is implemented with PHP sessions, `password_hash`/`password_verify`, session-ID regeneration, HttpOnly/Lax cookies, and Secure cookies when HTTPS is detected. `/setup` requires the externally supplied `REQSHEET_SETUP_KEY` via temporary HTTP Basic authentication and is available only while no organisation exists. `/login`, `/logout`, teacher routes, technician placeholder, and admin pages use the authenticated session’s user, organisation, operational role, and Admin permission; browser-supplied organisation/user IDs are not trusted.
+
+The pilot deliberately defers password reset/recovery, email verification, MFA, brute-force/rate limiting, advanced session management, admin recovery, organisation ownership transfer, and broader abuse controls. The awaiting-first-login flow and temporary setup protection require review before wider public deployment.

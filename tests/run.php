@@ -7,6 +7,7 @@ require __DIR__ . '/ExternalEnvironmentTest.php';
 require __DIR__ . '/RoutingTest.php';
 require __DIR__ . '/AdminTimetablePageTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
+require __DIR__ . '/AccountTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 
@@ -91,8 +92,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -143,10 +144,17 @@ assertThrows(
     'Duplicate migration name was accepted.',
 );
 assertSameValue('ok', HealthCheck::status(), 'Existing application health status changed.');
+
+$accountMigration = file_get_contents($migrationDirectory . '/0003_add_pilot_accounts.sql');
+if ($accountMigration === false) throw new RuntimeException('Account migration could not be read.');
+foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'users_login', 'awaiting_first_login', 'claimed'] as $expectedAccountFragment) {
+    if (!str_contains($accountMigration, $expectedAccountFragment)) throw new RuntimeException('Expected account schema fragment is missing: ' . $expectedAccountFragment);
+}
 \Reqsheet\Tests\TimetableGenerationTest::run();
 \Reqsheet\Tests\TimetableConfigurationTest::run();
 \Reqsheet\Tests\ExternalEnvironmentTest::run();
 \Reqsheet\Tests\RoutingTest::run();
 \Reqsheet\Tests\AdminTimetablePageTest::run();
+\Reqsheet\Tests\AccountTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

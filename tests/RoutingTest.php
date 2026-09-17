@@ -16,6 +16,11 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::match('GET', '/admin/timetable'), 'Admin timetable route was not recognised.');
         assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher'), 'Teacher route was not recognised.');
         assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher/week'), 'Teacher week route was not recognised.');
+        assertSameValue(ApplicationRoute::SETUP, ApplicationRoute::match('GET', '/setup'), 'Setup route was not recognised.');
+        assertSameValue(ApplicationRoute::LOGIN, ApplicationRoute::match('GET', '/login'), 'Login route was not recognised.');
+        assertSameValue(ApplicationRoute::LOGOUT, ApplicationRoute::match('GET', '/logout'), 'Logout route was not recognised.');
+        assertSameValue(ApplicationRoute::TECHNICIAN, ApplicationRoute::match('GET', '/technician'), 'Technician route was not recognised.');
+        assertSameValue(ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::match('GET', '/admin/people'), 'Admin people route was not recognised.');
 
         foreach ([
             '/unknown',

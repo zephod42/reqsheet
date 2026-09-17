@@ -14,7 +14,7 @@ Reqsheet will help a science department prepare, review, and print lesson requis
 
 ## Current database boundary
 
-The initial application-domain schema now covers organisations, staff identities, effective-dated timetable configuration, recurring lessons, dated lesson occurrences, and requisitions. Application services provide the validated path for timetable versions, slots, and recurring lessons; a bounded, explicit-date occurrence-generation service validates timetable spans and conflicts before inserting historical occurrences. A skeletal, temporarily protected admin timetable editor now uses those services for version creation and recurring-lesson creation/editing/removal before historical occurrences exist. A skeletal, temporarily protected teacher current-week view now reads dated occurrences and saves the three planning text fields without changing recurring lessons. The project still contains no authentication/authorization implementation, technician UI, printing implementation, or application-domain catalogues.
+The initial application-domain schema now covers organisations, staff identities, effective-dated timetable configuration, recurring lessons, dated lesson occurrences, and requisitions. Application services provide the validated path for timetable versions, slots, and recurring lessons; a bounded, explicit-date occurrence-generation service validates timetable spans and conflicts before inserting historical occurrences. A skeletal, temporarily protected admin timetable editor now uses those services for version creation and recurring-lesson creation/editing/removal before historical occurrences exist. A skeletal teacher current-week view now reads dated occurrences and saves the three planning text fields without changing recurring lessons. Pilot login, first-run setup, sessions, and role/admin checks now provide the minimum browser access path; the project still contains no technician timetable UI, printing implementation, or application-domain catalogues.
 
 ## Operational roles and landing pages
 
@@ -25,7 +25,7 @@ The two operational roles are Teacher and Technician. Admin is an additional per
 - Teacher+Admin uses the teacher week landing page; Technician+Admin uses the technician day landing page.
 - Admin configuration and timetable tools are available through the additional Admin permission.
 
-Authentication and authorization are implementation work; this section describes the agreed product navigation only.
+The current login and access checks are deliberately pilot-grade; this section describes the agreed product navigation and landing behaviour.
 
 ## Teacher week view
 
@@ -118,4 +118,4 @@ The existing database and service rules remain authoritative: ISO weekdays, vali
 
 ## Not designed yet
 
-Authentication, authorization, timetable cloning, approval workflow, reporting, and detailed requisition workflow remain open design work. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.
+Production-grade authentication and authorization hardening, timetable cloning, approval workflow, reporting, and detailed requisition workflow remain open design work. The current setup/login/session flow is deliberately pilot-grade. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.

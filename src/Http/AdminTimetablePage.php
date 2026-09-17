@@ -119,7 +119,7 @@ final class AdminTimetablePage
             $body .= $mode === 'day' ? $this->dayView($version, $selectedDay, $users, $query) : $this->gridView($version, $mode, $selectedStaff, $selectedRoom, $query);
             $body .= $this->lessonEditor($version, $users, $query);
         }
-        $body .= $this->versionForm();
+        $body .= '<p><a href="/admin/people">Manage people</a></p>' . $this->versionForm();
         return '<!doctype html><html><head><meta charset="utf-8"><title>Admin timetable</title><style>' . $this->css() . '</style></head><body><main>' . $body . '</main></body></html>';
     }
 

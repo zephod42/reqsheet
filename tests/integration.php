@@ -99,7 +99,7 @@ try {
     cleanTestDatabase($pdo);
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 2, 'Expected both migrations to apply to the clean test database.');
+        integrationAssert($migrationCount === 3, 'Expected all migrations to apply to the clean test database.');
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         foreach (TEST_TABLES as $table) {
