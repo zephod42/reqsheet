@@ -110,3 +110,5 @@ php -S 127.0.0.1:8080 -t public
 ```
 
 Stop the development server with `Ctrl-C`. Production deployment and Apache configuration are intentionally outside this bootstrap.
+
+The public HTTPS routing has been verified by an administrator: `GET /` and `GET /health` succeed, `POST /health` returns 405, and unknown or repository-looking paths return 404. Apache continues to use `FallbackResource /index.php`; the application allowlist prevents that fallback from exposing non-public repository paths.

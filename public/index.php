@@ -8,13 +8,16 @@ use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
 use Reqsheet\Database\ExternalEnvironment;
 use Reqsheet\HealthCheck;
+use Reqsheet\Http\ApplicationRoute;
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$route = ApplicationRoute::match($method, $path);
 
-if ($path === '/health') {
+if ($route === ApplicationRoute::HEALTH) {
     header('Content-Type: application/json; charset=UTF-8');
 
-    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+    if ($method !== 'GET') {
         http_response_code(405);
         header('Allow: GET');
         echo json_encode(['status' => 'method_not_allowed'], JSON_THROW_ON_ERROR) . PHP_EOL;
@@ -35,6 +38,13 @@ if ($path === '/health') {
         ['status' => $healthy ? 'ok' : 'unhealthy'],
         JSON_THROW_ON_ERROR,
     ) . PHP_EOL;
+    exit;
+}
+
+if ($route === ApplicationRoute::NOT_FOUND) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo "Not found\n";
     exit;
 }
 
