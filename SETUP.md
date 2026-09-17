@@ -4,9 +4,9 @@
 
 - PHP 8.2 or newer
 - Composer 2.x
-- MySQL client/server access when database work begins
+- MySQL 8.4 client/server access
 
-The current bootstrap uses PHP and Composer only. It does not require a database connection, web-server configuration, or privileged host changes.
+The repository includes a small PDO/database foundation and migration CLI, but no application-domain schema. It does not create MySQL users or databases and does not require privileged host changes.
 
 ## Bootstrap
 
@@ -23,6 +23,39 @@ If Packagist is reachable, install the declared development tools:
 composer install
 composer test:phpunit
 ```
+
+## Database foundation
+
+`.env.example` and `.env.migrate.example` are templates only. The application does not load these files automatically. Supply the real values through protected host configuration or the process environment; never commit real `.env` or `.env.migrate` files.
+
+Runtime configuration uses `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`. Migration configuration uses the corresponding `MIGRATION_DB_*` variables and must use a separate migration identity. With those migration variables exported:
+
+```sh
+php bin/migrate.php
+```
+
+The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. The current migration only creates that metadata table.
+
+MySQL DDL can implicitly commit and is not fully transactional. A failed migration is not recorded as applied, but a migration that fails after some DDL may leave partial schema changes. Review and repair the database before rerunning such a migration; migrations should be small, forward-only, and safe to retry where practical.
+
+The migration identity should have schema-changing privileges scoped only to the Reqsheet database, including `CREATE`, `ALTER`, and `DROP` as future migrations may need to replace or remove objects. The runtime identity should have only application DML privileges and no schema-changing privileges.
+
+## Verified development setup
+
+The local development setup has been provisioned and exercised by an administrator:
+
+- database: `reqsheet_dev`;
+- runtime identity: `reqsheet_runtime`, limited to `SELECT`, `INSERT`, `UPDATE`, and `DELETE` on that database;
+- migration identity: `reqsheet_migrator`, with privileges scoped to that database;
+- protected environment sources: `/etc/reqsheet/reqsheet-runtime.env` and `/etc/reqsheet/reqsheet-migrate.env`;
+- first migration: `Applied 1 migration.`;
+- repeat migration: `Applied 0 migrations.`;
+- `GET /health`: HTTP 200 with `{"status":"ok"}`;
+- `POST /health`: HTTP 405.
+
+The protected environment files are administrator-managed and are intentionally unreadable by the application agent. Their secret values are not stored in this repository. Production must use separately named database identities, database names, and credentials.
+
+The runtime application connects lazily. Ordinary requests do not require MySQL; `GET /health` does, and returns HTTP 503 with a generic response when configuration or the connection is unavailable. Non-GET `/health` requests return HTTP 405.
 
 For a local smoke test of the public entry point:
 

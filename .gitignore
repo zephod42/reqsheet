@@ -4,9 +4,10 @@
 /.env
 /.env.*
 !/.env.example
+!/.env.migrate.example
+/.env.migrate
 /var/cache/
 /var/log/
 *.log
 *.swp
 *~
-

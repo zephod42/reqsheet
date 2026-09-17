@@ -14,6 +14,16 @@ composer test
 php -S 127.0.0.1:8080 -t public
 ```
 
-The dependency-free `composer test` command is a temporary smoke test. When Composer can reach Packagist, install the local development dependency with `composer install` and run the PHPUnit suite with `composer test:phpunit`.
+The dependency-free `composer test` command is a temporary smoke test. The database foundation can be exercised with environment variables supplied by a protected shell or host configuration:
+
+```sh
+php bin/migrate.php
+```
+
+When Composer can reach Packagist, install the local development dependency with `composer install` and run the PHPUnit suite with `composer test:phpunit`.
+
+`GET /health` checks the runtime database connection and returns only a generic healthy/unhealthy status. The root response remains the initial `Reqsheet ok` smoke response.
+
+The database foundation has been verified against the local MySQL development environment. The development database, separated runtime/migration identities, protected host configuration, first migration, repeat migration, and `/health` success/method checks have all been exercised. No application-domain tables or product features are included yet.
 
 See [SETUP.md](SETUP.md), [PRODUCT_DESIGN.md](PRODUCT_DESIGN.md), [ROADMAP.md](ROADMAP.md), and [SECURITY.md](SECURITY.md) for the initial project direction.
