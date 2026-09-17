@@ -8,7 +8,11 @@ use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
 use Reqsheet\Database\MigrationRunner;
 use Reqsheet\Timetable\PdoTimetableGenerationStore;
+use Reqsheet\Timetable\PdoTimetableConfigurationStore;
+use Reqsheet\Timetable\RecurringLessonService;
+use Reqsheet\Timetable\TimetableSlotService;
 use Reqsheet\Timetable\TimetableOccurrenceGenerator;
+use Reqsheet\Timetable\TimetableVersionService;
 use Reqsheet\Timetable\TimetableValidationException;
 
 const TEST_TABLES = [
@@ -117,45 +121,41 @@ try {
             'INSERT INTO users (organisation_id, display_name, staff_identifier) VALUES (:organisation_id, :display_name, :staff_identifier)',
             ['organisation_id' => $organisationId, 'display_name' => 'Integration Teacher B', 'staff_identifier' => 'INT-B'],
         );
-        $versionId = $insert(
-            'INSERT INTO timetable_versions (organisation_id, label, effective_from, effective_to)
-             VALUES (:organisation_id, :label, :effective_from, :effective_to)',
-            [
-                'organisation_id' => $organisationId,
-                'label' => 'Integration timetable',
-                'effective_from' => '2026-09-01',
-                'effective_to' => '2026-09-30',
-            ],
+        $configurationStore = new PdoTimetableConfigurationStore($pdo);
+        $versionId = (new TimetableVersionService($configurationStore))->create(
+            $organisationId,
+            'Integration timetable',
+            '2026-09-01',
+            '2026-09-30',
         );
-
-        $slot = static function (string $day, int $sequence, string $kind, ?int $period) use ($insert, $versionId): int {
-            return $insert(
-                'INSERT INTO timetable_slots
-                    (timetable_version_id, day_of_week, sequence_number, kind, teaching_period_number, label, starts_at, ends_at)
-                 VALUES (:version_id, :day, :sequence, :kind, :period, :label, :starts_at, :ends_at)',
-                [
-                    'version_id' => $versionId,
-                    'day' => $day,
-                    'sequence' => $sequence,
-                    'kind' => $kind,
-                    'period' => $period,
-                    'label' => $period === null ? ucfirst($kind) : 'Period ' . $period,
-                    'starts_at' => sprintf('%02d:00:00', 8 + $sequence),
-                    'ends_at' => sprintf('%02d:00:00', 9 + $sequence),
-                ],
+        $slotService = new TimetableSlotService($configurationStore);
+        $slot = static function (int $day, int $sequence, string $kind, ?int $period) use ($slotService, $versionId): int {
+            return $slotService->create(
+                $versionId,
+                $day,
+                $sequence,
+                $kind,
+                $period,
+                $period === null ? ucfirst($kind) : 'Period ' . $period,
+                sprintf('%02d:00:00', 8 + $sequence),
+                sprintf('%02d:00:00', 9 + $sequence),
             );
         };
 
-        $mondayP1 = $slot('1', 1, 'teaching', 1);
-        $mondayP2 = $slot('1', 2, 'teaching', 2);
-        $break = $slot('1', 3, 'break', null);
-        $mondayP3 = $slot('1', 4, 'teaching', 3);
-        $nonTeaching = $slot('1', 5, 'non_teaching', null);
-        $mondayP4 = $slot('1', 6, 'teaching', 4);
-        $tuesdayP1 = $slot('2', 1, 'teaching', 1);
-        $tuesdayP2 = $slot('2', 2, 'teaching', 2);
+        $mondayP1 = $slot(1, 1, 'teaching', 1);
+        $mondayP2 = $slot(1, 2, 'teaching', 2);
+        $break = $slot(1, 3, 'break', null);
+        $mondayP3 = $slot(1, 4, 'teaching', 3);
+        $nonTeaching = $slot(1, 5, 'non_teaching', null);
+        $mondayP4 = $slot(1, 6, 'teaching', 4);
+        $tuesdayP1 = $slot(2, 1, 'teaching', 1);
+        $tuesdayP2 = $slot(2, 2, 'teaching', 2);
 
-        $lesson = static function (int $teacher, int $day, int $startSlot, int $duration, string $class, string $room) use ($insert, $versionId): int {
+        $lessonService = new RecurringLessonService($configurationStore);
+        $lesson = static function (int $teacher, int $day, int $startSlot, int $duration, string $class, string $room) use ($lessonService, $versionId): int {
+            return $lessonService->create($versionId, $teacher, $day, $startSlot, $duration, $class, $room);
+        };
+        $insertLesson = static function (int $teacher, int $day, int $startSlot, int $duration, string $class, string $room) use ($insert, $versionId): int {
             return $insert(
                 'INSERT INTO recurring_lessons
                     (timetable_version_id, teacher_user_id, day_of_week, start_slot_id, duration_periods, class_code, room_code)
@@ -198,7 +198,7 @@ try {
         $selectOccurrence->execute(['organisation_id' => $organisationId, 'lesson_id' => $doubleLessonId]);
         integrationAssert($selectOccurrence->fetch() == $doubleOccurrence, 'Repeated generation altered an existing occurrence.');
 
-        $invalidLessonId = $lesson($teacherA, 1, $mondayP2, 2, 'BREAK-TEST', 'LAB-C');
+        $invalidLessonId = $insertLesson($teacherA, 1, $mondayP2, 2, 'BREAK-TEST', 'LAB-C');
         integrationExpectValidation(
             static fn () => $generator->generate($organisationId, $versionId, '2026-09-07', '2026-09-07'),
             'A lesson crossing a break was accepted.',
@@ -206,21 +206,21 @@ try {
         $deleteLesson = $pdo->prepare('DELETE FROM recurring_lessons WHERE id = :id');
         $deleteLesson->execute(['id' => $invalidLessonId]);
 
-        $nonTeachingLessonId = $lesson($teacherA, 1, $mondayP3, 2, 'NON-TEACHING-TEST', 'LAB-C');
+        $nonTeachingLessonId = $insertLesson($teacherA, 1, $mondayP3, 2, 'NON-TEACHING-TEST', 'LAB-C');
         integrationExpectValidation(
             static fn () => $generator->generate($organisationId, $versionId, '2026-09-07', '2026-09-07'),
             'A lesson crossing a non-teaching slot was accepted.',
         );
         $deleteLesson->execute(['id' => $nonTeachingLessonId]);
 
-        $conflictLessonId = $lesson($teacherA, 1, $mondayP1, 1, 'TEACHER-CONFLICT', 'LAB-C');
+        $conflictLessonId = $insertLesson($teacherA, 1, $mondayP1, 1, 'TEACHER-CONFLICT', 'LAB-C');
         integrationExpectValidation(
             static fn () => $generator->generate($organisationId, $versionId, '2026-09-07', '2026-09-07'),
             'A teacher conflict was accepted.',
         );
         $deleteLesson->execute(['id' => $conflictLessonId]);
 
-        $roomConflictLessonId = $lesson($teacherB, 1, $mondayP1, 1, 'ROOM-CONFLICT', ' lab-a ');
+        $roomConflictLessonId = $insertLesson($teacherB, 1, $mondayP1, 1, 'ROOM-CONFLICT', ' lab-a ');
         integrationExpectValidation(
             static fn () => $generator->generate($organisationId, $versionId, '2026-09-07', '2026-09-07'),
             'A room conflict was accepted.',

@@ -13,6 +13,9 @@ final readonly class TimetableSlot
         public int $sequenceNumber,
         public string $kind,
         public ?int $teachingPeriodNumber,
+        public ?string $label = null,
+        public ?string $startsAt = null,
+        public ?string $endsAt = null,
     ) {
     }
 

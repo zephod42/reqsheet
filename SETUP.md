@@ -42,6 +42,12 @@ The migration identity should have schema-changing privileges scoped only to the
 
 The database enforces keys, foreign keys, required values, date/time ranges, allowed slot kinds, allowed requisition states, and simple organisation-local uniqueness. Service validation must enforce non-overlapping timetable-version date ranges, same-version/day slot relationships, contiguous teaching-only lesson spans, occurrence dates matching recurring lessons, cross-organisation consistency, requisition-state/content consistency, and room/teacher conflict detection. Room conflict comparison trims surrounding whitespace and compares case-insensitively; the stored room code is unchanged.
 
+## Timetable configuration services
+
+The create-only configuration services are the intended application path for writing timetable versions, slots, and recurring lessons. `TimetableVersionService` applies the half-open effective-date rule and rejects overlapping versions without truncating existing data. `TimetableSlotService` validates ISO weekdays, positive sequence/period values, allowed kinds, valid non-overlapping times, and coherent sequence/chronological order. `RecurringLessonService` validates organisation ownership, start-slot relationships, contiguous teaching-only spans, non-blank free-text class/room codes, and teacher/room conflicts. These services use `TimetableValidationException` for expected invalid input; PDO/database failures remain operational exceptions.
+
+There is intentionally no update service yet. This avoids changing configuration behind materialised historical occurrences. Any future update design must define the immutable boundary after occurrences have been generated and must never rewrite historical snapshots.
+
 ## Bounded occurrence generation
 
 Occurrence generation uses the runtime database environment and requires explicit IDs and dates. The end date is inclusive; timetable version `effective_to` remains exclusive. For example:

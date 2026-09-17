@@ -11,4 +11,4 @@ This is an intentionally small, reviewable starting roadmap.
 
 No roadmap item authorizes implementation of product features in this bootstrap task.
 
-The database foundation and initial application-domain schema are complete and verified against local MySQL. The bounded occurrence-generation service now validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Teacher entry, timetable editing, exception handling, and requisition editing remain future work.
+The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services now provide a create-only validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Teacher entry, timetable editing UI, exception handling, and requisition editing remain future work.

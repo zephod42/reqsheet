@@ -14,8 +14,8 @@ Reqsheet will help a science department prepare, review, and print lesson requis
 
 ## Current database boundary
 
-The initial application-domain schema now covers organisations, staff identities, effective-dated timetable configuration, recurring lessons, dated lesson occurrences, and requisitions. A bounded, explicit-date occurrence-generation service validates timetable spans and conflicts before inserting historical occurrences. It deliberately contains no authentication, roles, timetable editing, teacher UI, technician UI, printing implementation, or application-domain catalogues.
+The initial application-domain schema now covers organisations, staff identities, effective-dated timetable configuration, recurring lessons, dated lesson occurrences, and requisitions. Application services now provide the validated create path for timetable versions, slots, and recurring lessons; a bounded, explicit-date occurrence-generation service validates timetable spans and conflicts before inserting historical occurrences. These services deliberately provide no UI or update workflow. The project still contains no authentication, roles, teacher UI, technician UI, printing implementation, or application-domain catalogues.
 
 ## Not designed yet
 
-Authentication, roles, timetable editing, approval workflow, reporting, and detailed requisition workflow remain open design work. Occurrence exceptions, holidays, cancellations, and scheduled generation remain deferred.
+Authentication, roles, timetable editing UI, approval workflow, reporting, and detailed requisition workflow remain open design work. Timetable configuration currently has create-only services: effective-date versions cannot overlap, slots are validated for coherent day/time order, and lessons are validated for contiguous teaching spans and teacher/room conflicts. Occurrence exceptions, holidays, cancellations, updates, and scheduled generation remain deferred.
