@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 require __DIR__ . '/ExternalEnvironmentTest.php';
 require __DIR__ . '/RoutingTest.php';
 require __DIR__ . '/AdminTimetablePageTest.php';
+require __DIR__ . '/TeacherWeekPageTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 

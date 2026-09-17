@@ -14,6 +14,8 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::HEALTH, ApplicationRoute::match('GET', '/health'), 'GET /health was not routed to health.');
         assertSameValue(ApplicationRoute::HEALTH, ApplicationRoute::match('POST', '/health'), 'POST /health lost its method handling.');
         assertSameValue(ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::match('GET', '/admin/timetable'), 'Admin timetable route was not recognised.');
+        assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher'), 'Teacher route was not recognised.');
+        assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher/week'), 'Teacher week route was not recognised.');
 
         foreach ([
             '/unknown',

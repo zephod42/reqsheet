@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Reqsheet\Teacher;
+
+use DateTimeImmutable;
+use Reqsheet\Timetable\TimetableSlot;
+use Reqsheet\Timetable\TimetableVersion;
+
+interface TeacherPlanningStore
+{
+    public function teacherBelongsToOrganisation(int $teacherId, int $organisationId): bool;
+
+    public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion;
+
+    /** @return list<TimetableSlot> */
+    public function slotsForVersion(int $versionId): array;
+
+    /** @return list<array<string, mixed>> */
+    public function occurrencesForTeacherDate(int $organisationId, int $teacherId, DateTimeImmutable $date): array;
+
+    /** @return array<string, mixed>|null */
+    public function findOccurrenceForTeacher(int $organisationId, int $teacherId, int $occurrenceId): ?array;
+
+    public function savePlanning(
+        int $occurrenceId,
+        string $state,
+        string $lessonOutline,
+        string $requisitions,
+        string $riskAssessment,
+    ): void;
+}

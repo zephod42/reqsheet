@@ -11,6 +11,10 @@ use Reqsheet\HealthCheck;
 use Reqsheet\Http\AdminAccess;
 use Reqsheet\Http\AdminTimetablePage;
 use Reqsheet\Http\ApplicationRoute;
+use Reqsheet\Http\TeacherAccess;
+use Reqsheet\Http\TeacherWeekPage;
+use Reqsheet\Teacher\PdoTeacherPlanningStore;
+use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Timetable\PdoTimetableConfigurationStore;
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -48,6 +52,55 @@ if ($route === ApplicationRoute::NOT_FOUND) {
     http_response_code(404);
     header('Content-Type: text/plain; charset=UTF-8');
     echo "Not found\n";
+    exit;
+}
+
+if ($route === ApplicationRoute::TEACHER_WEEK) {
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+    } catch (\Throwable) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+        exit;
+    }
+    if (!TeacherAccess::configured($environment)) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Not found\n";
+        exit;
+    }
+    if (!TeacherAccess::allowed($environment, $_SERVER)) {
+        http_response_code(401);
+        header('WWW-Authenticate: Basic realm="Reqsheet teacher"');
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Authentication required\n";
+        exit;
+    }
+    try {
+        $teacherId = TeacherAccess::teacherId($environment);
+        $organisationId = TeacherAccess::organisationId($environment);
+        if ($organisationId < 1) {
+            throw new \RuntimeException('Teacher organisation is not configured.');
+        }
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $page = new TeacherWeekPage(
+            new TeacherPlanningService(
+                new PdoTeacherPlanningStore((new Database($config))->connection()),
+                TeacherAccess::firstDayOfWeek($environment),
+            ),
+            $organisationId,
+            $teacherId,
+        );
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $page->handle($method, $_GET, $_POST);
+    } catch (\Throwable) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
     exit;
 }
 
