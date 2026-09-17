@@ -1,0 +1,12 @@
+/vendor/
+/.phpunit.cache/
+/.phpunit.result.cache
+/.env
+/.env.*
+!/.env.example
+/var/cache/
+/var/log/
+*.log
+*.swp
+*~
+

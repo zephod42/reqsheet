@@ -1,0 +1,31 @@
+{
+    "name": "reqsheet/reqsheet",
+    "description": "Science-department lesson requisitions web application.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Reqsheet\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Reqsheet\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "php tests/run.php",
+        "test:phpunit": "phpunit --configuration phpunit.xml.dist"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
