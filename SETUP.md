@@ -123,4 +123,6 @@ After applying all migrations to a new database, add a strong secret as `REQSHEE
 
 The first-run browser URL is `/setup`. After setup, use `/login` with the first user’s name and password. Teachers are sent to `/teacher`; technicians are sent to `/technician`, which is currently a safe placeholder. Admin is an additional permission and does not change either operational landing page. Authenticated admins can create further users at `/admin/people`; those accounts are explicitly awaiting first login and set their password from `/login`.
 
-Pilot sessions use PHP sessions with regenerated IDs, HttpOnly/Lax cookies, and Secure cookies when HTTPS is detected. This is not the final authentication design.
+Pilot sessions use PHP sessions with regenerated IDs, HttpOnly/Lax cookies, and Secure cookies when HTTPS is detected. The agreed product direction is for ordinary users to have a persistent/remembered login during normal daily use; the exact lifetime, renewal, revocation, and related security policy remain for the authentication hardening pass.
+
+The setup gate applies after sign-up as well as during later organisation use. Required settings are school name, working days, first working day, periods per day, and at least one explicitly added room. An Admin with incomplete settings is sent directly to Settings/setup. A non-Admin sees the blocking message `Something's missing...` followed by `Settings need to be configured. Contact your admin.` rather than an empty operational screen.

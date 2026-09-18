@@ -5,6 +5,7 @@ Security is a design requirement from the beginning. The initial application-dom
 Future implementation must at minimum address:
 
 - password and session handling through reviewed, conventional mechanisms;
+- the persistent/remembered-login product intent, including an explicit reviewed policy for lifetime, renewal, revocation, and protection against session theft;
 - authorization checks on every protected action;
 - server-side validation and safe output escaping;
 - PDO prepared statements for database access;
@@ -35,6 +36,6 @@ The admin timetable editor is now protected by an authenticated session with the
 
 The skeletal teacher week view now requires a logged-in Teacher session; the temporary `REQSHEET_FIRST_DAY_OF_WEEK` environment setting only supplies week-shape scaffolding until organisation timetable settings own it. Teacher planning saves are scoped through the session’s organisation, teacher, and dated occurrence references and do not alter recurring timetable definitions.
 
-Pilot browser login is implemented with PHP sessions, `password_hash`/`password_verify`, session-ID regeneration, HttpOnly/Lax cookies, and Secure cookies when HTTPS is detected. `/setup` requires the externally supplied `REQSHEET_SETUP_KEY` via temporary HTTP Basic authentication and is available only while no organisation exists. `/login`, `/logout`, teacher routes, technician placeholder, and admin pages use the authenticated session’s user, organisation, operational role, and Admin permission; browser-supplied organisation/user IDs are not trusted.
+Pilot browser login is implemented with PHP sessions, `password_hash`/`password_verify`, session-ID regeneration, HttpOnly/Lax cookies, and Secure cookies when HTTPS is detected. The agreed product direction includes a persistent/remembered-login experience, but its lifetime and security policy remain deferred to the authentication hardening pass. `/setup` requires the externally supplied `REQSHEET_SETUP_KEY` via temporary HTTP Basic authentication and is available only while no organisation exists. `/login`, `/logout`, teacher routes, technician placeholder, and admin pages use the authenticated session’s user, organisation, operational role, and Admin permission; browser-supplied organisation/user IDs are not trusted.
 
 The pilot deliberately defers password reset/recovery, email verification, MFA, brute-force/rate limiting, advanced session management, admin recovery, organisation ownership transfer, and broader abuse controls. The awaiting-first-login flow and temporary setup protection require review before wider public deployment.

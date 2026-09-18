@@ -55,6 +55,7 @@ When implementing the agreed UI/admin work:
 - do not invent MIS-specific importers, arbitrary-file inference, heuristic stripping, regex guessing, or an AI API for timetable import;
 - treat any external AI-assisted CSV conversion as outside the application.
 - preserve the agreed primary landing views: Teacher is week-oriented and Technician is day-oriented; Admin is an additional capability, not an operational role.
+- preserve the agreed pilot UI decisions in `PRODUCT_DESIGN.md`: restrained black-and-white Reqsheet chrome, technical timetable typography, setup gating, persistent-login intent, teacher class colours, technician neutral/black-and-white output, and large lesson-editing pop-outs.
 
 ## Quality
 

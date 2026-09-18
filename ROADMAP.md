@@ -10,6 +10,12 @@ Completed foundations:
 - Teacher week-view skeleton and dated lesson planning editor: current configured week, navigable week controls, compact occurrence blocks, and direct editing of the three planning text fields. Completed in this milestone.
 - Pilot first-run setup and login: initial organisation/admin creation, hashed passwords, sessions, operational-role landing, and explicit awaiting-first-login accounts. Completed in this milestone.
 
+Agreed design decisions recorded on 2026-09-18:
+
+- Public landing/auth direction: restrained `Reqsheet.` wordmark landing page, left navigation, email-free pilot sign-up creating an organisation and first Admin, remembered-login intent, and consistent incomplete-settings gating for Admin and non-Admin users.
+- Settings direction: required school name, working days/week start, six default periods, and at least one explicitly added room; optional general/custom-day timings, typed separators, and disabled-by-default double-period merging that cannot cross separators.
+- Visual and lesson-editing direction: black-and-white Reqsheet chrome with technical timetable typography, teacher-only consistent pastel class colours, neutral technician screen/black-and-white print, and a large lesson pop-out for the three optional planning fields with an explicit `Nothing required` action.
+
 Upcoming implementation sequence:
 
 1. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
