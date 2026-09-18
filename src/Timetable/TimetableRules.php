@@ -149,6 +149,7 @@ final class TimetableRules
         $errors = [];
         $teacherOccupancy = [];
         $roomOccupancy = [];
+        $classOccupancy = [];
         foreach ($validated as $item) {
             $lesson = $item['lesson'];
             foreach ($item['sequences'] as $sequence) {
@@ -162,10 +163,20 @@ final class TimetableRules
                 $room = strtoupper(trim($lesson->roomCode));
                 if ($room !== '') {
                     $roomKey = $room . '/' . $lesson->dayOfWeek . '/' . $sequence;
-                    if (isset($roomOccupancy[$roomKey])) {
+                if (isset($roomOccupancy[$roomKey])) {
                         $errors[] = sprintf('Room conflict between lessons %d and %d.', $roomOccupancy[$roomKey], $lesson->id);
                     } else {
                         $roomOccupancy[$roomKey] = $lesson->id;
+                    }
+                }
+
+                $class = strtoupper(trim($lesson->classCode));
+                if ($class !== '') {
+                    $classKey = $class . '/' . $lesson->dayOfWeek . '/' . $sequence;
+                    if (isset($classOccupancy[$classKey])) {
+                        $errors[] = sprintf('Class conflict between lessons %d and %d.', $classOccupancy[$classKey], $lesson->id);
+                    } else {
+                        $classOccupancy[$classKey] = $lesson->id;
                     }
                 }
             }

@@ -15,6 +15,8 @@ final readonly class RecurringLesson
         public int $durationPeriods,
         public string $classCode,
         public string $roomCode,
+        public ?int $classId = null,
+        public ?int $roomId = null,
     ) {
     }
 }

@@ -11,6 +11,7 @@ Completed foundations:
 - Pilot first-run setup and login: initial organisation/admin creation, hashed passwords, sessions, operational-role landing, and explicit awaiting-first-login accounts. Completed in this milestone.
 - Pilot-visible UI milestone: shared restrained visual foundation, public landing/login/signup, organisation settings and setup gating, teacher week class colours, and large lesson editor with explicit `Nothing required` action. Completed in this milestone.
 - School tenant slug/host milestone: domain-independent organisation slugs, configurable base-host resolution, tenant-aware login and protected-route consistency, and school context on resolved pages. Wildcard DNS/TLS and final production-domain selection remain deployment work.
+- Versioned timetable-builder redesign: reusable organisation-level teacher, room, and class resources, one assignment dataset with editable teacher/room/class projections, resource creation from selectors, and per-version teacher/room/class clash validation.
 
 Agreed design decisions recorded on 2026-09-18:
 
@@ -20,7 +21,7 @@ Agreed design decisions recorded on 2026-09-18:
 
 Upcoming implementation sequence:
 
-1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic timetable entry, teacher week/day editing, technician workflows, and printing with representative schools.
+1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, technician workflows, and printing with representative schools.
 2. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
 3. Technician print/PDF workflow: future-week selection, one A4 page per day, selected-room layouts, and practical page fitting.
 4. Tenant deployment completion: select the eventual base domain, configure DNS/web-server wildcard acceptance, and provide production TLS coverage.

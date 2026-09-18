@@ -21,6 +21,7 @@ use Reqsheet\Teacher\TeacherPlanningService;
 const TEST_TABLES = [
     'requisitions',
     'onboarding_handoffs',
+    'organisation_classes',
     'lesson_occurrences',
     'recurring_lessons',
     'timetable_slots',
@@ -103,7 +104,7 @@ try {
     cleanTestDatabase($pdo);
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 6, 'Expected all migrations to apply to the clean test database.');
+        integrationAssert($migrationCount === 7, 'Expected all migrations to apply to the clean test database.');
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         foreach (TEST_TABLES as $table) {

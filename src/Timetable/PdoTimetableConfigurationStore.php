@@ -8,7 +8,7 @@ use DateTimeImmutable;
 use PDO;
 use PDOStatement;
 
-final class PdoTimetableConfigurationStore implements TimetableConfigurationStore
+final class PdoTimetableConfigurationStore implements ResourceTimetableStore
 {
     public function __construct(private readonly PDO $pdo)
     {
@@ -76,6 +76,90 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
         return array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN));
     }
 
+    public function roomsForOrganisation(int $organisationId): array
+    {
+        $statement = $this->prepare('SELECT id, room_code FROM organisation_rooms WHERE organisation_id = :organisation_id ORDER BY room_code, id');
+        $statement->execute(['organisation_id' => $organisationId]);
+        return array_map(static fn (array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['room_code']], $statement->fetchAll());
+    }
+
+    public function classesForOrganisation(int $organisationId): array
+    {
+        $statement = $this->prepare('SELECT id, class_code FROM organisation_classes WHERE organisation_id = :organisation_id ORDER BY class_code, id');
+        $statement->execute(['organisation_id' => $organisationId]);
+        return array_map(static fn (array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['class_code']], $statement->fetchAll());
+    }
+
+    public function createRoom(int $organisationId, string $code): int
+    {
+        $statement = $this->prepare('INSERT INTO organisation_rooms (organisation_id, room_code) VALUES (:organisation_id, :code)');
+        $statement->execute(['organisation_id' => $organisationId, 'code' => trim($code)]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function createClass(int $organisationId, string $code): int
+    {
+        $statement = $this->prepare('INSERT INTO organisation_classes (organisation_id, class_code) VALUES (:organisation_id, :code)');
+        $statement->execute(['organisation_id' => $organisationId, 'code' => trim($code)]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function createTeacher(int $organisationId, string $code, string $displayName): int
+    {
+        $statement = $this->prepare(
+            'INSERT INTO users (organisation_id, display_name, staff_identifier, operational_role, is_admin, account_state)
+             VALUES (:organisation_id, :display_name, :code, \'teacher\', FALSE, \'awaiting_first_login\')',
+        );
+        $statement->execute(['organisation_id' => $organisationId, 'display_name' => trim($displayName) === '' ? trim($code) : trim($displayName), 'code' => trim($code)]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function roomBelongsToOrganisation(int $roomId, int $organisationId): bool
+    {
+        return $this->resourceBelongs('organisation_rooms', $roomId, $organisationId);
+    }
+
+    public function classBelongsToOrganisation(int $classId, int $organisationId): bool
+    {
+        return $this->resourceBelongs('organisation_classes', $classId, $organisationId);
+    }
+
+    public function roomCode(int $roomId): ?string
+    {
+        return $this->resourceCode('organisation_rooms', 'room_code', $roomId);
+    }
+
+    public function classCode(int $classId): ?string
+    {
+        return $this->resourceCode('organisation_classes', 'class_code', $classId);
+    }
+
+    public function insertResourceLesson(int $versionId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, int $classId, int $roomId): int
+    {
+        $statement = $this->prepare(
+            'INSERT INTO recurring_lessons
+                (timetable_version_id, teacher_user_id, day_of_week, start_slot_id, duration_periods, class_code, room_code, class_id, room_id)
+             SELECT :version_id, :teacher, :day, :start_slot, :duration, c.class_code, r.room_code, c.id, r.id
+             FROM organisation_classes c CROSS JOIN organisation_rooms r
+             WHERE c.id = :class_id AND r.id = :room_id',
+        );
+        $statement->execute(['version_id' => $versionId, 'teacher' => $teacherUserId, 'day' => $dayOfWeek, 'start_slot' => $startSlotId, 'duration' => $durationPeriods, 'class_id' => $classId, 'room_id' => $roomId]);
+        if ($statement->rowCount() !== 1) throw new \RuntimeException('Timetable resources are not available.');
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function updateResourceLesson(int $lessonId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, int $classId, int $roomId): void
+    {
+        $statement = $this->prepare(
+            'UPDATE recurring_lessons rl JOIN organisation_classes c ON c.id = :class_id JOIN organisation_rooms r ON r.id = :room_id
+             SET rl.teacher_user_id = :teacher, rl.day_of_week = :day, rl.start_slot_id = :start_slot,
+                 rl.duration_periods = :duration, rl.class_code = c.class_code, rl.room_code = r.room_code,
+                 rl.class_id = c.id, rl.room_id = r.id WHERE rl.id = :id',
+        );
+        $statement->execute(['id' => $lessonId, 'teacher' => $teacherUserId, 'day' => $dayOfWeek, 'start_slot' => $startSlotId, 'duration' => $durationPeriods, 'class_id' => $classId, 'room_id' => $roomId]);
+        if ($statement->rowCount() < 1) throw new \RuntimeException('Timetable resources are not available.');
+    }
+
     public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $effectiveFrom, ?DateTimeImmutable $effectiveTo): int
     {
         $statement = $this->prepare(
@@ -135,7 +219,7 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
     {
         $statement = $this->prepare(
             'SELECT id, timetable_version_id, teacher_user_id, day_of_week, start_slot_id,
-                    duration_periods, class_code, room_code
+                    duration_periods, class_code, room_code, class_id, room_id
              FROM recurring_lessons WHERE timetable_version_id = :version_id
              ORDER BY day_of_week, start_slot_id, id',
         );
@@ -144,7 +228,7 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
             static fn (array $row): RecurringLesson => new RecurringLesson(
                 (int) $row['id'], (int) $row['timetable_version_id'], (int) $row['teacher_user_id'],
                 (int) $row['day_of_week'], (int) $row['start_slot_id'], (int) $row['duration_periods'],
-                (string) $row['class_code'], (string) $row['room_code'],
+                (string) $row['class_code'], (string) $row['room_code'], (int) $row['class_id'], (int) $row['room_id'],
             ),
             $statement->fetchAll(),
         );
@@ -154,7 +238,7 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
     {
         $statement = $this->prepare(
             'SELECT id, timetable_version_id, teacher_user_id, day_of_week, start_slot_id,
-                    duration_periods, class_code, room_code
+                    duration_periods, class_code, room_code, class_id, room_id
              FROM recurring_lessons WHERE id = :id',
         );
         $statement->execute(['id' => $lessonId]);
@@ -171,36 +255,20 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
 
     public function insertLesson(int $versionId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, string $classCode, string $roomCode): int
     {
-        $statement = $this->prepare(
-            'INSERT INTO recurring_lessons
-                (timetable_version_id, teacher_user_id, day_of_week, start_slot_id, duration_periods, class_code, room_code)
-             VALUES (:version_id, :teacher, :day, :start_slot, :duration, :class_code, :room_code)',
-        );
-        $statement->execute([
-            'version_id' => $versionId,
-            'teacher' => $teacherUserId,
-            'day' => $dayOfWeek,
-            'start_slot' => $startSlotId,
-            'duration' => $durationPeriods,
-            'class_code' => $classCode,
-            'room_code' => $roomCode,
-        ]);
-        return (int) $this->pdo->lastInsertId();
+        $organisationId = $this->organisationForVersion($versionId);
+        $classId = $this->ensureClass($organisationId, $classCode);
+        $roomId = $this->ensureRoom($organisationId, $roomCode);
+        return $this->insertResourceLesson($versionId, $teacherUserId, $dayOfWeek, $startSlotId, $durationPeriods, $classId, $roomId);
     }
 
     public function updateLesson(int $lessonId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, string $classCode, string $roomCode): void
     {
-        $statement = $this->prepare(
-            'UPDATE recurring_lessons
-             SET teacher_user_id = :teacher, day_of_week = :day, start_slot_id = :start_slot,
-                 duration_periods = :duration, class_code = :class_code, room_code = :room_code
-             WHERE id = :id',
-        );
-        $statement->execute([
-            'id' => $lessonId, 'teacher' => $teacherUserId, 'day' => $dayOfWeek,
-            'start_slot' => $startSlotId, 'duration' => $durationPeriods,
-            'class_code' => $classCode, 'room_code' => $roomCode,
-        ]);
+        $lesson = $this->findLesson($lessonId);
+        if ($lesson === null) throw new \RuntimeException('Lesson does not exist.');
+        $organisationId = $this->organisationForVersion($lesson->timetableVersionId);
+        $classId = $this->ensureClass($organisationId, $classCode);
+        $roomId = $this->ensureRoom($organisationId, $roomCode);
+        $this->updateResourceLesson($lessonId, $teacherUserId, $dayOfWeek, $startSlotId, $durationPeriods, $classId, $roomId);
     }
 
     public function deleteLesson(int $lessonId): void
@@ -237,7 +305,7 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
         return new RecurringLesson(
             (int) $row['id'], (int) $row['timetable_version_id'], (int) $row['teacher_user_id'],
             (int) $row['day_of_week'], (int) $row['start_slot_id'], (int) $row['duration_periods'],
-            (string) $row['class_code'], (string) $row['room_code'],
+            (string) $row['class_code'], (string) $row['room_code'], (int) $row['class_id'], (int) $row['room_id'],
         );
     }
 
@@ -257,5 +325,45 @@ final class PdoTimetableConfigurationStore implements TimetableConfigurationStor
             throw new \RuntimeException('Unable to prepare timetable configuration query.');
         }
         return $statement;
+    }
+
+    private function resourceBelongs(string $table, int $resourceId, int $organisationId): bool
+    {
+        $statement = $this->prepare("SELECT 1 FROM {$table} WHERE id = :id AND organisation_id = :organisation_id");
+        $statement->execute(['id' => $resourceId, 'organisation_id' => $organisationId]);
+        return $statement->fetchColumn() !== false;
+    }
+
+    private function resourceCode(string $table, string $column, int $resourceId): ?string
+    {
+        $statement = $this->prepare("SELECT {$column} FROM {$table} WHERE id = :id");
+        $statement->execute(['id' => $resourceId]);
+        $value = $statement->fetchColumn();
+        return $value === false ? null : (string) $value;
+    }
+
+    private function organisationForVersion(int $versionId): int
+    {
+        $statement = $this->prepare('SELECT organisation_id FROM timetable_versions WHERE id = :id');
+        $statement->execute(['id' => $versionId]);
+        $organisationId = $statement->fetchColumn();
+        if ($organisationId === false) throw new \RuntimeException('Timetable version does not exist.');
+        return (int) $organisationId;
+    }
+
+    private function ensureRoom(int $organisationId, string $code): int
+    {
+        $statement = $this->prepare('SELECT id FROM organisation_rooms WHERE organisation_id = :organisation_id AND room_code = :code');
+        $statement->execute(['organisation_id' => $organisationId, 'code' => trim($code)]);
+        $id = $statement->fetchColumn();
+        return $id === false ? $this->createRoom($organisationId, $code) : (int) $id;
+    }
+
+    private function ensureClass(int $organisationId, string $code): int
+    {
+        $statement = $this->prepare('SELECT id FROM organisation_classes WHERE organisation_id = :organisation_id AND class_code = :code');
+        $statement->execute(['organisation_id' => $organisationId, 'code' => trim($code)]);
+        $id = $statement->fetchColumn();
+        return $id === false ? $this->createClass($organisationId, $code) : (int) $id;
     }
 }

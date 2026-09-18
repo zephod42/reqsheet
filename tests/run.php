@@ -96,8 +96,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -138,6 +138,11 @@ $handoffMigration = file_get_contents($migrationDirectory . '/0006_create_onboar
 if ($handoffMigration === false) throw new RuntimeException('Onboarding handoff migration could not be read.');
 foreach (['onboarding_handoffs', 'token_hash', 'consumed_at', 'expires_at'] as $expectedHandoffFragment) {
     if (!str_contains($handoffMigration, $expectedHandoffFragment)) throw new RuntimeException('Expected onboarding handoff schema fragment is missing: ' . $expectedHandoffFragment);
+}
+$resourceMigration = file_get_contents($migrationDirectory . '/0007_add_timetable_resources.sql');
+if ($resourceMigration === false) throw new RuntimeException('Timetable resource migration could not be read.');
+foreach (['organisation_classes', 'class_id', 'room_id', 'recurring_lessons_class_fk', 'recurring_lessons_room_fk'] as $expectedResourceFragment) {
+    if (!str_contains($resourceMigration, $expectedResourceFragment)) throw new RuntimeException('Expected timetable resource schema fragment is missing: ' . $expectedResourceFragment);
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),

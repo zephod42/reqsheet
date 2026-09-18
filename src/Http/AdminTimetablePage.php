@@ -12,6 +12,8 @@ use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\TimetableValidationException;
 use Reqsheet\Timetable\TimetableVersion;
 use Reqsheet\Timetable\TimetableVersionService;
+use Reqsheet\Timetable\ResourceTimetableStore;
+use Reqsheet\Timetable\TimetableResourceService;
 
 final class AdminTimetablePage
 {
@@ -23,6 +25,7 @@ final class AdminTimetablePage
     /** @param array<string, mixed> $query @param array<string, mixed> $input */
     public function handle(string $method, array $query, array $input): string
     {
+        if ($this->store instanceof ResourceTimetableStore) return $this->resourceHandle($method, $query, $input, $this->store);
         $message = null;
         if ($method === 'POST') {
             try {
@@ -37,6 +40,138 @@ final class AdminTimetablePage
         $version = $this->store->findVersion($versionId);
         if ($version === null || $version->organisationId !== $this->organisationId) $version = $versions[0] ?? null;
         return $this->page($versions, $version, $query, $message);
+    }
+
+    private function resourceHandle(string $method, array $query, array $input, ResourceTimetableStore $store): string
+    {
+        $message = null;
+        if ($method === 'POST') {
+            try {
+                $action = (string) ($input['action'] ?? '');
+                if ($action === 'create_resource') {
+                    $resource = new TimetableResourceService($store);
+                    $type = (string) ($input['resource_type'] ?? '');
+                    $id = match ($type) {
+                        'teacher' => $resource->createTeacher($this->organisationId, (string) ($input['code'] ?? ''), (string) ($input['display_name'] ?? '')),
+                        'room' => $resource->createRoom($this->organisationId, (string) ($input['code'] ?? '')),
+                        'class' => $resource->createClass($this->organisationId, (string) ($input['code'] ?? '')),
+                        default => throw new TimetableValidationException(['Resource type is invalid.']),
+                    };
+                    $query = array_replace($query, ['create' => '', 'view' => $type, 'resource' => $id]);
+                    $message = ucfirst($type) . ' added.';
+                } elseif ($action === 'resource_save_lesson' || $action === 'resource_delete_lesson') {
+                    $versionId = (int) ($input['version'] ?? 0);
+                    $version = $store->findVersion($versionId);
+                    if ($version === null || $version->organisationId !== $this->organisationId) throw new TimetableValidationException(['Timetable version is not available for this organisation.']);
+                    $service = new RecurringLessonService($store);
+                    if ($action === 'resource_delete_lesson') {
+                        $service->remove((int) ($input['lesson_id'] ?? 0));
+                        $message = 'Lesson removed.';
+                    } else {
+                        $lessonId = (int) ($input['lesson_id'] ?? 0);
+                        if ($lessonId > 0) $service->updateResource($lessonId, (int) ($input['teacher_user_id'] ?? 0), (int) ($input['day_of_week'] ?? 0), (int) ($input['start_slot_id'] ?? 0), (int) ($input['duration_periods'] ?? 1), (int) ($input['class_id'] ?? 0), (int) ($input['room_id'] ?? 0));
+                        else $service->createResource($versionId, (int) ($input['teacher_user_id'] ?? 0), (int) ($input['day_of_week'] ?? 0), (int) ($input['start_slot_id'] ?? 0), (int) ($input['duration_periods'] ?? 1), (int) ($input['class_id'] ?? 0), (int) ($input['room_id'] ?? 0));
+                        $message = $lessonId > 0 ? 'Lesson updated.' : 'Lesson created.';
+                    }
+                    $query = array_replace($query, ['version' => $versionId, 'view' => (string) ($input['view'] ?? 'teacher'), 'resource' => (int) ($input['resource'] ?? 0), 'edit' => 0]);
+                } elseif ($action === 'create_version') {
+                    $id = (new TimetableVersionService($store))->create($this->organisationId, $this->nullable($input['label'] ?? null), (string) ($input['effective_from'] ?? ''), $this->nullable($input['effective_to'] ?? null));
+                    $query = array_replace($query, ['version' => $id]);
+                    $message = 'Timetable version created: ' . $id;
+                }
+            } catch (TimetableValidationException | \PDOException $exception) {
+                $message = $exception instanceof TimetableValidationException ? implode(' ', $exception->errors()) : 'That resource already exists or could not be saved.';
+            }
+        }
+        $versions = $store->versionsForOrganisation($this->organisationId);
+        $versionId = (int) ($query['version'] ?? $versions[0]->id ?? 0);
+        $version = $store->findVersion($versionId);
+        if ($version === null || $version->organisationId !== $this->organisationId) $version = $versions[0] ?? null;
+        return $this->resourcePage($store, $versions, $version, $query, $message);
+    }
+
+    private function resourcePage(ResourceTimetableStore $store, array $versions, ?TimetableVersion $version, array $query, ?string $message): string
+    {
+        $view = in_array(($query['view'] ?? 'teacher'), ['teacher', 'room', 'class'], true) ? (string) $query['view'] : 'teacher';
+        $users = $store->usersForOrganisation($this->organisationId);
+        $rooms = $store->roomsForOrganisation($this->organisationId);
+        $classes = $store->classesForOrganisation($this->organisationId);
+        $resource = (int) ($query['resource'] ?? 0);
+        if ($resource < 1) $resource = $view === 'teacher' ? (int) ($users[0]['id'] ?? 0) : ($view === 'room' ? (int) ($rooms[0]['id'] ?? 0) : (int) ($classes[0]['id'] ?? 0));
+        $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable builder</h1></div><a class="button" href="/admin/people">Manage people</a></section>';
+        $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
+        $body .= $this->resourceToolbar($versions, $version?->id, $view, $resource, $users, $rooms, $classes);
+        if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
+        if (!empty($query['create'])) $body .= $this->resourceCreationForm($version?->id, $view, $resource, (string) $query['create']);
+        elseif ($version !== null && $resource > 0) {
+            $body .= $this->resourceGrid($store, $version, $view, $resource);
+            if (isset($query['edit']) || isset($query['day']) || isset($query['start_slot'])) $body .= $this->resourceLessonEditor($store, $version, $view, $resource, (int) ($query['edit'] ?? 0), $query, $users, $rooms, $classes);
+        } elseif ($version !== null) $body .= '<p class="notice">Add a teacher, room, or class to begin.</p>';
+        return PageLayout::render('Admin timetable', $body . $this->versionForm(), $this->user);
+    }
+
+    private function resourceToolbar(array $versions, ?int $version, string $view, int $resource, array $users, array $rooms, array $classes): string
+    {
+        $versionSelect = str_replace('<select name="version"', '<select name="version" onchange="this.form.submit()"', $this->versionSelect($versions, $version));
+        $html = '<section class="timetable-toolbar"><form method="get"><label>Version ' . $versionSelect . '</label><label>Teacher <select name="teacher" onchange="location.href=this.value===\'__new__\'?\'/admin/timetable?version=' . (int) $version . '&view=teacher&create=teacher\':\'/admin/timetable?version=' . (int) $version . '&view=teacher&resource=\'+this.value"><option value="0">Select teacher</option>';
+        foreach ($users as $row) if ($row['is_active']) $html .= '<option value="' . $row['id'] . '"' . ($view === 'teacher' && $resource === (int) $row['id'] ? ' selected' : '') . '>' . $this->e($row['staff_identifier'] ?: $row['display_name']) . '</option>';
+        $html .= '<option value="__new__">Add new teacher...</option></select></label><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&view=teacher&create=teacher">Add teacher</a><label>Room <select name="room" onchange="location.href=this.value===\'__new__\'?\'/admin/timetable?version=' . (int) $version . '&view=room&create=room\':\'/admin/timetable?version=' . (int) $version . '&view=room&resource=\'+this.value"><option value="0">Select room</option>';
+        foreach ($rooms as $row) $html .= '<option value="' . $row['id'] . '"' . ($view === 'room' && $resource === (int) $row['id'] ? ' selected' : '') . '>' . $this->e($row['code']) . '</option>';
+        $html .= '<option value="__new__">Add new room...</option></select></label><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&view=room&create=room">Add room</a><label>Class <select name="class" onchange="location.href=this.value===\'__new__\'?\'/admin/timetable?version=' . (int) $version . '&view=class&create=class\':\'/admin/timetable?version=' . (int) $version . '&view=class&resource=\'+this.value"><option value="0">Select class</option>';
+        foreach ($classes as $row) $html .= '<option value="' . $row['id'] . '"' . ($view === 'class' && $resource === (int) $row['id'] ? ' selected' : '') . '>' . $this->e($row['code']) . '</option>';
+        return $html . '<option value="__new__">Add new class...</option></select></label><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&view=class&create=class">Add class code</a></form></section>';
+    }
+
+    private function resourceCreationForm(?int $version, string $view, int $resource, string $type): string
+    {
+        return '<section class="resource-create"><h2>Add ' . $this->e($type) . '</h2><form method="post"><input type="hidden" name="action" value="create_resource"><input type="hidden" name="resource_type" value="' . $this->e($type) . '"><input type="hidden" name="version" value="' . (int) $version . '"><label>' . ($type === 'teacher' ? 'Initials/code' : ($type === 'class' ? 'Class code' : 'Room code')) . '<input name="code" required></label>' . ($type === 'teacher' ? '<label>Display name (optional)<input name="display_name"></label>' : '') . '<div class="form-actions"><button>Add</button><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&view=' . $this->e($view) . '&resource=' . $resource . '">Cancel</a></div></form></section>';
+    }
+
+    private function resourceGrid(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource): string
+    {
+        $days = $this->workingDays($store->slotsForVersion($version->id));
+        $slots = $store->slotsForVersion($version->id);
+        $rows = [];
+        foreach ($slots as $slot) $rows[$slot->sequenceNumber] = $slot->sequenceNumber;
+        ksort($rows);
+        $lessons = $store->lessonsForVersion($version->id);
+        $html = '<section class="editor-section admin-resource-grid"><div class="section-heading"><div><p class="eyebrow">' . $this->e(ucfirst($view)) . ' timetable</p><h2>Selected ' . $this->e($view) . '</h2></div><p class="muted">Click an empty period to assign a lesson.</p></div><div class="timetable-scroll"><table><caption class="sr-only">Versioned timetable by ' . $this->e($view) . '</caption><thead><tr><th>Period</th>';
+        foreach ($days as $day) $html .= '<th>' . $this->e($this->dayName($day)) . '</th>';
+        $html .= '</tr></thead><tbody>';
+        foreach ($rows as $sequence) {
+            $first = null; foreach ($slots as $slot) if ($slot->sequenceNumber === $sequence) { $first = $slot; break; }
+            $separator = $first !== null && !$first->isTeaching();
+            $html .= '<tr' . ($separator ? ' class="timetable-separator"' : '') . '><th>' . $this->e($first?->label ?: 'P' . ($first?->teachingPeriodNumber ?? $sequence)) . '</th>';
+            foreach ($days as $day) {
+                $slot = null; foreach ($slots as $candidate) if ($candidate->dayOfWeek === $day && $candidate->sequenceNumber === $sequence) { $slot = $candidate; break; }
+                if ($slot === null || !$slot->isTeaching()) { $html .= '<td>' . ($slot ? $this->e($slot->label ?: ucfirst($slot->kind)) : '') . '</td>'; continue; }
+                $lesson = null; foreach ($lessons as $candidate) if ($candidate->dayOfWeek === $day && $candidate->startSlotId === $slot->id && (($view === 'teacher' && $candidate->teacherUserId === $resource) || ($view === 'room' && $candidate->roomId === $resource) || ($view === 'class' && $candidate->classId === $resource))) { $lesson = $candidate; break; }
+                $href = '/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '&day=' . $day . '&start_slot=' . $slot->id . ($lesson ? '&edit=' . $lesson->id : '');
+                $html .= '<td>' . ($lesson ? '<a class="admin-lesson" href="' . $href . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>Teacher ' . $lesson->teacherUserId . '</small></a>' : '<a class="empty-period" href="' . $href . '"><span>+</span><small>Add lesson</small></a>') . '</td>';
+            }
+            $html .= '</tr>';
+        }
+        return $html . '</tbody></table></div></section>';
+    }
+
+    private function resourceLessonEditor(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource, int $edit, array $query, array $users, array $rooms, array $classes): string
+    {
+        $lesson = $edit > 0 ? $store->findLesson($edit) : null;
+        $day = $lesson?->dayOfWeek ?? (int) ($query['day'] ?? 1);
+        $slot = $lesson?->startSlotId ?? (int) ($query['start_slot'] ?? 0);
+        $fixed = $view === 'teacher' ? 'teacher_user_id' : ($view === 'room' ? 'room_id' : 'class_id');
+        $fixedValue = $view === 'teacher' ? ($lesson?->teacherUserId ?? $resource) : ($view === 'room' ? ($lesson?->roomId ?? $resource) : ($lesson?->classId ?? $resource));
+        $html = '<dialog class="lesson-dialog" open><form method="post"><a class="close" href="/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '">Close</a><p class="eyebrow">' . $this->e($this->dayName($day)) . ' · version ' . $version->id . '</p><h2>' . ($lesson ? 'Edit assignment' : 'Add assignment') . '</h2><p class="muted">The ' . $this->e($view) . ' is fixed for this projection.</p><input type="hidden" name="action" value="resource_save_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="view" value="' . $view . '"><input type="hidden" name="resource" value="' . $resource . '"><input type="hidden" name="day_of_week" value="' . $day . '"><input type="hidden" name="start_slot_id" value="' . $slot . '">' . ($lesson ? '<input type="hidden" name="lesson_id" value="' . $lesson->id . '">' : '');
+        $html .= '<input type="hidden" name="' . $fixed . '" value="' . $fixedValue . '"><label>Teacher ' . ($view === 'teacher' ? '<strong>fixed</strong>' : $this->resourceSelect('teacher_user_id', $lesson?->teacherUserId ?? 0, $users, 'Add new teacher...')) . '</label><label>Room ' . ($view === 'room' ? '<strong>fixed</strong>' : $this->resourceSelect('room_id', $lesson?->roomId ?? 0, $rooms, 'Add new room...')) . '</label><label>Class ' . ($view === 'class' ? '<strong>fixed</strong>' : $this->resourceSelect('class_id', $lesson?->classId ?? 0, $classes, 'Add new class...')) . '</label><label>Length<select name="duration_periods\"><option value="1">1 period</option></select></label><div class="form-actions"><button>Save assignment</button><a class="button secondary" href="/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '">Cancel</a></div></form>';
+        if ($lesson) $html .= '<form method="post" class="delete-form"><input type="hidden" name="action" value="resource_delete_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="view" value="' . $view . '"><input type="hidden" name="resource" value="' . $resource . '"><input type="hidden" name="lesson_id" value="' . $lesson->id . '"><button class="danger">Remove assignment</button></form>';
+        return $html . '</dialog><script>document.addEventListener("change",function(e){if(e.target.value!=="__new__")return;var type=e.target.name==="teacher_user_id"?"teacher":(e.target.name==="room_id"?"room":"class");location.href="/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '&create="+type;});</script>';
+    }
+
+    private function resourceSelect(string $name, int $selected, array $rows, string $addLabel): string
+    {
+        $html = '<select name="' . $name . '"><option value="0">Select...</option>';
+        foreach ($rows as $row) { $id = (int) $row['id']; $label = $row['code'] ?? ($row['staff_identifier'] ?: $row['display_name']); $html .= '<option value="' . $id . '"' . ($id === $selected ? ' selected' : '') . '>' . $this->e((string) $label) . '</option>'; }
+        return $html . '<option value="__new__">' . $this->e($addLabel) . '</option></select>';
     }
 
     /** @param array<string, mixed> $input */

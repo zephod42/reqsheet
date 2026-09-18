@@ -78,6 +78,7 @@ final class TimetableConfigurationTest
         self::expectLessonValidation($service, 1, 10, 1, 101, 1, 'Y', ' ');
         self::expectLessonValidation($service, 1, 10, 1, 101, 1, 'Y', 'LAB-A');
         self::expectLessonValidation($service, 1, 11, 1, 101, 1, 'Y', 'LAB-A');
+        self::expectLessonValidation($service, 1, 11, 1, 101, 1, 'Y9', 'LAB-Z');
     }
 
     private static function configurationSlots(ConfigurationStore $store): void

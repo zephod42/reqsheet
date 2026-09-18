@@ -113,6 +113,14 @@ Printing supports My rooms, All rooms, or a custom room selection. It is derived
 
 ## Admin configuration
 
+### Versioned timetable builder
+
+The admin timetable builder uses one versioned timetable dataset viewed through three projections: Teacher, Room, and Class. Teachers, rooms, and class codes are reusable organisation-level resources; assignments reference those resources and remain tied to the selected timetable version. Editing an assignment in one projection changes the same assignment seen in the other projections.
+
+The builder presents one large grid at a time, with configured working days as columns and teaching periods as rows. Break, lunch, and other separators are structural non-editable bands. A compact toolbar provides Add teacher, Add room, Add class code, and selectors for the three projections. Resource selectors include an Add new route so a missing resource can be created without abandoning the cell editor.
+
+Teacher, room, and class resources are organisation-scoped and duplicate codes are rejected. A teacher projection fixes the teacher while selecting class and room; a room projection fixes the room; a class projection fixes the class. At each version/day/period, a teacher, room, or class may not be assigned to two different lessons. Existing version and historical-occurrence protections remain in force.
+
 Admin configuration should remain straightforward and editable. The first-run Settings/setup screen must collect the following before normal use:
 
 - School name.
