@@ -18,7 +18,9 @@ final class SettingsService
     /** @return array<string, mixed> */
     public function load(int $organisationId): array
     {
-        return $this->store->find($organisationId);
+        $settings = $this->store->find($organisationId);
+        if (trim((string) ($settings['start_time'] ?? '')) === '') $settings['start_time'] = '08:00';
+        return $settings;
     }
 
     /** @param array<string, mixed> $input */
@@ -77,7 +79,7 @@ final class SettingsService
             'school_name' => $schoolName, 'working_days' => $days, 'first_day_of_week' => $firstDay,
             'periods_per_day' => $periods, 'start_time' => $startTime,
             'standard_period_minutes' => $periodLength, 'custom_day_settings' => $customDays,
-            'separators' => $separators, 'allow_double_periods' => isset($input['allow_double_periods']),
+            'separators' => $separators, 'allow_double_periods' => isset($input['allow_conjoined_periods']) || isset($input['allow_double_periods']),
         ], $rooms);
     }
 

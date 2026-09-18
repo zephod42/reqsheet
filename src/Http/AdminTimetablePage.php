@@ -12,6 +12,7 @@ use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\TimetableValidationException;
 use Reqsheet\Timetable\TimetableVersion;
 use Reqsheet\Timetable\TimetableVersionService;
+use Reqsheet\Timetable\TimetableSlotService;
 use Reqsheet\Timetable\ResourceTimetableStore;
 use Reqsheet\Timetable\TimetableResourceService;
 
@@ -76,6 +77,7 @@ final class AdminTimetablePage
                     $query = array_replace($query, ['version' => $versionId, 'view' => (string) ($input['view'] ?? 'teacher'), 'resource' => (int) ($input['resource'] ?? 0), 'edit' => 0]);
                 } elseif ($action === 'create_version') {
                     $id = (new TimetableVersionService($store))->create($this->organisationId, $this->nullable($input['label'] ?? null), (string) ($input['effective_from'] ?? ''), $this->nullable($input['effective_to'] ?? null));
+                    $this->seedVersionStructure($store, $id);
                     $query = array_replace($query, ['version' => $id]);
                     $message = 'Timetable version created: ' . $id;
                 }
@@ -159,10 +161,14 @@ final class AdminTimetablePage
         $lesson = $edit > 0 ? $store->findLesson($edit) : null;
         $day = $lesson?->dayOfWeek ?? (int) ($query['day'] ?? 1);
         $slot = $lesson?->startSlotId ?? (int) ($query['start_slot'] ?? 0);
+        $maxDuration = $this->maxDuration($version->id, $day, $slot);
+        $lengthOptions = '';
+        for ($duration = 1; $duration <= $maxDuration; $duration++) $lengthOptions .= '<option value="' . $duration . '"' . ($duration === ($lesson?->durationPeriods ?? 1) ? ' selected' : '') . '>' . $duration . ' period' . ($duration === 1 ? '' : 's') . '</option>';
         $fixed = $view === 'teacher' ? 'teacher_user_id' : ($view === 'room' ? 'room_id' : 'class_id');
         $fixedValue = $view === 'teacher' ? ($lesson?->teacherUserId ?? $resource) : ($view === 'room' ? ($lesson?->roomId ?? $resource) : ($lesson?->classId ?? $resource));
         $html = '<dialog class="lesson-dialog" open><form method="post"><a class="close" href="/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '">Close</a><p class="eyebrow">' . $this->e($this->dayName($day)) . ' · version ' . $version->id . '</p><h2>' . ($lesson ? 'Edit assignment' : 'Add assignment') . '</h2><p class="muted">The ' . $this->e($view) . ' is fixed for this projection.</p><input type="hidden" name="action" value="resource_save_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="view" value="' . $view . '"><input type="hidden" name="resource" value="' . $resource . '"><input type="hidden" name="day_of_week" value="' . $day . '"><input type="hidden" name="start_slot_id" value="' . $slot . '">' . ($lesson ? '<input type="hidden" name="lesson_id" value="' . $lesson->id . '">' : '');
         $html .= '<input type="hidden" name="' . $fixed . '" value="' . $fixedValue . '"><label>Teacher ' . ($view === 'teacher' ? '<strong>fixed</strong>' : $this->resourceSelect('teacher_user_id', $lesson?->teacherUserId ?? 0, $users, 'Add new teacher...')) . '</label><label>Room ' . ($view === 'room' ? '<strong>fixed</strong>' : $this->resourceSelect('room_id', $lesson?->roomId ?? 0, $rooms, 'Add new room...')) . '</label><label>Class ' . ($view === 'class' ? '<strong>fixed</strong>' : $this->resourceSelect('class_id', $lesson?->classId ?? 0, $classes, 'Add new class...')) . '</label><label>Length<select name="duration_periods\"><option value="1">1 period</option></select></label><div class="form-actions"><button>Save assignment</button><a class="button secondary" href="/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '">Cancel</a></div></form>';
+        $html = str_replace('<option value="1">1 period</option>', $lengthOptions, $html);
         if ($lesson) $html .= '<form method="post" class="delete-form"><input type="hidden" name="action" value="resource_delete_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="view" value="' . $view . '"><input type="hidden" name="resource" value="' . $resource . '"><input type="hidden" name="lesson_id" value="' . $lesson->id . '"><button class="danger">Remove assignment</button></form>';
         return $html . '</dialog><script>document.addEventListener("change",function(e){if(e.target.value!=="__new__")return;var type=e.target.name==="teacher_user_id"?"teacher":(e.target.name==="room_id"?"room":"class");location.href="/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '&create="+type;});</script>';
     }
@@ -172,6 +178,39 @@ final class AdminTimetablePage
         $html = '<select name="' . $name . '"><option value="0">Select...</option>';
         foreach ($rows as $row) { $id = (int) $row['id']; $label = $row['code'] ?? ($row['staff_identifier'] ?: $row['display_name']); $html .= '<option value="' . $id . '"' . ($id === $selected ? ' selected' : '') . '>' . $this->e((string) $label) . '</option>'; }
         return $html . '<option value="__new__">' . $this->e($addLabel) . '</option></select>';
+    }
+
+    private function seedVersionStructure(ResourceTimetableStore $store, int $versionId): void
+    {
+        if ($store->slotsForVersion($versionId) !== []) return;
+        $days = array_values(array_filter(array_map('intval', (array) ($this->settings['working_days'] ?? [1, 2, 3, 4, 5])), static fn (int $day): bool => $day >= 1 && $day <= 7));
+        $periods = max(1, min(20, (int) ($this->settings['periods_per_day'] ?? 6)));
+        $start = (string) ($this->settings['start_time'] ?? '08:00');
+        if (!preg_match('/^\d{2}:\d{2}$/D', $start)) $start = '08:00';
+        $length = max(1, (int) ($this->settings['standard_period_minutes'] ?? 60));
+        $separators = [];
+        foreach ((array) ($this->settings['separators'] ?? []) as $separator) {
+            $after = (int) ($separator['after_period'] ?? 0);
+            if ($after >= 1 && $after < $periods) $separators[$after] = $separator;
+        }
+        $service = new TimetableSlotService($store);
+        foreach ($days as $day) {
+            $sequence = 1;
+            $clock = \DateTimeImmutable::createFromFormat('!H:i', $start) ?: new \DateTimeImmutable('08:00');
+            for ($period = 1; $period <= $periods; $period++) {
+                $end = $clock->modify('+' . $length . ' minutes');
+                $service->create($versionId, $day, $sequence++, 'teaching', $period, 'P' . $period, $clock->format('H:i'), $end->format('H:i'));
+                $clock = $end;
+                if (isset($separators[$period])) {
+                    $separator = $separators[$period];
+                    $kind = ($separator['type'] ?? '') === 'Lunchtime' ? 'lunch' : (($separator['type'] ?? '') === 'Break' ? 'break' : 'non_teaching');
+                    $minutes = max(1, (int) ($separator['duration_minutes'] ?? 15));
+                    $separatorEnd = $clock->modify('+' . $minutes . ' minutes');
+                    $service->create($versionId, $day, $sequence++, $kind, null, (string) ($separator['type'] ?? 'Other'), $clock->format('H:i'), $separatorEnd->format('H:i'));
+                    $clock = $separatorEnd;
+                }
+            }
+        }
     }
 
     /** @param array<string, mixed> $input */
@@ -189,7 +228,7 @@ final class AdminTimetablePage
         $day = (int) ($input['day_of_week'] ?? 0);
         $slot = (int) ($input['start_slot_id'] ?? 0);
         $duration = max(1, (int) ($input['duration_periods'] ?? 1));
-        if (!$this->doublePeriodsAllowed() && $duration !== 1) throw new TimetableValidationException(['Double periods are disabled in organisation settings.']);
+        if (!$this->conjoinedPeriodsAllowed() && $duration !== 1) throw new TimetableValidationException(['Conjoined periods are disabled in organisation settings.']);
         $class = (string) ($input['class_code'] ?? '');
         $room = (string) ($input['room_code'] ?? '');
         $service = new RecurringLessonService($this->store);
@@ -336,11 +375,11 @@ final class AdminTimetablePage
         $html = '<dialog class="lesson-dialog" open><form method="post"><a class="close" href="/admin/timetable?version=' . $version->id . '&teacher=' . $teacher . '">Close</a><p class="eyebrow">' . $this->e($this->dayName($day)) . ' · ' . $this->e($this->slotLabel($slots, $slotId)) . '</p><h2>' . $title . '</h2><p class="muted">Editing ' . $this->e($this->teacherName($teacher)) . '. The teacher is fixed by this week view.</p><input type="hidden" name="action" value="' . $action . '"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="teacher_user_id" value="' . $teacher . '"><input type="hidden" name="day_of_week" value="' . $day . '"><input type="hidden" name="start_slot_id" value="' . $slotId . '">';
         if ($lesson !== null) $html .= '<input type="hidden" name="lesson_id" value="' . $lesson->id . '">';
         $html .= '<label>Class code<input name="class_code" required value="' . $this->e($lesson?->classCode ?? '') . '"></label><label>Room<input name="room_code" required value="' . $this->e($lesson?->roomCode ?? '') . '"></label>';
-        if ($this->doublePeriodsAllowed()) {
+        if ($this->conjoinedPeriodsAllowed()) {
             $html .= '<label>Length / span<select name="duration_periods">';
             for ($duration = 1; $duration <= $maxDuration; $duration++) $html .= '<option value="' . $duration . '"' . ($duration === ($lesson?->durationPeriods ?? 1) ? ' selected' : '') . '>' . $duration . ' period' . ($duration === 1 ? '' : 's') . '</option>';
             $html .= '</select></label>';
-        } else $html .= '<input type="hidden" name="duration_periods" value="1"><p class="muted">Double periods are disabled in Settings.</p>';
+        } else $html .= '<input type="hidden" name="duration_periods" value="1"><p class="muted">Conjoined periods are disabled in Settings.</p>';
         $html .= '<div class="form-actions"><button>Save lesson</button><a class="button secondary" href="/admin/timetable?version=' . $version->id . '&teacher=' . $teacher . '">Cancel</a></div></form>';
         if ($lesson !== null) $html .= '<form method="post" class="delete-form"><input type="hidden" name="action" value="delete_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="teacher_user_id" value="' . $teacher . '"><input type="hidden" name="lesson_id" value="' . $lesson->id . '"><button class="danger">Remove lesson</button></form>';
         return $html . '</dialog>';
@@ -370,7 +409,7 @@ final class AdminTimetablePage
         return 1;
     }
 
-    private function doublePeriodsAllowed(): bool { return (bool) ($this->settings['allow_double_periods'] ?? true); }
+    private function conjoinedPeriodsAllowed(): bool { return (bool) ($this->settings['allow_double_periods'] ?? true); }
 
     private function versionForm(): string
     {

@@ -126,7 +126,7 @@ Admin configuration should remain straightforward and editable. The first-run Se
 - School name.
 - Working days, defaulting to Monday-Friday.
 - First day of the working week, defaulting to Monday.
-- Periods per day, defaulting to six.
+- Periods per day, defaulting to six; the configured count drives all period-dependent settings controls and timetable rows.
 - At least one room; no room is defaulted or pre-filled.
 
 The same screen also offers optional settings:
@@ -134,7 +134,7 @@ The same screen also offers optional settings:
 - A general start time and standard period length.
 - A `Custom day` facility so individual days may use different timings or period lengths.
 - Separators/breaks with type Break, Lunchtime, or Other, the periods between which they occur, and an optional duration.
-- An `Allow double periods` toggle, disabled by default. Its help text explains that adjoining periods with the same class code and room code are combined when enabled. Configured breaks, lunch, and other separators prevent merging across them.
+- An `Allow conjoined periods` toggle, disabled by default. When enabled, one lesson may span any number of contiguous teaching periods. Configured breaks, lunch, and other separators prevent merging across them.
 - Primary accent colour and Secondary accent colour only. White/black base, timetable grid, automatic class colours, and technician print styling remain independent from these settings; arbitrary school CSS is not exposed.
 
 The timetable structure remains an ordered editor that can add, move, and rename periods and separators. Each teaching period has a configurable label/name, order, start time, and end time; separators have configurable names, timing, and order. Admins can manage rooms/labs by adding, renaming, reordering, and deactivating/archiving them.
@@ -152,7 +152,7 @@ School-specific subdomains are a high-priority architecture/product item. The sh
 
 The parent/base domain is configurable and is not hard-coded into tenant logic. During staging/Pumba, equivalent subdomains under the current DuckDNS base may be supported where practical so real tenant routing can be exercised before production. Moving from one base domain to another should require DNS, TLS, and base-domain configuration changes only, not a tenant/data-model redesign. A later enhancement may remember a user’s chosen school/subdomain and redirect generic-root visitors directly to it. Once tenant context is resolved, the school landing/login page visibly shows the school name near or below the Reqsheet branding.
 
-An admin can copy/clone an existing timetable as the basis of a new version. “Edit timetable” opens a clickable timetable maker. Viewing and editing can be organised by staff member, room, or day, with staff-member view as the default. Lesson entry remains simple: class code, room, and period/span. The configured structure drives teacher week/day layouts, separator positioning, occurrence generation, chronological ordering, determination of true period adjacency, and double/multi-period merge eligibility. Start/end times are stored even when normal teacher day labels show only the period name. The existing service-level timetable validation rules remain authoritative for all entry paths: a multi-period lesson may cross only contiguous teaching periods and may not cross any configured break, lunch, or other non-teaching interval; periods separated by such an interval are separate lesson blocks.
+An admin can copy/clone an existing timetable as the basis of a new version. “Edit timetable” opens a clickable timetable maker. Viewing and editing can be organised by staff member, room, or day, with staff-member view as the default. Lesson entry remains simple: class code, room, and period/span. The configured structure drives teacher week/day layouts, separator positioning, occurrence generation, chronological ordering, determination of true period adjacency, and conjoined-period eligibility. A fresh day-start defaults to 08:00 until an organisation-specific value is saved. Start/end times are stored even when normal teacher day labels show only the period name. The existing service-level timetable validation rules remain authoritative for all entry paths: a conjoined lesson may span any number of contiguous teaching periods but may not cross any configured break, lunch, or other non-teaching interval; periods separated by such an interval are separate lesson blocks.
 
 ## Canonical timetable CSV import/export
 

@@ -62,9 +62,9 @@ final class AdminTimetablePageTest
 
         $disabled = new AdminTimetablePage($store, 1, ['working_days' => [1], 'first_day_of_week' => 1, 'allow_double_periods' => false]);
         $disabledView = $disabled->handle('GET', ['version' => 1, 'teacher' => 10, 'edit' => 99], []);
-        assertContains('Double periods are disabled in Settings.', $disabledView, 'Disabled double-period mode exposed the wrong editor state.');
+        assertContains('Conjoined periods are disabled in Settings.', $disabledView, 'Disabled conjoined-period mode exposed the wrong editor state.');
         $blockedSpan = $disabled->handle('POST', [], ['action' => 'create_lesson', 'version' => 1, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 2, 'class_code' => 'SPAN', 'room_code' => 'P1']);
-        assertContains('Double periods are disabled', $blockedSpan, 'Disabled double-period mode permitted a span.');
+        assertContains('Conjoined periods are disabled', $blockedSpan, 'Disabled conjoined-period mode permitted a span.');
     }
 }
 

@@ -12,6 +12,7 @@ Completed foundations:
 - Pilot-visible UI milestone: shared restrained visual foundation, public landing/login/signup, organisation settings and setup gating, teacher week class colours, and large lesson editor with explicit `Nothing required` action. Completed in this milestone.
 - School tenant slug/host milestone: domain-independent organisation slugs, configurable base-host resolution, tenant-aware login and protected-route consistency, and school context on resolved pages. Wildcard DNS/TLS and final production-domain selection remain deployment work.
 - Versioned timetable-builder redesign: reusable organisation-level teacher, room, and class resources, one assignment dataset with editable teacher/room/class projections, resource creation from selectors, and per-version teacher/room/class clash validation.
+- Settings/timetable robustness: configurable period counts drive separators and seeded timetable structure; conjoined lessons may span any contiguous teaching periods but never separators; fresh start time defaults to 08:00; authenticated sidebar structure remains consistent with admin destinations disabled for non-admins.
 
 Agreed design decisions recorded on 2026-09-18:
 

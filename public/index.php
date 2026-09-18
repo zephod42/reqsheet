@@ -352,6 +352,8 @@ if ($route === ApplicationRoute::TEACHER_WEEK) {
             ),
             $user['organisation_id'],
             $user['id'],
+            new \DateTimeImmutable('today'),
+            $user,
         );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
@@ -370,7 +372,7 @@ if ($route === ApplicationRoute::TECHNICIAN) {
         exit;
     }
     header('Content-Type: text/html; charset=UTF-8');
-    echo (new TechnicianPlaceholderPage())->render();
+    echo (new TechnicianPlaceholderPage())->render($user);
     exit;
 }
 

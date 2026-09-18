@@ -23,7 +23,9 @@ final class PageLayout
         if ($user !== null) {
             $landing = ($user['operational_role'] ?? '') === 'technician' ? '/technician' : '/teacher';
             $nav .= '<li class="nav-divider"><a' . $active($landing) . ' href="' . $landing . '">' . (($landing === '/technician') ? 'Technician' : 'Teacher week') . '</a></li>';
-            if ((bool) ($user['is_admin'] ?? false)) $nav .= '<li><a' . $active('/settings') . ' href="/settings">Settings</a></li><li><a' . $active('/admin/people') . ' href="/admin/people">People</a></li><li><a' . $active('/admin/timetable') . ' href="/admin/timetable">Timetable</a></li>';
+            $admin = (bool) ($user['is_admin'] ?? false);
+            $adminLink = fn (string $path, string $label): string => $admin ? '<a' . $active($path) . ' href="' . $path . '">' . $label . '</a>' : '<span class="nav-disabled" aria-disabled="true" title="Administrators only">' . $label . '</span>';
+            $nav .= '<li>' . $adminLink('/settings', 'Settings') . '</li><li>' . $adminLink('/admin/people', 'People') . '</li><li>' . $adminLink('/admin/timetable', 'Timetable') . '</li>';
             $nav .= '<li><a href="/logout">Log out</a></li>';
         }
         $nav .= '</ul></nav>';

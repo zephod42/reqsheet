@@ -79,6 +79,7 @@ small { font-size: .82rem; }
 .site-nav li.nav-divider { border-top: 1px solid #d0d0d0; margin-top: var(--space-3); padding-top: var(--space-3); }
 .site-nav li a { display: block; border-radius: var(--corner); padding: .38rem .5rem; text-decoration: none; }
 .site-nav li a:hover, .site-nav li a:focus-visible { background: var(--secondary-pale); }
+.site-nav .nav-disabled { display: block; border-radius: var(--corner); padding: .38rem .5rem; color: var(--muted); cursor: not-allowed; }
 .site-nav li a.active { background: var(--primary-pale); box-shadow: inset 3px 0 0 var(--primary-accent); font-weight: 700; }
 .site-main { width: min(100%, 78rem); padding: var(--space-5) clamp(1rem, 4vw, 4rem); }
 .tenant-name { margin: -.8rem 0 var(--space-4); color: var(--muted); font-size: .95rem; font-weight: 650; }

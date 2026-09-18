@@ -33,6 +33,16 @@ final class SettingsTest
         assertSameValue(['LAB-A'], $store->rooms, 'Room was not saved.');
         assertSameValue(true, $store->saved['allow_double_periods'], 'Double-period setting was not saved.');
         assertSameValue('Break', $store->saved['separators'][0]['type'], 'Separator type was not saved.');
+        $service->save(1, [
+            'school_name' => 'Nine Period School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
+            'periods_per_day' => 9, 'rooms' => ['LAB-A'], 'separator_type' => ['Break'],
+            'separator_after' => [6], 'separator_duration' => ['15'], 'allow_conjoined_periods' => '1',
+        ]);
+        assertSameValue(9, $store->saved['periods_per_day'], 'Nine-period settings were not saved.');
+        assertSameValue(6, $store->saved['separators'][0]['after_period'], 'A separator after period 6 was not saved.');
+        assertSameValue(true, $store->saved['allow_double_periods'], 'Conjoined-period setting was not saved.');
+        $ninePeriodView = (new SettingsPage(new SettingsService($store), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]))->handle('GET', []);
+        assertContainsValue('After period 8', $ninePeriodView, 'Nine-period settings did not expose the period 8/9 separator boundary.');
 
         $transitionStore = new SettingsTransitionStoreFake();
         $settingsPage = new SettingsPage(new SettingsService($transitionStore), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
@@ -45,6 +55,8 @@ final class SettingsTest
         assertContainsValue('Settings saved.', $afterSetup, 'Completed settings did not render the saved state.');
         assertNotContainsValue('Service unavailable', $afterSetup, 'Completed settings rendered an unavailable state.');
         assertContainsValue('value="Transition School"', $afterSetup, 'Completed settings were not loaded for the next page render.');
+        assertContainsValue('value="08:00"', $beforeSetup, 'Fresh settings did not default the start time to 08:00.');
+        assertContainsValue('Allow conjoined periods', $beforeSetup, 'Settings did not use conjoined-period wording.');
 
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
         $signupAccounts = new \Reqsheet\Account\AccountService($signupStore);
@@ -69,6 +81,8 @@ final class SettingsTest
         assertContainsValue('Settings need to be configured. Contact your admin.', $blocked, 'Setup blocking message was not rendered.');
         $adminNav = \Reqsheet\Http\PageLayout::render('Admin', '<p>Admin</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
         assertContainsValue('href="/settings"', $adminNav, 'Admin navigation did not expose Settings.');
+        $teacherNav = \Reqsheet\Http\PageLayout::render('Teacher', '<p>Teacher</p>', ['id' => 2, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => false]);
+        assertContainsValue('nav-disabled', $teacherNav, 'Non-admin navigation did not retain disabled admin destinations.');
     }
 
     private static function expectValidation(callable $operation, string $message): void
@@ -91,7 +105,7 @@ final class SettingsStoreFake implements OrganisationSettingsStore
 
     public function find(int $organisationId): array
     {
-        return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => 6, 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => [], 'allow_double_periods' => false];
+        return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => $this->saved['periods_per_day'] ?? 6, 'start_time' => $this->saved['start_time'] ?? '', 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => $this->saved['separators'] ?? [], 'allow_double_periods' => $this->saved['allow_double_periods'] ?? false];
     }
 
     public function save(int $organisationId, array $settings, array $rooms): void

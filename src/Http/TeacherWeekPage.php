@@ -18,6 +18,7 @@ final class TeacherWeekPage
         private readonly int $organisationId,
         private readonly int $teacherId,
         private readonly DateTimeImmutable $today = new DateTimeImmutable('today'),
+        private readonly ?array $user = null,
     ) {
     }
 
@@ -94,7 +95,7 @@ final class TeacherWeekPage
         }
         $body .= '</tbody></table></div>';
         $body .= $this->modal($editing);
-        return PageLayout::render('Teacher week', $body . '<script>' . $this->script() . '</script>');
+        return PageLayout::render('Teacher week', $body . '<script>' . $this->script() . '</script>', $this->user);
     }
 
     /** @param array<string, mixed> $occurrence */
@@ -127,7 +128,7 @@ final class TeacherWeekPage
     private function weekDayLabel(DateTimeImmutable $date): string { return $date->format('l j F Y'); }
     private function periodLabel(TimetableSlot $slot): string { return $slot->label ?: 'P' . $slot->teachingPeriodNumber; }
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-    private function error(string $message): string { return PageLayout::render('Teacher week', '<p class="notice error">' . $this->e($message) . '</p>'); }
+    private function error(string $message): string { return PageLayout::render('Teacher week', '<p class="notice error">' . $this->e($message) . '</p>', $this->user); }
     private function classTone(string $class): int { return abs(crc32($class)) % 6; }
     private function script(): string { return "document.querySelectorAll('[data-lesson-id]').forEach(function(link){link.addEventListener('click',function(event){var dialog=document.getElementById('lesson-editor');if(!dialog||!dialog.showModal)return;event.preventDefault();dialog.querySelector('input[name=occurrence_id]').value=link.dataset.lessonId;dialog.querySelector('input[name=date]').value=link.dataset.date;dialog.querySelector('h2').textContent='Edit lesson planning';dialog.querySelector('.lesson-context').textContent=link.dataset.class+' · '+link.dataset.room+' | '+link.dataset.date+' · '+link.dataset.period;dialog.querySelector('[name=lesson_outline]').value=link.dataset.outline;dialog.querySelector('[name=requisitions]').value=link.dataset.requisitions;dialog.querySelector('[name=risk_assessment]').value=link.dataset.risk;dialog.querySelector('[data-nothing-required]').checked=link.dataset.requisitions==='Nothing required';dialog.showModal();});});document.querySelectorAll('[data-close]').forEach(function(button){button.addEventListener('click',function(){button.closest('dialog').close();});});document.querySelectorAll('[data-nothing-required]').forEach(function(box){box.addEventListener('change',function(){var field=box.closest('label').querySelector('[name=requisitions]');if(box.checked){field.value='Nothing required';}else if(field.value==='Nothing required'){field.value='';}});});"; }
 }
