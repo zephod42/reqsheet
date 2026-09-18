@@ -39,10 +39,11 @@ final class SettingsTest
         $signupView = $signup->handle('GET', []);
         assertContainsValue('School name', $signupView, 'Signup did not ask for a school name.');
         assertNotContainsValue('email', strtolower($signupView), 'Signup unexpectedly requires email.');
-        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'display_name' => 'Pilot Admin', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
+        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilot-school', 'display_name' => 'Pilot Admin', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
         assertContainsValue('/settings', $created, 'Successful signup did not route the first admin to settings.');
         assertSameValue(true, (bool) $signupStore->accounts['Pilot Admin']['is_admin'], 'Signup did not create an admin account.');
         assertSameValue(2, $signupStore->accounts['Pilot Admin']['organisation_id'], 'Public signup did not create a second organisation.');
+        assertSameValue('pilot-school', $signupStore->accounts['Pilot Admin']['tenant_slug'], 'Public signup did not store the tenant slug.');
         assertSameValue(1, $signupStore->accounts['Existing Admin']['organisation_id'], 'Public signup leaked or changed the existing tenant.');
         assertSameValue(2, \Reqsheet\Http\SessionAuth::current()['organisation_id'], 'Public signup did not authenticate the new admin tenant.');
         self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', null, 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');

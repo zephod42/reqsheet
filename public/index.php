@@ -26,6 +26,9 @@ use Reqsheet\Http\SetupAccess;
 use Reqsheet\Http\SetupPage;
 use Reqsheet\Http\SignupPage;
 use Reqsheet\Http\TechnicianPlaceholderPage;
+use Reqsheet\Http\TenantHostContext;
+use Reqsheet\Http\TenantHostException;
+use Reqsheet\Http\TenantHostResolver;
 use Reqsheet\Teacher\PdoTeacherPlanningStore;
 use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Timetable\PdoTimetableConfigurationStore;
@@ -35,6 +38,51 @@ use Reqsheet\Settings\SettingsService;
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $route = ApplicationRoute::match($method, $path);
+
+$rawEnvironment = getenv();
+$rawEnvironment = is_array($rawEnvironment) ? $rawEnvironment : [];
+try {
+    $environment = ExternalEnvironment::load($rawEnvironment);
+} catch (\Throwable) {
+    $environment = $rawEnvironment;
+}
+
+$tenantContext = null;
+try {
+    $baseHost = TenantHostResolver::configuredBaseHost($environment, $_SERVER);
+    if ($baseHost === null) {
+        $tenantContext = new TenantHostContext($baseHost, null, null);
+    } else {
+        $requestHost = TenantHostResolver::requestHost($_SERVER);
+        $tenantSlug = TenantHostResolver::tenantSlugForHost($requestHost, $baseHost);
+        if ($tenantSlug === null) {
+            $tenantContext = new TenantHostContext($baseHost, null, null);
+        } else {
+            $config = DatabaseConfig::fromEnvironment($environment);
+            $tenantContext = (new TenantHostResolver(new PdoAccountStore((new Database($config))->connection())))->resolve($requestHost, $baseHost);
+        }
+    }
+    PageLayout::setTenantOrganisation($tenantContext->organisation);
+} catch (TenantHostException $exception) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo "School not found\n";
+    exit;
+} catch (\Throwable) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo "Service unavailable\n";
+    exit;
+}
+
+$tenantOrganisationId = $tenantContext?->organisation['id'] ?? null;
+$currentUser = SessionAuth::current();
+if ($tenantOrganisationId !== null && $currentUser !== null && (int) $currentUser['organisation_id'] !== (int) $tenantOrganisationId) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo "School not found\n";
+    exit;
+}
 
 if ($route === ApplicationRoute::LOGIN) {
     $loginPage = new LoginPage();
@@ -51,7 +99,7 @@ if ($route === ApplicationRoute::LOGIN) {
         $accounts = new AccountService(new PdoAccountStore((new Database($config))->connection()));
         if ($method === 'POST' && ($_POST['action'] ?? '') === 'claim') {
             $login = (string) ($_POST['login'] ?? '');
-            $account = $accounts->claimFirstLogin($login, (string) ($_POST['password'] ?? ''), (string) ($_POST['password_confirmation'] ?? ''));
+            $account = $accounts->claimFirstLogin($login, (string) ($_POST['password'] ?? ''), (string) ($_POST['password_confirmation'] ?? ''), $tenantOrganisationId === null ? null : (int) $tenantOrganisationId);
             SessionAuth::login($account);
             header('Location: ' . SessionAuth::landingPath($account), true, 302);
             exit;
@@ -59,12 +107,12 @@ if ($route === ApplicationRoute::LOGIN) {
         if ($method === 'POST') {
             $login = (string) ($_POST['login'] ?? '');
             try {
-                $account = $accounts->authenticate($login, (string) ($_POST['password'] ?? ''));
+                $account = $accounts->authenticate($login, (string) ($_POST['password'] ?? ''), $tenantOrganisationId === null ? null : (int) $tenantOrganisationId);
                 SessionAuth::login($account);
                 header('Location: ' . SessionAuth::landingPath($account), true, 302);
                 exit;
             } catch (\Reqsheet\Account\AccountValidationException $exception) {
-                if ($accounts->needsFirstLogin($login)) {
+                if ($accounts->needsFirstLogin($login, $tenantOrganisationId === null ? null : (int) $tenantOrganisationId)) {
                     header('Content-Type: text/html; charset=UTF-8');
                     echo $loginPage->firstLogin($login);
                     exit;
@@ -96,7 +144,7 @@ if ($route === ApplicationRoute::SIGNUP) {
     try {
         $environment = ExternalEnvironment::load($environment);
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new SignupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())));
+        $page = new SignupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $tenantContext?->baseHost ?? '');
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
     } catch (\Throwable) {
@@ -146,7 +194,7 @@ if ($route === ApplicationRoute::SETUP) {
     }
     try {
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new SetupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())));
+        $page = new SetupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $tenantContext?->baseHost ?? '');
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
     } catch (\Throwable) {
@@ -191,7 +239,6 @@ if ($route === ApplicationRoute::NOT_FOUND) {
     exit;
 }
 
-$currentUser = SessionAuth::current();
 if ($route === ApplicationRoute::SETTINGS) {
     if (!SessionAuth::isAdmin($currentUser)) {
         header('Location: /login', true, 302);

@@ -25,6 +25,25 @@ final class PdoAccountStore implements AccountStore
         return $statement->fetchColumn() !== false;
     }
 
+    public function organisationTenantSlugExists(string $tenantSlug): bool
+    {
+        $statement = $this->prepare('SELECT 1 FROM organisations WHERE tenant_slug = :tenant_slug LIMIT 1');
+        $statement->execute(['tenant_slug' => $tenantSlug]);
+        return $statement->fetchColumn() !== false;
+    }
+
+    public function findOrganisationByTenantSlug(string $tenantSlug): ?array
+    {
+        $statement = $this->prepare('SELECT id, name, tenant_slug FROM organisations WHERE tenant_slug = :tenant_slug LIMIT 1');
+        $statement->execute(['tenant_slug' => $tenantSlug]);
+        $row = $statement->fetch();
+        return $row === false ? null : [
+            'id' => (int) $row['id'],
+            'name' => (string) $row['name'],
+            'tenant_slug' => (string) $row['tenant_slug'],
+        ];
+    }
+
     public function findLogin(string $login): ?array
     {
         $statement = $this->prepare(
@@ -46,12 +65,12 @@ final class PdoAccountStore implements AccountStore
         ];
     }
 
-    public function createFirstOrganisation(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash): int
+    public function createFirstOrganisation(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin first-run setup.');
         try {
             if ($this->organisationCount() !== 0) throw new AccountValidationException(['First-run setup is no longer available.']);
-            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash);
+            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash, $tenantSlug);
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete first-run setup.');
             return $organisationId;
         } catch (\Throwable $exception) {
@@ -60,11 +79,11 @@ final class PdoAccountStore implements AccountStore
         }
     }
 
-    public function createOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash): int
+    public function createOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin organisation signup.');
         try {
-            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash);
+            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash, $tenantSlug);
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete organisation signup.');
             return $organisationId;
         } catch (\Throwable $exception) {
@@ -108,10 +127,10 @@ final class PdoAccountStore implements AccountStore
         return $statement;
     }
 
-    private function insertOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash): int
+    private function insertOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug): int
     {
-        $organisation = $this->prepare('INSERT INTO organisations (name) VALUES (:name)');
-        $organisation->execute(['name' => $organisationName]);
+        $organisation = $this->prepare('INSERT INTO organisations (name, tenant_slug) VALUES (:name, :tenant_slug)');
+        $organisation->execute(['name' => $organisationName, 'tenant_slug' => $tenantSlug]);
         $organisationId = (int) $this->pdo->lastInsertId();
         $user = $this->prepare(
             'INSERT INTO users

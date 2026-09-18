@@ -9,7 +9,7 @@ use Reqsheet\Account\AccountValidationException;
 
 final class SetupPage
 {
-    public function __construct(private readonly AccountService $accounts)
+    public function __construct(private readonly AccountService $accounts, private readonly string $baseHost = '')
     {
     }
 
@@ -26,6 +26,7 @@ final class SetupPage
                     (string) ($input['operational_role'] ?? ''),
                     (string) ($input['password'] ?? ''),
                     (string) ($input['password_confirmation'] ?? ''),
+                    (string) ($input['tenant_slug'] ?? ''),
                 );
                 return '<!doctype html><meta charset="utf-8"><title>Reqsheet setup complete</title><main><h1>Setup complete</h1><p>The first account is ready. <a href="/login">Continue to login</a>.</p></main>';
             } catch (AccountValidationException $exception) {
@@ -33,13 +34,17 @@ final class SetupPage
             }
         }
         if (!$this->accounts->setupAvailable()) return $this->simple('Setup is no longer available.');
-        return $this->form($message);
+        return $this->form($message, $input);
     }
 
-    private function form(?string $message): string
+    /** @param array<string, mixed> $input */
+    private function form(?string $message, array $input): string
     {
         $notice = $message === null ? '' : '<p class="error">' . $this->e($message) . '</p>';
-        return '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Reqsheet first-run setup</title><style>body{font:16px system-ui,sans-serif;margin:2rem;max-width:38rem}label{display:block;margin:1rem 0}input,select,button{font:inherit;padding:.45rem;width:100%;box-sizing:border-box}.error{background:#fee;padding:.7rem}</style><main><h1>First-run setup</h1><p>Create the first Reqsheet organisation and administrator.</p>' . $notice . '<form method="post"><label>Organisation / school name<input name="organisation_name" required></label><label>First user name/login<input name="display_name" required></label><label>Staff abbreviation (optional)<input name="staff_identifier"></label><label>Operational role<select name="operational_role"><option value="teacher">Teacher</option><option value="technician">Technician</option></select></label><label>Password<input type="password" name="password" minlength="8" required></label><label>Confirm password<input type="password" name="password_confirmation" minlength="8" required></label><button>Create organisation and admin account</button></form></main>';
+        $organisationName = (string) ($input['organisation_name'] ?? '');
+        $tenantSlug = (string) ($input['tenant_slug'] ?? \Reqsheet\Account\TenantSlug::suggest($organisationName));
+        $preview = $tenantSlug !== '' && $this->baseHost !== '' ? '<p>Preview: <code>' . $this->e(strtolower(trim($tenantSlug) . '.' . $this->baseHost)) . '</code></p>' : '';
+        return '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Reqsheet first-run setup</title><style>body{font:16px system-ui,sans-serif;margin:2rem;max-width:38rem}label{display:block;margin:1rem 0}input,select,button{font:inherit;padding:.45rem;width:100%;box-sizing:border-box}.error{background:#fee;padding:.7rem}</style><main><h1>First-run setup</h1><p>Create the first Reqsheet organisation and administrator.</p>' . $notice . '<form method="post"><label>Organisation / school name<input name="organisation_name" value="' . $this->e($organisationName) . '" required></label><label>Tenant slug<input name="tenant_slug" value="' . $this->e($tenantSlug) . '" required><small>The deployment-configured domain is not part of the tenant identity.</small></label>' . $preview . '<label>First user name/login<input name="display_name" value="' . $this->e((string) ($input['display_name'] ?? '')) . '" required></label><label>Staff abbreviation (optional)<input name="staff_identifier" value="' . $this->e((string) ($input['staff_identifier'] ?? '')) . '"></label><label>Operational role<select name="operational_role"><option value="teacher">Teacher</option><option value="technician">Technician</option></select></label><label>Password<input type="password" name="password" minlength="8" required></label><label>Confirm password<input type="password" name="password_confirmation" minlength="8" required></label><button>Create organisation and admin account</button></form></main>';
     }
 
     private function simple(string $message): string { return '<!doctype html><meta charset="utf-8"><title>Reqsheet setup</title><main><p>' . $this->e($message) . '</p></main>'; }

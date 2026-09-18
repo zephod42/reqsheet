@@ -9,6 +9,7 @@ require __DIR__ . '/AdminTimetablePageTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
 require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
 require __DIR__ . '/AccountTest.php';
+require __DIR__ . '/TenantTest.php';
 require __DIR__ . '/SettingsTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
@@ -94,8 +95,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -126,6 +127,11 @@ $settingsMigration = file_get_contents($migrationDirectory . '/0004_add_organisa
 if ($settingsMigration === false) throw new RuntimeException('Settings migration could not be read.');
 foreach (['organisation_settings', 'organisation_rooms', 'allow_double_periods'] as $expectedSettingsFragment) {
     if (!str_contains($settingsMigration, $expectedSettingsFragment)) throw new RuntimeException('Expected settings schema fragment is missing: ' . $expectedSettingsFragment);
+}
+$tenantMigration = file_get_contents($migrationDirectory . '/0005_add_tenant_slugs.sql');
+if ($tenantMigration === false) throw new RuntimeException('Tenant migration could not be read.');
+foreach (['tenant_slug', 'organisations_tenant_slug', 'organisation-'] as $expectedTenantFragment) {
+    if (!str_contains($tenantMigration, $expectedTenantFragment)) throw new RuntimeException('Expected tenant schema fragment is missing: ' . $expectedTenantFragment);
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
@@ -164,6 +170,7 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\RoutingTest::run();
 \Reqsheet\Tests\AdminTimetablePageTest::run();
 \Reqsheet\Tests\AccountTest::run();
+\Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

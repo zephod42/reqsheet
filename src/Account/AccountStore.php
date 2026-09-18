@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Reqsheet\Account;
 
-interface AccountStore
+interface AccountStore extends TenantStore
 {
     public function organisationCount(): int;
 
     public function organisationExists(int $organisationId): bool;
+
+    public function organisationTenantSlugExists(string $tenantSlug): bool;
 
     /** @return array<string, mixed>|null */
     public function findLogin(string $login): ?array;
@@ -19,6 +21,7 @@ interface AccountStore
         ?string $staffIdentifier,
         string $role,
         string $passwordHash,
+        string $tenantSlug = '',
     ): int;
 
     public function createOrganisationAdmin(
@@ -27,6 +30,7 @@ interface AccountStore
         ?string $staffIdentifier,
         string $role,
         string $passwordHash,
+        string $tenantSlug = '',
     ): int;
 
     public function createUser(

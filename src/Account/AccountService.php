@@ -24,13 +24,15 @@ final class AccountService
         string $role,
         string $password,
         string $confirmation,
+        ?string $tenantSlug = null,
     ): int {
         $this->validateIdentity($organisationName, $displayName, $role);
         $this->validatePassword($password, $confirmation);
+        $tenantSlug = $this->validatedTenantSlug($organisationName, $tenantSlug);
         if (!$this->setupAvailable()) throw new AccountValidationException(['First-run setup is no longer available.']);
         return $this->store->createFirstOrganisation(
             trim($organisationName), trim($displayName), $this->nullable($staffIdentifier), $role,
-            password_hash($password, PASSWORD_DEFAULT),
+            password_hash($password, PASSWORD_DEFAULT), $tenantSlug,
         );
     }
 
@@ -40,12 +42,14 @@ final class AccountService
         string $role,
         string $password,
         string $confirmation,
+        ?string $tenantSlug = null,
     ): int {
         $this->validateIdentity($organisationName, $displayName, $role);
         $this->validatePassword($password, $confirmation);
+        $tenantSlug = $this->validatedTenantSlug($organisationName, $tenantSlug);
         return $this->store->createOrganisationAdmin(
             trim($organisationName), trim($displayName), null, $role,
-            password_hash($password, PASSWORD_DEFAULT),
+            password_hash($password, PASSWORD_DEFAULT), $tenantSlug,
         );
     }
 
@@ -57,10 +61,10 @@ final class AccountService
     }
 
     /** @return array<string, mixed> */
-    public function authenticate(string $login, string $password): array
+    public function authenticate(string $login, string $password, ?int $organisationId = null): array
     {
         $account = $this->store->findLogin(trim($login));
-        if ($account === null || !($account['is_active'] ?? false)) throw new AccountValidationException(['Invalid login details.']);
+        if ($account === null || !($account['is_active'] ?? false) || ($organisationId !== null && (int) ($account['organisation_id'] ?? 0) !== $organisationId)) throw new AccountValidationException(['Invalid login details.']);
         if (($account['account_state'] ?? '') === 'awaiting_first_login' && ($account['password_hash'] ?? null) === null) {
             throw new AccountValidationException(['This account is awaiting its first login password.']);
         }
@@ -70,18 +74,19 @@ final class AccountService
         return $account;
     }
 
-    public function needsFirstLogin(string $login): bool
+    public function needsFirstLogin(string $login, ?int $organisationId = null): bool
     {
         $account = $this->store->findLogin(trim($login));
         return $account !== null && ($account['is_active'] ?? false)
+            && ($organisationId === null || (int) ($account['organisation_id'] ?? 0) === $organisationId)
             && ($account['account_state'] ?? '') === 'awaiting_first_login'
             && ($account['password_hash'] ?? null) === null;
     }
 
-    public function claimFirstLogin(string $login, string $password, string $confirmation): array
+    public function claimFirstLogin(string $login, string $password, string $confirmation, ?int $organisationId = null): array
     {
         $account = $this->store->findLogin(trim($login));
-        if ($account === null || !($account['is_active'] ?? false) || ($account['account_state'] ?? '') !== 'awaiting_first_login' || ($account['password_hash'] ?? null) !== null) {
+        if ($account === null || !($account['is_active'] ?? false) || ($organisationId !== null && (int) ($account['organisation_id'] ?? 0) !== $organisationId) || ($account['account_state'] ?? '') !== 'awaiting_first_login' || ($account['password_hash'] ?? null) !== null) {
             throw new AccountValidationException(['This account has already been claimed or is unavailable.']);
         }
         $this->validatePassword($password, $confirmation);
@@ -111,5 +116,19 @@ final class AccountService
     {
         $value = $value === null ? '' : trim($value);
         return $value === '' ? null : $value;
+    }
+
+    private function validatedTenantSlug(string $organisationName, ?string $tenantSlug): string
+    {
+        $candidate = $tenantSlug === null || trim($tenantSlug) === ''
+            ? TenantSlug::suggest($organisationName)
+            : trim($tenantSlug);
+        try {
+            $slug = TenantSlug::normalise($candidate);
+        } catch (AccountValidationException $exception) {
+            throw $exception;
+        }
+        if ($this->store->organisationTenantSlugExists($slug)) throw new AccountValidationException(['That tenant slug is already in use. Choose another slug.']);
+        return $slug;
     }
 }

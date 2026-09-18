@@ -57,7 +57,7 @@ When implementing the agreed UI/admin work:
 - preserve the agreed primary landing views: Teacher is week-oriented and Technician is day-oriented; Admin is an additional capability, not an operational role.
 - preserve the agreed pilot UI decisions in `PRODUCT_DESIGN.md`: restrained black-and-white Reqsheet chrome, technical timetable typography, setup gating, persistent-login intent, teacher class colours, technician neutral/black-and-white output, and large lesson-editing pop-outs.
 - preserve the agreed visual/product guardrails: central CSS accent tokens; exactly two admin theme values (Primary and Secondary); no arbitrary school CSS; stable teacher class accents separate from school theme/grid/print styling; white teacher lesson cards over a neutral grid; regular dark-green class codes and dark-wine room codes; compact fixed text areas with Requisitions dominant; and accessible lesson-copy duplication that never moves the source.
-- preserve configurable, tenant-isolated school subdomains: production `<school>.reqsheet.uk`, staging equivalents under the configured DuckDNS/base domain, internal slug uniqueness validation, and no hard-coded parent domain.
+- preserve configurable, tenant-isolated school subdomains: `<school>.<configured-base-domain>`, staging equivalents under the configured base domain, internal slug uniqueness validation, and no hard-coded parent domain.
 - prioritize manual live testing on Pumba with realistic schools/timetables before unnecessary architectural work; keep visual/style iteration independent where practical.
 
 ## Quality

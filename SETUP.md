@@ -34,6 +34,8 @@ Runtime configuration uses `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_P
 php bin/migrate.php
 ```
 
+Tenant host resolution uses the deployment configuration value `REQSHEET_BASE_HOST`, containing the public root/base hostname only, such as `example.test` in local development. It must not include a scheme, port, tenant slug, or path. Tenant resolution is disabled when this value is absent, except for localhost/loopback development; deployments must set it explicitly rather than deriving it from the request Host header or a non-local web-server name. Tenant slugs remain domain-independent, so changing this value does not require a schema or data migration.
+
 For the web runtime, the administrator may set `REQSHEET_ENV_FILE` to one explicit absolute path outside the repository. The application parses only literal `KEY=value` lines, ignores blank lines and comments, does not execute shell syntax or interpolation, and does not overwrite variables already supplied to the process. If the variable is absent, the existing process-environment behaviour is unchanged. For the protected local runtime configuration, the Apache vhost should set only the path:
 
 ```apache
@@ -129,6 +131,6 @@ The public pilot signup route is `/signup`; it creates the first organisation an
 
 ## Tenant host configuration
 
-Production school URLs use the shared pattern `<school>.reqsheet.uk`; the root `reqsheet.uk` remains the generic public entry, sign-up, and school-selection route. The parent/base domain must be supplied through deployment configuration rather than hard-coded in tenant logic. Signup/setup stores a validated, Admin-editable tenant slug and checks uniqueness in Reqsheet’s database; it does not perform registrar availability checks. The shared application/server must resolve the host to the correct isolated organisation before serving school-specific pages.
+School URLs use the shared pattern `<school>.<configured-base-domain>`; the configured base host remains the generic public entry, sign-up, and school-selection route. The final production domain is undecided and the parent/base domain must be supplied through deployment configuration rather than hard-coded in tenant logic. Signup/setup stores a validated, Admin-editable tenant slug and checks uniqueness in Reqsheet’s database; it does not perform registrar availability checks. The shared application/server must resolve the host to the correct isolated organisation before serving school-specific pages.
 
-For Pumba/staging, use equivalent subdomains under the current DuckDNS hostname where practical, such as `<school>.reqsheet.duckdns.org`, to exercise real tenant routing. Migration to `reqsheet.uk` should require DNS/TLS/base-domain configuration changes only. The resolved school landing/login page should show the school name near or below the Reqsheet branding.
+For Pumba/staging, use equivalent subdomains under the current DuckDNS base where practical to exercise real tenant routing. Changing the configured base domain should require DNS/TLS/base-domain configuration changes only. The resolved school landing/login page should show the school name near or below the Reqsheet branding.

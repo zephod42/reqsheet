@@ -10,6 +10,7 @@ Completed foundations:
 - Teacher week-view skeleton and dated lesson planning editor: current configured week, navigable week controls, compact occurrence blocks, and direct editing of the three planning text fields. Completed in this milestone.
 - Pilot first-run setup and login: initial organisation/admin creation, hashed passwords, sessions, operational-role landing, and explicit awaiting-first-login accounts. Completed in this milestone.
 - Pilot-visible UI milestone: shared restrained visual foundation, public landing/login/signup, organisation settings and setup gating, teacher week class colours, and large lesson editor with explicit `Nothing required` action. Completed in this milestone.
+- School tenant slug/host milestone: domain-independent organisation slugs, configurable base-host resolution, tenant-aware login and protected-route consistency, and school context on resolved pages. Wildcard DNS/TLS and final production-domain selection remain deployment work.
 
 Agreed design decisions recorded on 2026-09-18:
 
@@ -22,7 +23,7 @@ Upcoming implementation sequence:
 1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic timetable entry, teacher week/day editing, technician workflows, and printing with representative schools.
 2. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
 3. Technician print/PDF workflow: future-week selection, one A4 page per day, selected-room layouts, and practical page fitting.
-4. High-priority school subdomain/tenant routing: configurable base domain, validated unique slugs, staging subdomains, and school-name context on resolved landing/login pages.
+4. Tenant deployment completion: select the eventual base domain, configure DNS/web-server wildcard acceptance, and provide production TLS coverage.
 5. Teacher lesson duplication: accessible copy workflows for visible and future lessons, overwrite confirmation, and practical undo.
 6. Admin theme settings: exactly Primary and Secondary accent values, centrally applied without arbitrary CSS or coupling to class/grid/print colours.
 7. Canonical timetable CSV import/export: Reqsheet template export, deterministic validation/preview, and confirmed import.

@@ -102,7 +102,7 @@ try {
     cleanTestDatabase($pdo);
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 3, 'Expected all migrations to apply to the clean test database.');
+        integrationAssert($migrationCount === 5, 'Expected all migrations to apply to the clean test database.');
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         foreach (TEST_TABLES as $table) {
@@ -115,7 +115,7 @@ try {
             return insertId($pdo);
         };
 
-        $organisationId = $insert('INSERT INTO organisations (name) VALUES (:name)', ['name' => 'Reqsheet Integration School']);
+        $organisationId = $insert('INSERT INTO organisations (name, tenant_slug) VALUES (:name, :tenant_slug)', ['name' => 'Reqsheet Integration School', 'tenant_slug' => 'integration-school']);
         $teacherA = $insert(
             'INSERT INTO users
                 (organisation_id, display_name, staff_identifier, operational_role, is_admin, password_hash, account_state)
