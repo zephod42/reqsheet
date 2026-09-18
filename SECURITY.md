@@ -15,14 +15,14 @@ Future implementation must at minimum address:
 - separate runtime and migration database identities, with the runtime identity denied schema-changing privileges;
 - migration review, backup procedures, and explicit handling of MySQL's non-atomic DDL before production application;
 - audit logging appropriate to requisition and approval changes.
-- tenant resolution and isolation for every school host, including strict validation of editable tenant slugs and uniqueness checks within Reqsheet’s database;
+- continued tenant resolution and isolation for every school host, including strict validation of editable tenant slugs and uniqueness checks within Reqsheet’s database;
 - host/base-domain configuration that avoids deriving tenant identity from an untrusted or hard-coded assumption;
 
 Never commit credentials, `.env` files, logs, runtime data, or production configuration to this repository. The example environment files contain placeholders only; real runtime and migration secrets must be supplied from protected host configuration outside the repository. The health endpoint never returns connection details or exception messages.
 
 The web runtime can load configuration only when `REQSHEET_ENV_FILE` explicitly names one absolute file outside the repository. The parser accepts literal `KEY=value` entries only, preserves already-defined process variables, and supports no shell execution or interpolation. Missing or malformed configured files fail as generic unhealthy application state; contents and credentials are not exposed.
 
-School subdomains are a tenant-routing concern, not a registrar lookup. The final production domain is undecided; the application must resolve a validated slug under a deployment-configured parent/base domain, enforce organisation isolation on every request and database access path, and support equivalent staging hosts under DuckDNS. The configured base host is a generic public route; once a tenant is resolved, the school name may be shown on its landing/login page. Tenant data and host routing must remain portable when the base domain changes. DNS must route tenant hosts, the web server must accept them, and production TLS must cover them; wildcard certificate automation is a separate deployment decision.
+School subdomains are implemented as a tenant-routing concern, not a registrar lookup. A persistent domain-independent `tenant_slug` is resolved under the deployment-configured `REQSHEET_BASE_HOST`; the generic base host is the public route, unknown tenants return an application-level 404, and cross-organisation authenticated contexts are rejected. Signup uses a one-time short-lived tenant-bound handoff before establishing the normal tenant-scoped session on the tenant host. The final production domain is deliberately undecided/configurable; the current DuckDNS/Pumba arrangement is staging only and is not an application dependency. Tenant data and host routing remain portable when the base domain changes. DNS, web-server acceptance, and production TLS are deployment concerns.
 
 Admin theming must remain limited to Primary and Secondary accent values. Arbitrary custom CSS is prohibited; theme accents must not be allowed to alter the black/white base, timetable grid, automatic class colours, or technician print output.
 

@@ -18,7 +18,7 @@ Reqsheet will help a science department prepare, review, and print lesson requis
 
 The public landing page is deliberately simple: `Reqsheet.` appears as large, simple black text on a white background. The full stop is deliberate branding and there is no tagline. Login fields appear below the wordmark. A simple left-side navigation contains About, Demo, Sign up, and Contact. Clicking the wordmark anywhere returns to the main landing/home page.
 
-Pilot authentication should support a persistent/remembered login so ordinary users are not repeatedly prompted for a password during normal daily use. The exact session lifetime and security policy remain part of the later account-security pass. Pilot sign-up must not require email; sign-up creates a new organisation/school and its first Admin account.
+Pilot authentication should support a persistent/remembered login so ordinary users are not repeatedly prompted for a password during normal daily use. The exact session lifetime and security policy remain part of the later account-security pass. Pilot sign-up must not require email; sign-up creates a new organisation/school and its first Admin account. Signup begins on the generic base host, then uses a one-time, short-lived tenant-bound onboarding handoff to move the browser to the new tenant hostname. The tenant host consumes that handoff, establishes the normal tenant-scoped session, and redirects the new Admin to `/settings`.
 
 ### Setup gating
 
@@ -115,7 +115,7 @@ Printing supports My rooms, All rooms, or a custom room selection. It is derived
 
 ### Versioned timetable builder
 
-The admin timetable builder uses one versioned timetable dataset viewed through three projections: Teacher, Room, and Class. Teachers, rooms, and class codes are reusable organisation-level resources; assignments reference those resources and remain tied to the selected timetable version. Editing an assignment in one projection changes the same assignment seen in the other projections.
+The admin timetable builder uses one versioned timetable dataset viewed through three projections: Teacher, Room, and Class. Teachers use existing organisation users, rooms reuse organisation room resources, and class codes are reusable organisation-scoped resources. Assignments reference those resources and remain tied to the selected timetable version. Editing an assignment in one projection changes the same assignment seen in the other projections.
 
 The builder presents one large grid at a time, with configured working days as columns and teaching periods as rows. Break, lunch, and other separators are structural non-editable bands. A compact toolbar provides Add teacher, Add room, Add class code, and selectors for the three projections. Resource selectors include an Add new route so a missing resource can be created without abandoning the cell editor.
 
@@ -126,7 +126,7 @@ Admin configuration should remain straightforward and editable. The first-run Se
 - School name.
 - Working days, defaulting to Monday-Friday.
 - First day of the working week, defaulting to Monday.
-- Periods per day, defaulting to six; the configured count drives all period-dependent settings controls and timetable rows.
+- Periods per day, defaulting to six; the configured count drives all period-dependent settings controls, seeded structure, separators, and timetable rows.
 - At least one room; no room is defaulted or pre-filled.
 
 The same screen also offers optional settings:
@@ -146,13 +146,13 @@ The first pilot may create an account with no password until its first login, wh
 
 Timetables are effective-dated versions. Each version has a label/name and effective start date; a later version supersedes an earlier version from its start date. The design supports mid-year revisions and future academic-year timetables being entered and edited in advance. Historical versions are preserved, and dated occurrences retain their historical snapshots.
 
-## Multi-tenant school URL design
+## Implemented multi-tenant school URL architecture
 
-School-specific subdomains are a high-priority architecture/product item. The shared production pattern is `<school>.<configured-base-domain>`, with all subdomains using the same shared application/server and tenant isolation. The configured base host is the generic public entry, sign-up, and school-selection route. The final production domain remains undecided and is deployment configuration, not product data. During school signup/setup, the system captures or suggests a tenant/subdomain slug derived from the school name, lets the Admin edit it, validates its format, and checks uniqueness in Reqsheet’s own database. This is internal tenant-slug uniqueness, not a registrar availability lookup.
+Organisation identity is persistent and domain-independent: each organisation has a validated, unique `tenant_slug`. The shared application uses the deployment-configured `REQSHEET_BASE_HOST`; the generic base hostname serves public Reqsheet, while `<tenant_slug>.<base-host>` resolves the organisation context. An unknown tenant produces an application-level 404, and an authenticated session whose organisation does not match the resolved host is rejected. Signup creates the organisation and Admin on the generic host, then uses the one-time, short-lived tenant-bound onboarding handoff described above to move the browser to the tenant hostname and establish the normal tenant-scoped session.
 
-The parent/base domain is configurable and is not hard-coded into tenant logic. During staging/Pumba, equivalent subdomains under the current DuckDNS base may be supported where practical so real tenant routing can be exercised before production. Moving from one base domain to another should require DNS, TLS, and base-domain configuration changes only, not a tenant/data-model redesign. A later enhancement may remember a user’s chosen school/subdomain and redirect generic-root visitors directly to it. Once tenant context is resolved, the school landing/login page visibly shows the school name near or below the Reqsheet branding.
+The base host is configurable and is not hard-coded into tenant logic. The final production domain remains deliberately undecided; selecting it is a deployment decision and does not change the tenant architecture or data model. The current DuckDNS/Pumba arrangement is staging only and must not become an application dependency. DNS, web-server acceptance, and TLS coverage are deployment concerns. Once tenant context is resolved, the school landing/login page visibly shows the school name near or below the Reqsheet branding.
 
-An admin can copy/clone an existing timetable as the basis of a new version. “Edit timetable” opens a clickable timetable maker. Viewing and editing can be organised by staff member, room, or day, with staff-member view as the default. Lesson entry remains simple: class code, room, and period/span. The configured structure drives teacher week/day layouts, separator positioning, occurrence generation, chronological ordering, determination of true period adjacency, and conjoined-period eligibility. A fresh day-start defaults to 08:00 until an organisation-specific value is saved. Start/end times are stored even when normal teacher day labels show only the period name. The existing service-level timetable validation rules remain authoritative for all entry paths: a conjoined lesson may span any number of contiguous teaching periods but may not cross any configured break, lunch, or other non-teaching interval; periods separated by such an interval are separate lesson blocks.
+An admin can copy/clone an existing timetable as the basis of a new version. “Edit timetable” opens a clickable timetable maker. Viewing and editing can be organised by staff member, room, or day, with staff-member view as the default. Lesson assignments select an existing organisation teacher, room, and reusable class resource; they are not free-text room/class fields in the builder. The configured structure drives teacher week/day layouts, separator positioning, occurrence generation, chronological ordering, determination of true period adjacency, and conjoined-period eligibility. A fresh day-start defaults to 08:00 until an organisation-specific value is saved. Start/end times are stored even when normal teacher day labels show only the period name. The existing service-level timetable validation rules remain authoritative for all entry paths: a conjoined lesson may span any number of contiguous teaching periods but may not cross any configured break, lunch, or other non-teaching interval; periods separated by such an interval are separate lesson blocks.
 
 ## Canonical timetable CSV import/export
 
@@ -179,8 +179,8 @@ Populate the attached Reqsheet CSV template using the attached timetable export.
 
 Recurring timetable configuration and dated lesson/requisition records remain separate. A timetable change creates or selects an effective-dated version; it does not rewrite historical occurrences or requisitions. Multi-period lessons remain one underlying lesson and one eventual requisition even when displayed across several grid rows.
 
-The existing database and service rules remain authoritative: ISO weekdays, valid ordered slots, contiguous teaching-only spans, effective-date boundaries, organisation ownership, teacher conflicts, and non-blank free-text class/room values must be validated before committing timetable data. Exceptions, holidays, cancellations, and other timetable overrides remain deferred.
+The existing database and service rules remain authoritative: ISO weekdays, valid ordered slots, contiguous teaching-only spans, effective-date boundaries, organisation ownership, resource ownership, teacher/room/class conflicts, and non-blank resource codes must be validated before committing timetable data. Exceptions, holidays, cancellations, and other timetable overrides remain deferred.
 
 ## Not designed yet
 
-Production-grade authentication and authorization hardening, tenant subdomain routing, school-theme settings, approval workflow, reporting, and detailed requisition workflow remain open design work. The current setup/login/session flow is deliberately pilot-grade. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.
+Production-grade authentication and authorization hardening, school-theme settings, approval workflow, reporting, and detailed requisition workflow remain open design work. The current setup/login/session flow is deliberately pilot-grade. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.
