@@ -7,6 +7,7 @@ namespace Reqsheet\Tests;
 use Reqsheet\Http\SetupBlockingPage;
 use Reqsheet\Http\SignupPage;
 use Reqsheet\Http\HomePage;
+use Reqsheet\Account\AccountValidationException;
 use Reqsheet\Settings\OrganisationSettingsStore;
 use Reqsheet\Settings\SettingsService;
 use Reqsheet\Settings\SettingsValidationException;
@@ -32,13 +33,19 @@ final class SettingsTest
         assertSameValue('Break', $store->saved['separators'][0]['type'], 'Separator type was not saved.');
 
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
-        $signup = new SignupPage(new \Reqsheet\Account\AccountService($signupStore));
+        $signupAccounts = new \Reqsheet\Account\AccountService($signupStore);
+        $signupAccounts->createFirstOrganisation('Existing School', 'Existing Admin', null, 'teacher', 'existing-pass', 'existing-pass');
+        $signup = new SignupPage($signupAccounts);
         $signupView = $signup->handle('GET', []);
         assertContainsValue('School name', $signupView, 'Signup did not ask for a school name.');
         assertNotContainsValue('email', strtolower($signupView), 'Signup unexpectedly requires email.');
         $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'display_name' => 'Pilot Admin', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
         assertContainsValue('/settings', $created, 'Successful signup did not route the first admin to settings.');
         assertSameValue(true, (bool) $signupStore->accounts['Pilot Admin']['is_admin'], 'Signup did not create an admin account.');
+        assertSameValue(2, $signupStore->accounts['Pilot Admin']['organisation_id'], 'Public signup did not create a second organisation.');
+        assertSameValue(1, $signupStore->accounts['Existing Admin']['organisation_id'], 'Public signup leaked or changed the existing tenant.');
+        assertSameValue(2, \Reqsheet\Http\SessionAuth::current()['organisation_id'], 'Public signup did not authenticate the new admin tenant.');
+        self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', null, 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');
         \Reqsheet\Http\SessionAuth::logout();
         assertContainsValue('action="/login"', (new HomePage())->render(), 'Home login form did not post to /login.');
 
@@ -50,6 +57,12 @@ final class SettingsTest
     private static function expectValidation(callable $operation, string $message): void
     {
         try { $operation(); } catch (SettingsValidationException) { return; }
+        throw new \RuntimeException($message);
+    }
+
+    private static function expectAccountValidation(callable $operation, string $message): void
+    {
+        try { $operation(); } catch (AccountValidationException) { return; }
         throw new \RuntimeException($message);
     }
 }

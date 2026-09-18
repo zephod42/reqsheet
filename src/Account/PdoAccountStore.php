@@ -51,22 +51,21 @@ final class PdoAccountStore implements AccountStore
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin first-run setup.');
         try {
             if ($this->organisationCount() !== 0) throw new AccountValidationException(['First-run setup is no longer available.']);
-            $organisation = $this->prepare('INSERT INTO organisations (name) VALUES (:name)');
-            $organisation->execute(['name' => $organisationName]);
-            $organisationId = (int) $this->pdo->lastInsertId();
-            $user = $this->prepare(
-                'INSERT INTO users
-                    (organisation_id, display_name, staff_identifier, operational_role, is_admin, password_hash, account_state)
-                 VALUES (:organisation_id, :display_name, :staff_identifier, :role, TRUE, :password_hash, \'claimed\')',
-            );
-            $user->execute([
-                'organisation_id' => $organisationId,
-                'display_name' => $displayName,
-                'staff_identifier' => $staffIdentifier,
-                'role' => $role,
-                'password_hash' => $passwordHash,
-            ]);
+            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash);
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete first-run setup.');
+            return $organisationId;
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
+    }
+
+    public function createOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash): int
+    {
+        if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin organisation signup.');
+        try {
+            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash);
+            if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete organisation signup.');
             return $organisationId;
         } catch (\Throwable $exception) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
@@ -107,5 +106,25 @@ final class PdoAccountStore implements AccountStore
         $statement = $this->pdo->prepare($sql);
         if ($statement === false) throw new \RuntimeException('Unable to prepare account query.');
         return $statement;
+    }
+
+    private function insertOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash): int
+    {
+        $organisation = $this->prepare('INSERT INTO organisations (name) VALUES (:name)');
+        $organisation->execute(['name' => $organisationName]);
+        $organisationId = (int) $this->pdo->lastInsertId();
+        $user = $this->prepare(
+            'INSERT INTO users
+                (organisation_id, display_name, staff_identifier, operational_role, is_admin, password_hash, account_state)
+             VALUES (:organisation_id, :display_name, :staff_identifier, :role, TRUE, :password_hash, \'claimed\')',
+        );
+        $user->execute([
+            'organisation_id' => $organisationId,
+            'display_name' => $displayName,
+            'staff_identifier' => $staffIdentifier,
+            'role' => $role,
+            'password_hash' => $passwordHash,
+        ]);
+        return $organisationId;
     }
 }

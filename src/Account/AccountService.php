@@ -34,6 +34,21 @@ final class AccountService
         );
     }
 
+    public function createOrganisationAdmin(
+        string $organisationName,
+        string $displayName,
+        string $role,
+        string $password,
+        string $confirmation,
+    ): int {
+        $this->validateIdentity($organisationName, $displayName, $role);
+        $this->validatePassword($password, $confirmation);
+        return $this->store->createOrganisationAdmin(
+            trim($organisationName), trim($displayName), null, $role,
+            password_hash($password, PASSWORD_DEFAULT),
+        );
+    }
+
     public function createUser(int $organisationId, string $displayName, ?string $staffIdentifier, string $role, bool $isAdmin): int
     {
         $this->validateIdentity('Organisation', $displayName, $role);

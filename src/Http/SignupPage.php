@@ -19,8 +19,8 @@ final class SignupPage
         $message = null;
         if ($method === 'POST') {
             try {
-                $this->accounts->createFirstOrganisation(
-                    (string) ($input['school_name'] ?? ''), (string) ($input['display_name'] ?? ''), null,
+                $this->accounts->createOrganisationAdmin(
+                    (string) ($input['school_name'] ?? ''), (string) ($input['display_name'] ?? ''),
                     (string) ($input['operational_role'] ?? 'teacher'), (string) ($input['password'] ?? ''),
                     (string) ($input['password_confirmation'] ?? ''),
                 );

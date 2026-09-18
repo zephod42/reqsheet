@@ -21,6 +21,14 @@ interface AccountStore
         string $passwordHash,
     ): int;
 
+    public function createOrganisationAdmin(
+        string $organisationName,
+        string $displayName,
+        ?string $staffIdentifier,
+        string $role,
+        string $passwordHash,
+    ): int;
+
     public function createUser(
         int $organisationId,
         string $displayName,
