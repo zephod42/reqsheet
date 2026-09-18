@@ -9,7 +9,8 @@ use Reqsheet\Account\AccountValidationException;
 
 final class AdminPeoplePage
 {
-    public function __construct(private readonly AccountService $accounts, private readonly int $organisationId)
+    /** @param array<string, mixed> $user */
+    public function __construct(private readonly AccountService $accounts, private readonly int $organisationId, private readonly array $user = [])
     {
     }
 
@@ -32,7 +33,7 @@ final class AdminPeoplePage
             }
         }
         $notice = $message === null ? '' : '<p>' . $this->e($message) . '</p>';
-        return '<!doctype html><meta charset="utf-8"><title>Reqsheet people</title><style>body{font:16px system-ui,sans-serif;margin:2rem;max-width:38rem}label{display:block;margin:1rem 0}input,select,button{font:inherit;padding:.45rem;width:100%;box-sizing:border-box}</style><main><h1>People</h1>' . $notice . '<form method="post"><label>Name/login<input name="display_name" required></label><label>Staff abbreviation (optional)<input name="staff_identifier"></label><label>Operational role<select name="operational_role"><option value="teacher">Teacher</option><option value="technician">Technician</option></select></label><label>Admin permission<select name="is_admin"><option value="0">No</option><option value="1">Yes</option></select></label><button>Create user</button></form><p><a href="/admin/timetable">Back to timetable</a></p></main>';
+        return PageLayout::render('People', '<section class="content-narrow"><div class="page-header"><div><p class="eyebrow">Admin</p><h1>People</h1></div><a class="button secondary" href="/admin/timetable">Timetable</a></div>' . $notice . '<p>Create a teacher or technician independently of timetable population. A new teacher may have an empty timetable.</p><form method="post"><label>Name/login<input name="display_name" required></label><label>Staff abbreviation (optional)<input name="staff_identifier"></label><label>Operational role<select name="operational_role"><option value="teacher">Teacher</option><option value="technician">Technician</option></select></label><label>Admin permission<select name="is_admin"><option value="0">No</option><option value="1">Yes</option></select></label><button>Create user</button></form></section>', $this->user);
     }
 
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }

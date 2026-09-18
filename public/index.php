@@ -298,7 +298,7 @@ if ($route === ApplicationRoute::ADMIN_PEOPLE) {
     try {
         $environment = ExternalEnvironment::load($environment);
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new AdminPeoplePage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $user['organisation_id']);
+        $page = new AdminPeoplePage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $user['organisation_id'], $user);
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
     } catch (\Throwable) {
@@ -327,7 +327,13 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE) {
     }
     try {
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new AdminTimetablePage(new PdoTimetableConfigurationStore((new Database($config))->connection()), $user['organisation_id']);
+        $database = new Database($config);
+        $page = new AdminTimetablePage(
+            new PdoTimetableConfigurationStore($database->connection()),
+            $user['organisation_id'],
+            (new SettingsService(new PdoOrganisationSettingsStore($database->connection())))->load($user['organisation_id']),
+            $user,
+        );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
     } catch (\Throwable) {

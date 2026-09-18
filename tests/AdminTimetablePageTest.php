@@ -28,21 +28,27 @@ final class AdminTimetablePageTest
             new TimetableSlot(103, 1, 1, 3, 'teaching', 2, 'P2', '10:15:00', '11:15:00'),
             new TimetableSlot(201, 1, 2, 1, 'teaching', 1, 'P1', '09:00:00', '10:00:00'),
         ];
-        $page = new AdminTimetablePage($store, 1);
-        $staff = $page->handle('GET', ['version' => 1, 'mode' => 'staff', 'staff' => 10], []);
+        $page = new AdminTimetablePage($store, 1, [
+            'working_days' => [1, 2], 'first_day_of_week' => 1, 'periods_per_day' => 3, 'allow_double_periods' => true,
+        ]);
+        $staff = $page->handle('GET', ['version' => 1, 'teacher' => 10], []);
         assertContains('Pilot timetable', $staff, 'Version context was not rendered.');
-        assertContains('Staff member timetable', $staff, 'Staff view was not rendered.');
+        assertContains('Teacher A', $staff, 'Teacher-first selection was not rendered.');
+        assertContains('name="teacher"', $staff, 'Teacher selector was not rendered.');
         assertContains('Break', $staff, 'Configured separator was not rendered.');
         assertContains('Period One', $staff, 'Configured teaching-period label was not rendered.');
-        assertContains('Empty teaching cell', $staff, 'Available teaching cell was not rendered.');
+        assertContains('Add lesson', $staff, 'Available period was not rendered as an add target.');
+
+        $emptyTeacher = $page->handle('GET', ['version' => 1, 'teacher' => 11], []);
+        assertContains('Teacher B', $emptyTeacher, 'Second teacher was not selectable.');
+        assertContains('Weekly view', $emptyTeacher, 'Empty teacher week was not rendered.');
 
         $created = $page->handle('POST', [], ['action' => 'create_lesson', 'version' => 1, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 1, 'class_code' => '13PHY', 'room_code' => 'P1']);
         assertContains('Lesson created', $created, 'Lesson creation was not handled.');
         $lessonId = $store->lessons[0]->id;
-        $room = $page->handle('GET', ['version' => 1, 'mode' => 'room', 'room' => 'P1'], []);
-        assertContains('13PHY', $room, 'Room view did not use the shared lesson data.');
-        $day = $page->handle('GET', ['version' => 1, 'mode' => 'day', 'day' => 1], []);
-        assertContains('Monday overview', $day, 'Day view was not rendered.');
+        $saved = $page->handle('GET', ['version' => 1, 'teacher' => 10], []);
+        assertContains('13PHY', $saved, 'Saved lesson was not rendered in the selected teacher week.');
+        assertContains('P1', $saved, 'Saved lesson room was not rendered in the selected teacher week.');
 
         $updated = $page->handle('POST', [], ['action' => 'update_lesson', 'version' => 1, 'lesson_id' => $lessonId, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 103, 'duration_periods' => 1, 'class_code' => '13PHY-UPDATED', 'room_code' => 'P2']);
         assertContains('Lesson updated', $updated, 'Lesson update was not handled.');
@@ -53,6 +59,12 @@ final class AdminTimetablePageTest
         $store->occurrences[99] = 1;
         $blocked = $page->handle('POST', [], ['action' => 'delete_lesson', 'version' => 1, 'lesson_id' => 99]);
         assertContains('cannot be removed after historical occurrences', $blocked, 'Historical lesson removal was not blocked.');
+
+        $disabled = new AdminTimetablePage($store, 1, ['working_days' => [1], 'first_day_of_week' => 1, 'allow_double_periods' => false]);
+        $disabledView = $disabled->handle('GET', ['version' => 1, 'teacher' => 10, 'edit' => 99], []);
+        assertContains('Double periods are disabled in Settings.', $disabledView, 'Disabled double-period mode exposed the wrong editor state.');
+        $blockedSpan = $disabled->handle('POST', [], ['action' => 'create_lesson', 'version' => 1, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 2, 'class_code' => 'SPAN', 'room_code' => 'P1']);
+        assertContains('Double periods are disabled', $blockedSpan, 'Disabled double-period mode permitted a span.');
     }
 }
 

@@ -52,6 +52,8 @@ final class SettingsTest
         $blocked = (new SetupBlockingPage())->render(['is_admin' => false]);
         assertContainsValue("Something's missing...", $blocked, 'Setup blocking heading was not rendered.');
         assertContainsValue('Settings need to be configured. Contact your admin.', $blocked, 'Setup blocking message was not rendered.');
+        $adminNav = \Reqsheet\Http\PageLayout::render('Admin', '<p>Admin</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
+        assertContainsValue('href="/settings"', $adminNav, 'Admin navigation did not expose Settings.');
     }
 
     private static function expectValidation(callable $operation, string $message): void

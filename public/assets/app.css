@@ -53,5 +53,40 @@ textarea { min-height: 6rem; resize: vertical; }
 .check-label input { width: auto; margin: 0; }
 .blocking-state { min-height: 70vh; display: grid; place-content: center; text-align: center; }
 .blocking-state h1 { font-size: clamp(2rem, 6vw, 4rem); margin: 0; }
+.eyebrow { margin: 0 0 .25rem; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.context { border-left: 3px solid var(--ink); padding: .65rem .8rem; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: .8rem; border-bottom: 1px solid var(--rule); padding: .9rem 0; }
+.toolbar label { min-width: 13rem; margin: 0; }
+.button.secondary, button.secondary { background: #fff; color: var(--ink); }
+.editor-section { margin-top: 1.5rem; }
+.secondary-section { border-top: 1px solid var(--rule); padding-top: 1rem; }
+.section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .7rem; }
+.section-heading h2 { margin: 0; }
+.admin-week-grid { border-collapse: collapse; table-layout: fixed; min-width: 760px; width: 100%; font-family: var(--technical); }
+.admin-week-grid th, .admin-week-grid td { border: 1px solid var(--rule); padding: .35rem; vertical-align: top; }
+.admin-week-grid thead th { border-bottom: 2px solid var(--rule); height: 2.6rem; }
+.admin-week-grid thead th:first-child { width: 7rem; font-family: var(--sans); }
+.admin-week-grid td { height: 6.4rem; }
+.admin-week-grid .day-label { font-family: var(--sans); font-weight: 750; }
+.admin-week-grid .separator-column, .admin-week-grid .separator-cell { background: #eee; color: #555; font-size: .75rem; }
+.admin-week-grid .separator-column { width: 2.8rem; }
+.empty-cell { background: #fafafa; }
+.empty-period { display: flex; height: 100%; min-height: 5.5rem; align-items: center; justify-content: center; flex-direction: column; gap: .25rem; color: #555; text-decoration: none; }
+.empty-period span { font: 1.7rem/1 var(--sans); }
+.empty-period small { font-family: var(--sans); }
+.empty-period:hover, .empty-period:focus { outline: 2px solid var(--ink); outline-offset: -2px; background: #fff; color: var(--ink); }
+.admin-lesson { display: flex; height: 5.6rem; flex-direction: column; gap: .2rem; border: 1px solid var(--ink); padding: .45rem; color: inherit; background: #fff; text-decoration: none; }
+.admin-lesson strong { font-size: 1.05rem; }
+.admin-lesson span { font-size: .9rem; }
+.admin-lesson small { margin-top: auto; font-family: var(--sans); color: #555; }
+.lesson-dialog { display: block; margin: 2rem auto; }
+.lesson-dialog .close { float: right; }
+.lesson-dialog h2 { margin-top: 0; }
+.lesson-dialog form:first-child { max-width: 42rem; margin: 0 auto; }
+.delete-form { max-width: 42rem; margin: 1rem auto 0; }
+.danger { background: #fff; color: #900; border-color: #900; }
+.inline-form { display: flex; flex-wrap: wrap; align-items: end; gap: .7rem; }
+.inline-form label { flex: 1 1 10rem; margin: 0; }
+@media (max-width: 42rem) { .section-heading { display: block; } .toolbar label { flex: 1 1 100%; } .lesson-dialog { margin: 1rem auto; } }
 @media (max-width: 42rem) { .site-shell { display: block; } .site-nav { border-right: 0; border-bottom: 1px solid var(--rule); padding: .8rem 1rem; } .wordmark { margin: 0 1.2rem 0 0; } .site-nav ul { display: inline-flex; gap: .8rem; flex-wrap: wrap; } .site-nav li { margin: 0; } .site-main { padding: 1.2rem 1rem; } }
 @media print { body { background: #fff; color: #000; } .site-nav, .page-header a, dialog { display: none !important; } .site-shell { display: block; } .site-main { padding: 0; } .lesson-block, .week-grid th, .week-grid td { background: #fff !important; color: #000 !important; } }
