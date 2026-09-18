@@ -9,6 +9,7 @@ Completed foundations:
 - Documentation/code reconciliation: canonical product behaviour and the committed timetable editor have been checked for consistency in this pass.
 - Teacher week-view skeleton and dated lesson planning editor: current configured week, navigable week controls, compact occurrence blocks, and direct editing of the three planning text fields. Completed in this milestone.
 - Pilot first-run setup and login: initial organisation/admin creation, hashed passwords, sessions, operational-role landing, and explicit awaiting-first-login accounts. Completed in this milestone.
+- Pilot-visible UI milestone: shared restrained visual foundation, public landing/login/signup, organisation settings and setup gating, teacher week class colours, and large lesson editor with explicit `Nothing required` action. Completed in this milestone.
 
 Agreed design decisions recorded on 2026-09-18:
 

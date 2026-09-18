@@ -7,6 +7,11 @@ namespace Reqsheet\Http;
 final class ApplicationRoute
 {
     public const ROOT = 'root';
+    public const SIGNUP = 'signup';
+    public const SETTINGS = 'settings';
+    public const ABOUT = 'about';
+    public const DEMO = 'demo';
+    public const CONTACT = 'contact';
     public const HEALTH = 'health';
     public const ADMIN_TIMETABLE = 'admin_timetable';
     public const TEACHER_WEEK = 'teacher_week';
@@ -33,6 +38,11 @@ final class ApplicationRoute
         if ($path === '/logout') return self::LOGOUT;
         if ($path === '/technician') return self::TECHNICIAN;
         if ($path === '/admin/people') return self::ADMIN_PEOPLE;
+        if ($path === '/signup') return self::SIGNUP;
+        if ($path === '/settings') return self::SETTINGS;
+        if ($path === '/about') return self::ABOUT;
+        if ($path === '/demo') return self::DEMO;
+        if ($path === '/contact') return self::CONTACT;
         if ($method === 'GET' && $path === '/') {
             return self::ROOT;
         }

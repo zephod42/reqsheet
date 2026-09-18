@@ -8,6 +8,7 @@ require __DIR__ . '/RoutingTest.php';
 require __DIR__ . '/AdminTimetablePageTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
 require __DIR__ . '/AccountTest.php';
+require __DIR__ . '/SettingsTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 
@@ -92,8 +93,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -119,6 +120,11 @@ foreach (['roles', 'permissions', 'rooms', 'equipment', 'stock', 'timetable_exce
     if (preg_match('/CREATE TABLE [^;]*\b' . preg_quote($forbiddenTable, '/') . '\b/i', $domainMigration) === 1) {
         throw new RuntimeException('Deferred table was introduced: ' . $forbiddenTable);
     }
+}
+$settingsMigration = file_get_contents($migrationDirectory . '/0004_add_organisation_settings.sql');
+if ($settingsMigration === false) throw new RuntimeException('Settings migration could not be read.');
+foreach (['organisation_settings', 'organisation_rooms', 'allow_double_periods'] as $expectedSettingsFragment) {
+    if (!str_contains($settingsMigration, $expectedSettingsFragment)) throw new RuntimeException('Expected settings schema fragment is missing: ' . $expectedSettingsFragment);
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
@@ -156,5 +162,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\RoutingTest::run();
 \Reqsheet\Tests\AdminTimetablePageTest::run();
 \Reqsheet\Tests\AccountTest::run();
+\Reqsheet\Tests\SettingsTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

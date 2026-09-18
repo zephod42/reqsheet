@@ -17,13 +17,20 @@ use Reqsheet\Http\TeacherAccess;
 use Reqsheet\Http\TeacherWeekPage;
 use Reqsheet\Http\AdminPeoplePage;
 use Reqsheet\Http\LoginPage;
+use Reqsheet\Http\HomePage;
+use Reqsheet\Http\PageLayout;
 use Reqsheet\Http\SessionAuth;
+use Reqsheet\Http\SettingsPage;
+use Reqsheet\Http\SetupBlockingPage;
 use Reqsheet\Http\SetupAccess;
 use Reqsheet\Http\SetupPage;
+use Reqsheet\Http\SignupPage;
 use Reqsheet\Http\TechnicianPlaceholderPage;
 use Reqsheet\Teacher\PdoTeacherPlanningStore;
 use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Timetable\PdoTimetableConfigurationStore;
+use Reqsheet\Settings\PdoOrganisationSettingsStore;
+use Reqsheet\Settings\SettingsService;
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -74,6 +81,36 @@ if ($route === ApplicationRoute::LOGIN) {
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
     }
+    exit;
+}
+
+if ($route === ApplicationRoute::ROOT) {
+    header('Content-Type: text/html; charset=UTF-8');
+    echo (new HomePage())->render();
+    exit;
+}
+
+if ($route === ApplicationRoute::SIGNUP) {
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $page = new SignupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())));
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $page->handle($method, $_POST);
+    } catch (\Throwable) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::DEMO, ApplicationRoute::CONTACT], true)) {
+    $heading = ucfirst($route);
+    header('Content-Type: text/html; charset=UTF-8');
+    echo PageLayout::render($heading, '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>');
     exit;
 }
 
@@ -152,6 +189,52 @@ if ($route === ApplicationRoute::NOT_FOUND) {
     header('Content-Type: text/plain; charset=UTF-8');
     echo "Not found\n";
     exit;
+}
+
+$currentUser = SessionAuth::current();
+if ($route === ApplicationRoute::SETTINGS) {
+    if (!SessionAuth::isAdmin($currentUser)) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $page = new SettingsPage(new SettingsService(new PdoOrganisationSettingsStore((new Database($config))->connection())), $currentUser['organisation_id'], $currentUser);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $page->handle($method, $_POST);
+    } catch (\Throwable) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE], true)) {
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $settings = (new SettingsService(new PdoOrganisationSettingsStore((new Database($config))->connection())))->load($currentUser['organisation_id']);
+        if (empty($settings['complete'])) {
+            if (SessionAuth::isAdmin($currentUser)) {
+                header('Location: /settings', true, 302);
+                exit;
+            }
+            header('Content-Type: text/html; charset=UTF-8');
+            echo (new SetupBlockingPage())->render($currentUser);
+            exit;
+        }
+    } catch (\Throwable) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+        exit;
+    }
 }
 
 if ($route === ApplicationRoute::TEACHER_WEEK) {

@@ -1,0 +1,57 @@
+:root { color-scheme: light; --ink: #111; --paper: #fff; --muted: #666; --rule: #111; --technical: "SFMono-Regular", Consolas, "Liberation Mono", monospace; --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.45 var(--sans); }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; }
+button, .button { border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; padding: .55rem .8rem; text-decoration: none; }
+button:hover, .button:hover { background: #333; }
+input, select, textarea { border: 1px solid #777; border-radius: 0; padding: .5rem; width: 100%; background: #fff; color: var(--ink); }
+label { display: block; margin: .9rem 0; font-weight: 650; }
+label input, label select, label textarea { display: block; margin-top: .3rem; font-weight: 400; }
+.site-shell { min-height: 100vh; display: grid; grid-template-columns: 12rem minmax(0, 1fr); }
+.site-nav { border-right: 1px solid var(--rule); padding: 1.3rem 1rem; }
+.wordmark { display: inline-block; font-size: 1.65rem; font-weight: 750; letter-spacing: -.04em; text-decoration: none; margin-bottom: 2rem; }
+.site-nav ul { list-style: none; margin: 0; padding: 0; }
+.site-nav li { margin: .65rem 0; }
+.site-main { width: min(100%, 76rem); padding: 2rem clamp(1rem, 4vw, 4rem); }
+.content-narrow { max-width: 38rem; }
+.technical, .timetable, .lesson-block, .week-grid { font-family: var(--technical); }
+.notice { border: 1px solid var(--ink); padding: .75rem; margin: 1rem 0; }
+.error { background: #fff0f0; }
+.page-header { border-bottom: 2px solid var(--rule); display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: .75rem; }
+.page-header h1 { margin: 0; font-size: clamp(1.25rem, 3vw, 1.8rem); }
+.week-arrow { font-size: 2.2rem; text-decoration: none; padding: .2rem .65rem; }
+.this-week { display: block; text-align: center; }
+.timetable-scroll { overflow-x: auto; max-width: 100%; }
+.week-grid { border-collapse: collapse; table-layout: fixed; min-width: 760px; width: 100%; }
+.week-grid th, .week-grid td { border: 1px solid var(--rule); }
+.week-grid thead th { border-bottom: 2px solid var(--rule); height: 2.5rem; padding: .35rem; }
+.week-grid thead th:first-child { width: 6rem; }
+.teaching-column { min-width: 9rem; }
+.separator-column { width: 2rem; min-width: 2rem; background: #eee; writing-mode: vertical-rl; font-size: .75rem; }
+.day-label { padding: .6rem; text-align: left; white-space: nowrap; font-family: var(--sans); }
+.today-row .day-label { font-weight: 750; }
+.week-grid td { height: 7rem; padding: .25rem; vertical-align: top; }
+.separator-cell { background: #eee; }
+.lesson-block { display: flex; flex-direction: column; height: 6.5rem; overflow: hidden; text-decoration: none; color: inherit; border: 1px solid var(--ink); background: #fff; }
+.lesson-header { display: flex; justify-content: space-between; gap: .4rem; border-bottom: 2px solid var(--ink); padding: .35rem .45rem; }
+.lesson-header strong { font-weight: 800; }
+.lesson-body { padding: .45rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.muted { color: #555; font-style: italic; }
+.class-tone-0 { background: #fce4ec; } .class-tone-1 { background: #e3f2fd; } .class-tone-2 { background: #e8f5e9; } .class-tone-3 { background: #fff3e0; } .class-tone-4 { background: #f3e5f5; } .class-tone-5 { background: #fffde7; }
+.message { border: 1px solid var(--ink); padding: .7rem; }
+dialog { border: 1px solid var(--ink); padding: 1.25rem; width: min(62rem, calc(100% - 2rem)); max-width: none; }
+dialog::backdrop { background: rgb(0 0 0 / 55%); }
+dialog label { margin: .8rem 0; }
+textarea { min-height: 6rem; resize: vertical; }
+.close { float: right; background: #fff; color: var(--ink); }
+.form-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.settings-section { border-top: 1px solid var(--rule); margin-top: 1.5rem; padding-top: .75rem; }
+.day-options, .room-list, .separator-list { display: grid; gap: .5rem; }
+.day-options { grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
+.check-label { font-weight: 400; display: flex; gap: .45rem; align-items: center; }
+.check-label input { width: auto; margin: 0; }
+.blocking-state { min-height: 70vh; display: grid; place-content: center; text-align: center; }
+.blocking-state h1 { font-size: clamp(2rem, 6vw, 4rem); margin: 0; }
+@media (max-width: 42rem) { .site-shell { display: block; } .site-nav { border-right: 0; border-bottom: 1px solid var(--rule); padding: .8rem 1rem; } .wordmark { margin: 0 1.2rem 0 0; } .site-nav ul { display: inline-flex; gap: .8rem; flex-wrap: wrap; } .site-nav li { margin: 0; } .site-main { padding: 1.2rem 1rem; } }
+@media print { body { background: #fff; color: #000; } .site-nav, .page-header a, dialog { display: none !important; } .site-shell { display: block; } .site-main { padding: 0; } .lesson-block, .week-grid th, .week-grid td { background: #fff !important; color: #000 !important; } }

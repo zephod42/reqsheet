@@ -42,7 +42,7 @@ SetEnv REQSHEET_ENV_FILE /etc/reqsheet/reqsheet-runtime.env
 
 The application does not search for `.env` files and does not load repository environment files. A configured file that is missing, malformed, relative, or inside the repository causes database-backed requests to fail safely with the existing generic unhealthy response; file contents are never returned.
 
-The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. The domain migration creates organisations, users, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. It does not seed data or generate occurrences.
+The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. The domain migrations create organisations, users, organisation settings and rooms, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. They do not seed data or generate occurrences.
 
 MySQL DDL can implicitly commit and is not fully transactional. A failed migration is not recorded as applied, but a migration that fails after some DDL may leave partial schema changes. Review and repair the database before rerunning such a migration; migrations should be small, forward-only, and safe to retry where practical.
 
@@ -111,7 +111,7 @@ php -S 127.0.0.1:8080 -t public
 
 Stop the development server with `Ctrl-C`. Production deployment and Apache configuration are intentionally outside this bootstrap.
 
-The public HTTPS routing has been verified by an administrator: `GET /` and `GET /health` succeed, `POST /health` returns 405, and unknown or repository-looking paths return 404. Apache continues to use `FallbackResource /index.php`; the application allowlist prevents that fallback from exposing non-public repository paths.
+The public HTTPS routing has been verified by an administrator: `GET /`, `GET /login`, and `GET /health` succeed, `POST /health` returns 405, and unknown or repository-looking paths return 404. The public pilot also exposes `/signup`, `/about`, `/demo`, and `/contact`; protected application routes remain session-gated. Apache continues to use `FallbackResource /index.php`; the application allowlist prevents that fallback from exposing non-public repository paths.
 
 The skeletal admin timetable editor requires a logged-in account with Admin permission and uses the session organisation; it no longer relies on an environment-selected user or organisation. It supports staff, room, and day inspection plus validated recurring-lesson creation/editing/removal. Lessons with historical occurrences are immutable.
 
@@ -125,4 +125,4 @@ The first-run browser URL is `/setup`. After setup, use `/login` with the first 
 
 Pilot sessions use PHP sessions with regenerated IDs, HttpOnly/Lax cookies, and Secure cookies when HTTPS is detected. The agreed product direction is for ordinary users to have a persistent/remembered login during normal daily use; the exact lifetime, renewal, revocation, and related security policy remain for the authentication hardening pass.
 
-The setup gate applies after sign-up as well as during later organisation use. Required settings are school name, working days, first working day, periods per day, and at least one explicitly added room. An Admin with incomplete settings is sent directly to Settings/setup. A non-Admin sees the blocking message `Something's missing...` followed by `Settings need to be configured. Contact your admin.` rather than an empty operational screen.
+The public pilot signup route is `/signup`; it creates the first organisation and Admin account without email and signs that account into `/settings`. Required settings are school name, working days, first working day, periods per day, and at least one explicitly added room. An Admin with incomplete settings is sent directly to `/settings`. A non-Admin sees the blocking message `Something's missing...` followed by `Settings need to be configured. Contact your admin.` rather than an empty operational screen. The legacy protected `/setup` bootstrap remains available only while no organisation exists.

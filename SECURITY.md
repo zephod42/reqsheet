@@ -30,7 +30,7 @@ The schema does not include authentication or authorisation data. Cross-organisa
 
 The optional MySQL integration harness is deliberately destructive within its test database: it accepts only the exact database name `reqsheet_test`, requires explicit `REQSHEET_TEST_DB_*` variables and `REQSHEET_RUN_INTEGRATION=1`, rejects the runtime/migration identities, refuses unexpected tables, uses synthetic fixtures only, and cleans the known schema tables afterward. It must never receive development or production credentials.
 
-The public HTTPS route allowlist has been verified by an administrator. Unauthenticated public traffic is limited to the root and health routes; unknown and repository-looking paths return generic 404 responses, while Apache `FallbackResource /index.php` remains enabled. The admin timetable route is separately gated and is not part of the public route surface.
+The public HTTPS route allowlist has been verified by an administrator. Unauthenticated public traffic is limited to the root, login, signup, informational landing links, and health routes; unknown and repository-looking paths return generic 404 responses, while Apache `FallbackResource /index.php` remains enabled. The admin timetable, settings, people, teacher, and technician routes are separately gated and are not part of the public route surface.
 
 The admin timetable editor is now protected by an authenticated session with the Admin permission. Timetable mutations continue through the validated services; recurring lessons may be edited or removed only before materialised occurrences exist, and historical occurrences remain immutable. The prior environment-key admin gate remains only as test/development code and is not used by the normal browser route.
 

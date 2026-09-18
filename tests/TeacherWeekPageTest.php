@@ -42,6 +42,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Lesson outline', $editing, 'Planning editor did not expose lesson outline.');
         assertContainsValue('Risk assessment', $editing, 'Planning editor did not expose risk assessment.');
         assertContainsValue('LAB-A', $editing, 'Planning editor did not identify the room.');
+        assertContainsValue('Nothing required', $editing, 'Planning editor did not expose the explicit blank requisition action.');
 
         $page->handle('POST', [], [
             'date' => '2026-09-09', 'occurrence_id' => 500,
@@ -49,6 +50,8 @@ final class TeacherWeekPageTest
         ]);
         assertSameValue('Updated requisitions', $store->occurrences[500]['requirements_text'], 'Dated requisition was not saved.');
         assertSameValue('13PHY', $store->occurrences[500]['snapshot_class_code'], 'Recurring timetable data was changed while saving planning.');
+        $page->handle('POST', [], ['date' => '2026-09-09', 'occurrence_id' => 500, 'requisitions' => 'Nothing required']);
+        assertSameValue('nothing_required', $store->occurrences[500]['state'], 'Nothing required did not set the explicit requisition state.');
         $reloaded = $page->handle('GET', ['date' => '2026-09-09', 'edit' => 500], []);
         assertContainsValue('Updated outline', $reloaded, 'Saved outline did not reload.');
         assertContainsValue('Updated requisitions', $reloaded, 'Saved requisitions did not reload.');

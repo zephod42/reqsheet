@@ -69,9 +69,11 @@ final class TeacherPlanningService
         $requisitions = trim($requisitions);
         $riskAssessment = trim($riskAssessment);
         $existingState = is_string($occurrence['state'] ?? null) ? $occurrence['state'] : null;
-        $state = $requisitions !== ''
+        $state = $requisitions === 'Nothing required'
+            ? 'nothing_required'
+            : ($requisitions !== ''
             ? 'requirements_entered'
-            : ($existingState === 'nothing_required' ? 'nothing_required' : 'not_completed');
+            : ($existingState === 'nothing_required' ? 'nothing_required' : 'not_completed'));
         $this->store->savePlanning($occurrenceId, $state, $lessonOutline, $requisitions, $riskAssessment);
     }
 }
