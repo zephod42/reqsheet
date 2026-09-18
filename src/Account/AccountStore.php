@@ -12,8 +12,13 @@ interface AccountStore extends TenantStore
 
     public function organisationTenantSlugExists(string $tenantSlug): bool;
 
+    public function findOrganisationTenantSlug(int $organisationId): ?string;
+
     /** @return array<string, mixed>|null */
     public function findLogin(string $login): ?array;
+
+    /** @return array<string, mixed>|null */
+    public function findUserById(int $userId): ?array;
 
     public function createFirstOrganisation(
         string $organisationName,

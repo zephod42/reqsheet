@@ -6,10 +6,11 @@ namespace Reqsheet\Http;
 
 use Reqsheet\Account\AccountService;
 use Reqsheet\Account\AccountValidationException;
+use Reqsheet\Auth\OnboardingHandoffService;
 
 final class SignupPage
 {
-    public function __construct(private readonly AccountService $accounts, private readonly string $baseHost = '')
+    public function __construct(private readonly AccountService $accounts, private readonly string $baseHost = '', private readonly ?OnboardingHandoffService $handoffs = null)
     {
     }
 
@@ -19,15 +20,20 @@ final class SignupPage
         $message = null;
         if ($method === 'POST') {
             try {
-                $this->accounts->createOrganisationAdmin(
+                $organisationId = $this->accounts->createOrganisationAdmin(
                     (string) ($input['school_name'] ?? ''), (string) ($input['display_name'] ?? ''),
                     (string) ($input['operational_role'] ?? 'teacher'), (string) ($input['password'] ?? ''),
                     (string) ($input['password_confirmation'] ?? ''),
                     (string) ($input['tenant_slug'] ?? ''),
                 );
                 $account = $this->accounts->authenticate((string) $input['display_name'], (string) $input['password']);
-                SessionAuth::login($account);
-                return '<meta http-equiv="refresh" content="0;url=/settings"><p>Continuing to settings…</p>';
+                if ($this->handoffs === null || $this->baseHost === '') throw new \RuntimeException('Tenant onboarding is not configured.');
+                $token = $this->handoffs->issue((int) $account['id'], $organisationId);
+                $tenantSlug = $this->accounts->organisationTenantSlug($organisationId);
+                if ($tenantSlug === null) throw new \RuntimeException('Created organisation has no tenant slug.');
+                $destination = 'https://' . $tenantSlug . '.' . $this->baseHost . '/onboarding?token=' . rawurlencode($token);
+                SessionAuth::logout();
+                return '<meta http-equiv="refresh" content="0;url=' . $this->e($destination) . '"><p>Continuing to your school…</p>';
             } catch (AccountValidationException $exception) {
                 $message = implode(' ', $exception->errors());
             }

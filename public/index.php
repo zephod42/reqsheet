@@ -10,6 +10,8 @@ use Reqsheet\Database\ExternalEnvironment;
 use Reqsheet\HealthCheck;
 use Reqsheet\Account\AccountService;
 use Reqsheet\Account\PdoAccountStore;
+use Reqsheet\Auth\OnboardingHandoffService;
+use Reqsheet\Auth\PdoOnboardingHandoffStore;
 use Reqsheet\Http\AdminAccess;
 use Reqsheet\Http\AdminTimetablePage;
 use Reqsheet\Http\ApplicationRoute;
@@ -144,13 +146,51 @@ if ($route === ApplicationRoute::SIGNUP) {
     try {
         $environment = ExternalEnvironment::load($environment);
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new SignupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $tenantContext?->baseHost ?? '');
+        $connection = (new Database($config))->connection();
+        $page = new SignupPage(
+            new AccountService(new PdoAccountStore($connection)),
+            $tenantContext?->baseHost ?? '',
+            new OnboardingHandoffService(new PdoOnboardingHandoffStore($connection)),
+        );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
     } catch (\Throwable) {
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if ($route === ApplicationRoute::ONBOARDING) {
+    if ($method !== 'GET' || $tenantOrganisationId === null) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Onboarding handoff not found\n";
+        exit;
+    }
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $connection = (new Database($config))->connection();
+        $handoff = (new OnboardingHandoffService(new PdoOnboardingHandoffStore($connection)))->consume(
+            (string) ($_GET['token'] ?? ''),
+            (int) $tenantOrganisationId,
+        );
+        if ($handoff === null) throw new \RuntimeException('Onboarding handoff was invalid.');
+        $accounts = new AccountService(new PdoAccountStore($connection));
+        $account = $accounts->findUserById($handoff['user_id']);
+        if ($account === null || !(bool) ($account['is_active'] ?? false) || (int) $account['organisation_id'] !== (int) $tenantOrganisationId) {
+            throw new \RuntimeException('Onboarding account was invalid.');
+        }
+        SessionAuth::login($account);
+        header('Location: /settings', true, 302);
+    } catch (\Throwable) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Onboarding handoff not found\n";
     }
     exit;
 }

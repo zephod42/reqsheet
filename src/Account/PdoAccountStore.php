@@ -32,6 +32,14 @@ final class PdoAccountStore implements AccountStore
         return $statement->fetchColumn() !== false;
     }
 
+    public function findOrganisationTenantSlug(int $organisationId): ?string
+    {
+        $statement = $this->prepare('SELECT tenant_slug FROM organisations WHERE id = :id');
+        $statement->execute(['id' => $organisationId]);
+        $slug = $statement->fetchColumn();
+        return $slug === false ? null : (string) $slug;
+    }
+
     public function findOrganisationByTenantSlug(string $tenantSlug): ?array
     {
         $statement = $this->prepare('SELECT id, name, tenant_slug FROM organisations WHERE tenant_slug = :tenant_slug LIMIT 1');
@@ -52,6 +60,27 @@ final class PdoAccountStore implements AccountStore
              FROM users WHERE display_name = :login LIMIT 1',
         );
         $statement->execute(['login' => $login]);
+        $row = $statement->fetch();
+        return $row === false ? null : [
+            'id' => (int) $row['id'],
+            'organisation_id' => (int) $row['organisation_id'],
+            'display_name' => (string) $row['display_name'],
+            'operational_role' => (string) $row['operational_role'],
+            'is_admin' => (bool) $row['is_admin'],
+            'password_hash' => $row['password_hash'] === null ? null : (string) $row['password_hash'],
+            'account_state' => (string) $row['account_state'],
+            'is_active' => (bool) $row['is_active'],
+        ];
+    }
+
+    public function findUserById(int $userId): ?array
+    {
+        $statement = $this->prepare(
+            'SELECT id, organisation_id, display_name, operational_role, is_admin,
+                    password_hash, account_state, is_active
+             FROM users WHERE id = :id LIMIT 1',
+        );
+        $statement->execute(['id' => $userId]);
         $row = $statement->fetch();
         return $row === false ? null : [
             'id' => (int) $row['id'],

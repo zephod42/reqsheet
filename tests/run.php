@@ -11,6 +11,7 @@ require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
 require __DIR__ . '/AccountTest.php';
 require __DIR__ . '/TenantTest.php';
 require __DIR__ . '/SettingsTest.php';
+require __DIR__ . '/OnboardingHandoffTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 
@@ -95,8 +96,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -132,6 +133,11 @@ $tenantMigration = file_get_contents($migrationDirectory . '/0005_add_tenant_slu
 if ($tenantMigration === false) throw new RuntimeException('Tenant migration could not be read.');
 foreach (['tenant_slug', 'organisations_tenant_slug', 'organisation-'] as $expectedTenantFragment) {
     if (!str_contains($tenantMigration, $expectedTenantFragment)) throw new RuntimeException('Expected tenant schema fragment is missing: ' . $expectedTenantFragment);
+}
+$handoffMigration = file_get_contents($migrationDirectory . '/0006_create_onboarding_handoffs.sql');
+if ($handoffMigration === false) throw new RuntimeException('Onboarding handoff migration could not be read.');
+foreach (['onboarding_handoffs', 'token_hash', 'consumed_at', 'expires_at'] as $expectedHandoffFragment) {
+    if (!str_contains($handoffMigration, $expectedHandoffFragment)) throw new RuntimeException('Expected onboarding handoff schema fragment is missing: ' . $expectedHandoffFragment);
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
@@ -172,5 +178,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\AccountTest::run();
 \Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();
+\Reqsheet\Tests\OnboardingHandoffTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

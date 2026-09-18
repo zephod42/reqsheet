@@ -74,6 +74,17 @@ final class AccountService
         return $account;
     }
 
+    /** @return array<string, mixed>|null */
+    public function findUserById(int $userId): ?array
+    {
+        return $this->store->findUserById($userId);
+    }
+
+    public function organisationTenantSlug(int $organisationId): ?string
+    {
+        return $this->store->findOrganisationTenantSlug($organisationId);
+    }
+
     public function needsFirstLogin(string $login, ?int $organisationId = null): bool
     {
         $account = $this->store->findLogin(trim($login));
