@@ -8,6 +8,6 @@ final class TechnicianPlaceholderPage
 {
     public function render(): string
     {
-        return '<!doctype html><meta charset="utf-8"><title>Reqsheet technician</title><main><h1>Technician interface</h1><p>The technician interface is not yet implemented.</p><p><a href="/logout">Log out</a></p></main>';
+        return PageLayout::render('Technician', '<section class="content-narrow technician-placeholder"><p class="eyebrow">Technician</p><h1>Technician interface</h1><p class="notice">The technician day view is not yet implemented.</p><p><a class="button secondary" href="/logout">Log out</a></p></section>');
     }
 }

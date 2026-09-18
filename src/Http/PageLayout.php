@@ -17,9 +17,13 @@ final class PageLayout
 
     public static function render(string $title, string $body, ?array $user = null): string
     {
-        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet.</a><ul><li><a href="/about">About</a></li><li><a href="/demo">Demo</a></li><li><a href="/signup">Sign up</a></li><li><a href="/contact">Contact</a></li>';
+        $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        $active = static fn (string $path): string => ($path === '/teacher' ? str_starts_with($currentPath, '/teacher') : $currentPath === $path) ? ' class="active" aria-current="page"' : '';
+        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet.</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li><li><a' . $active('/signup') . ' href="/signup">Sign up</a></li><li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
         if ($user !== null) {
-            if ((bool) ($user['is_admin'] ?? false)) $nav .= '<li><a href="/settings">Settings</a></li><li><a href="/admin/people">People</a></li>';
+            $landing = ($user['operational_role'] ?? '') === 'technician' ? '/technician' : '/teacher';
+            $nav .= '<li class="nav-divider"><a' . $active($landing) . ' href="' . $landing . '">' . (($landing === '/technician') ? 'Technician' : 'Teacher week') . '</a></li>';
+            if ((bool) ($user['is_admin'] ?? false)) $nav .= '<li><a' . $active('/settings') . ' href="/settings">Settings</a></li><li><a' . $active('/admin/people') . ' href="/admin/people">People</a></li><li><a' . $active('/admin/timetable') . ' href="/admin/timetable">Timetable</a></li>';
             $nav .= '<li><a href="/logout">Log out</a></li>';
         }
         $nav .= '</ul></nav>';
