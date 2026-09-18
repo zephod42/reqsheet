@@ -5,6 +5,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 require __DIR__ . '/ExternalEnvironmentTest.php';
 require __DIR__ . '/RoutingTest.php';
+require __DIR__ . '/TimetableConfigurationTest.php';
 require __DIR__ . '/AdminTimetablePageTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
 require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
@@ -13,7 +14,6 @@ require __DIR__ . '/TenantTest.php';
 require __DIR__ . '/SettingsTest.php';
 require __DIR__ . '/OnboardingHandoffTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
-require __DIR__ . '/TimetableConfigurationTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;

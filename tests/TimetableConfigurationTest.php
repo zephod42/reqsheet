@@ -131,7 +131,7 @@ final class TimetableConfigurationTest
     }
 }
 
-final class ConfigurationStore implements TimetableConfigurationStore
+class ConfigurationStore implements TimetableConfigurationStore
 {
     /** @var array<int, TimetableVersion> */
     public array $versions = [];

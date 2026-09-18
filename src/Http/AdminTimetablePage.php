@@ -58,7 +58,14 @@ final class AdminTimetablePage
                         'class' => $resource->createClass($this->organisationId, (string) ($input['code'] ?? '')),
                         default => throw new TimetableValidationException(['Resource type is invalid.']),
                     };
-                    $query = array_replace($query, ['create' => '', 'view' => $type, 'resource' => $id]);
+                    $returnView = in_array(($input['return_view'] ?? ''), ['teacher', 'room', 'class'], true) ? (string) $input['return_view'] : $type;
+                    $query = array_replace($query, [
+                        'create' => '', 'view' => $returnView,
+                        'resource' => (int) ($input['return_resource'] ?? $id),
+                        'day' => (int) ($input['return_day'] ?? 0),
+                        'start_slot' => (int) ($input['return_start_slot'] ?? 0),
+                        'new_' . $type => $id,
+                    ]);
                     $message = ucfirst($type) . ' added.';
                 } elseif ($action === 'resource_save_lesson' || $action === 'resource_delete_lesson') {
                     $versionId = (int) ($input['version'] ?? 0);
@@ -94,7 +101,8 @@ final class AdminTimetablePage
 
     private function resourcePage(ResourceTimetableStore $store, array $versions, ?TimetableVersion $version, array $query, ?string $message): string
     {
-        $view = in_array(($query['view'] ?? 'teacher'), ['teacher', 'room', 'class'], true) ? (string) $query['view'] : 'teacher';
+        $requestedView = (string) ($query['view'] ?? 'teacher');
+        $view = in_array($requestedView, ['teacher', 'room', 'class'], true) ? $requestedView : 'teacher';
         $users = $store->usersForOrganisation($this->organisationId);
         $rooms = $store->roomsForOrganisation($this->organisationId);
         $classes = $store->classesForOrganisation($this->organisationId);
@@ -104,7 +112,7 @@ final class AdminTimetablePage
         $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
         $body .= $this->resourceToolbar($versions, $version?->id, $view, $resource, $users, $rooms, $classes);
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
-        if (!empty($query['create'])) $body .= $this->resourceCreationForm($version?->id, $view, $resource, (string) $query['create']);
+        if (!empty($query['create'])) $body .= $this->resourceCreationForm($version?->id, $view, $resource, (string) $query['create'], $query);
         elseif ($version !== null && $resource > 0) {
             $body .= $this->resourceGrid($store, $version, $view, $resource);
             if (isset($query['edit']) || isset($query['day']) || isset($query['start_slot'])) $body .= $this->resourceLessonEditor($store, $version, $view, $resource, (int) ($query['edit'] ?? 0), $query, $users, $rooms, $classes);
@@ -124,9 +132,9 @@ final class AdminTimetablePage
         return $html . '<option value="__new__">Add new class...</option></select></label><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&view=class&create=class">Add class code</a></form></section>';
     }
 
-    private function resourceCreationForm(?int $version, string $view, int $resource, string $type): string
+    private function resourceCreationForm(?int $version, string $view, int $resource, string $type, array $query = []): string
     {
-        return '<section class="resource-create"><h2>Add ' . $this->e($type) . '</h2><form method="post"><input type="hidden" name="action" value="create_resource"><input type="hidden" name="resource_type" value="' . $this->e($type) . '"><input type="hidden" name="version" value="' . (int) $version . '"><label>' . ($type === 'teacher' ? 'Initials/code' : ($type === 'class' ? 'Class code' : 'Room code')) . '<input name="code" required></label>' . ($type === 'teacher' ? '<label>Display name (optional)<input name="display_name"></label>' : '') . '<div class="form-actions"><button>Add</button><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&view=' . $this->e($view) . '&resource=' . $resource . '">Cancel</a></div></form></section>';
+        return '<dialog class="resource-dialog" open><form method="post"><a class="close" href="/admin/timetable?version=' . (int) $version . '&view=' . $this->e((string) ($query['return_view'] ?? $view)) . '&resource=' . (int) ($query['return_resource'] ?? $resource) . '&day=' . (int) ($query['return_day'] ?? 0) . '&start_slot=' . (int) ($query['return_start_slot'] ?? 0) . '">Cancel</a><p class="eyebrow">Add resource</p><h2>' . $this->e($type === 'teacher' ? 'Teacher' : ($type === 'class' ? 'Class code' : 'Room')) . '</h2><input type="hidden" name="action" value="create_resource"><input type="hidden" name="resource_type" value="' . $this->e($type) . '"><input type="hidden" name="version" value="' . (int) $version . '"><input type="hidden" name="return_view" value="' . $this->e((string) ($query['return_view'] ?? $view)) . '"><input type="hidden" name="return_resource" value="' . (int) ($query['return_resource'] ?? $resource) . '"><input type="hidden" name="return_day" value="' . (int) ($query['return_day'] ?? 0) . '"><input type="hidden" name="return_start_slot" value="' . (int) ($query['return_start_slot'] ?? 0) . '"><label>' . ($type === 'teacher' ? 'Initials/code' : ($type === 'class' ? 'Class code' : 'Room code')) . '<input name="code" required autofocus></label>' . ($type === 'teacher' ? '<label>Display name (optional)<input name="display_name"></label>' : '') . '<div class="form-actions"><button>Add</button></div></form></dialog><script>document.addEventListener("DOMContentLoaded",function(){var dialog=document.querySelector(".resource-dialog");if(!dialog)return;if(typeof dialog.showModal==="function"){dialog.close();dialog.showModal();}var field=dialog.querySelector("[autofocus]");if(field)field.focus();});</script>';
     }
 
     private function resourceGrid(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource): string
@@ -140,16 +148,24 @@ final class AdminTimetablePage
         $html = '<section class="editor-section admin-resource-grid"><div class="section-heading"><div><p class="eyebrow">' . $this->e(ucfirst($view)) . ' timetable</p><h2>Selected ' . $this->e($view) . '</h2></div><p class="muted">Click an empty period to assign a lesson.</p></div><div class="timetable-scroll"><table><caption class="sr-only">Versioned timetable by ' . $this->e($view) . '</caption><thead><tr><th>Period</th>';
         foreach ($days as $day) $html .= '<th>' . $this->e($this->dayName($day)) . '</th>';
         $html .= '</tr></thead><tbody>';
+        $spanned = [];
         foreach ($rows as $sequence) {
             $first = null; foreach ($slots as $slot) if ($slot->sequenceNumber === $sequence) { $first = $slot; break; }
             $separator = $first !== null && !$first->isTeaching();
-            $html .= '<tr' . ($separator ? ' class="timetable-separator"' : '') . '><th>' . $this->e($first?->label ?: 'P' . ($first?->teachingPeriodNumber ?? $sequence)) . '</th>';
+            $html .= '<tr' . ($separator ? ' class="timetable-separator"' : '') . '><th>' . $this->e($first?->isTeaching() ? $this->periodLabel($first) : ($first ? $this->separatorLabel($first) : 'P' . $sequence)) . '</th>';
             foreach ($days as $day) {
+                if (!empty($spanned[$day][$sequence])) continue;
                 $slot = null; foreach ($slots as $candidate) if ($candidate->dayOfWeek === $day && $candidate->sequenceNumber === $sequence) { $slot = $candidate; break; }
-                if ($slot === null || !$slot->isTeaching()) { $html .= '<td>' . ($slot ? $this->e($slot->label ?: ucfirst($slot->kind)) : '') . '</td>'; continue; }
+                if ($slot === null || !$slot->isTeaching()) { $html .= '<td class="' . ($slot && !$slot->isTeaching() ? 'separator-cell' : 'empty-cell') . '">' . ($slot ? $this->e($this->separatorLabel($slot)) : '') . '</td>'; continue; }
                 $lesson = null; foreach ($lessons as $candidate) if ($candidate->dayOfWeek === $day && $candidate->startSlotId === $slot->id && (($view === 'teacher' && $candidate->teacherUserId === $resource) || ($view === 'room' && $candidate->roomId === $resource) || ($view === 'class' && $candidate->classId === $resource))) { $lesson = $candidate; break; }
                 $href = '/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '&day=' . $day . '&start_slot=' . $slot->id . ($lesson ? '&edit=' . $lesson->id : '');
-                $html .= '<td>' . ($lesson ? '<a class="admin-lesson" href="' . $href . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>Teacher ' . $lesson->teacherUserId . '</small></a>' : '<a class="empty-period" href="' . $href . '"><span>+</span><small>Add lesson</small></a>') . '</td>';
+                if ($lesson) {
+                    $daySlots = array_values(array_filter($slots, static fn (TimetableSlot $candidate): bool => $candidate->dayOfWeek === $day));
+                    $span = count(TimetableRules::occupiedSequences($daySlots, $slot, $lesson->durationPeriods));
+                    $span = max(1, $span);
+                    foreach ($daySlots as $candidate) if ($candidate->sequenceNumber !== $sequence && $candidate->sequenceNumber > $sequence && $candidate->sequenceNumber < $sequence + $span) $spanned[$day][$candidate->sequenceNumber] = true;
+                    $html .= '<td rowspan="' . $span . '"><a class="admin-lesson" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>Teacher ' . $lesson->teacherUserId . ' · ' . $lesson->durationPeriods . ' period' . ($lesson->durationPeriods === 1 ? '' : 's') . '</small></a></td>';
+                } else $html .= '<td class="empty-cell"><a class="empty-period" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '" aria-label="Add lesson on ' . $this->e($this->dayName($day)) . ' ' . $this->e($this->periodLabel($slot)) . '"><span>+</span><small>Add lesson</small></a></td>';
             }
             $html .= '</tr>';
         }
@@ -157,6 +173,39 @@ final class AdminTimetablePage
     }
 
     private function resourceLessonEditor(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource, int $edit, array $query, array $users, array $rooms, array $classes): string
+    {
+        $lesson = $edit > 0 ? $store->findLesson($edit) : null;
+        $day = $lesson?->dayOfWeek ?? (int) ($query['day'] ?? 1);
+        $slot = $lesson?->startSlotId ?? (int) ($query['start_slot'] ?? 0);
+        $fixed = $view === 'teacher' ? 'teacher_user_id' : ($view === 'room' ? 'room_id' : 'class_id');
+        $fixedValue = $view === 'teacher' ? ($lesson?->teacherUserId ?? $resource) : ($view === 'room' ? ($lesson?->roomId ?? $resource) : ($lesson?->classId ?? $resource));
+        $teacherValue = $lesson?->teacherUserId ?? (int) ($query['new_teacher'] ?? 0);
+        $roomValue = $lesson?->roomId ?? (int) ($query['new_room'] ?? 0);
+        $classValue = $lesson?->classId ?? (int) ($query['new_class'] ?? 0);
+        $fixedLabel = $this->resourceName($view, $fixedValue, $users, $rooms, $classes);
+        $periodLabel = $this->slotLabelById($store->slotsForVersion($version->id), $slot);
+        $cancel = '/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource;
+        $html = '<dialog id="assignment-editor" class="assignment-dialog" open aria-labelledby="assignment-editor-title"><form method="post">';
+        $html .= '<a class="close" href="' . $cancel . '">Cancel</a><p class="eyebrow">Version ' . $this->e($version->label ?: 'Untitled timetable') . '</p><h2 id="assignment-editor-title">' . ($lesson ? 'Edit assignment' : 'Add assignment') . '</h2>';
+        $html .= '<p class="lesson-context"><strong>' . $this->e(ucfirst($view) . ' ' . $fixedLabel) . '</strong> · ' . $this->e($this->dayName($day)) . ' · ' . $this->e($periodLabel) . '</p>';
+        $html .= '<input type="hidden" name="action" value="resource_save_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="view" value="' . $view . '"><input type="hidden" name="resource" value="' . $resource . '"><input type="hidden" name="day_of_week" value="' . $day . '"><input type="hidden" name="start_slot_id" value="' . $slot . '">' . ($lesson ? '<input type="hidden" name="lesson_id" value="' . $lesson->id . '">' : '');
+        $html .= '<input type="hidden" name="' . $fixed . '" value="' . $fixedValue . '"><div class="fixed-resource"><span>' . $this->e(ucfirst($view)) . ' (fixed)</span><strong>' . $this->e($fixedLabel) . '</strong></div>';
+        if ($view !== 'teacher') $html .= '<label for="teacher_user_id">Teacher' . $this->resourceSelect('teacher_user_id', $teacherValue, $users, 'Add new teacher...') . '</label>';
+        if ($view !== 'room') $html .= '<label for="room_id">Room' . $this->resourceSelect('room_id', $roomValue, $rooms, 'Add new room...') . '</label>';
+        if ($view !== 'class') $html .= '<label for="class_id">Class code' . $this->resourceSelect('class_id', $classValue, $classes, 'Add new class...') . '</label>';
+        if ($this->conjoinedPeriodsAllowed()) {
+            $html .= '<label for="duration_periods">Length / span<select id="duration_periods" name="duration_periods">';
+            $maxDuration = $this->maxDuration($version->id, $day, $slot);
+            for ($duration = 1; $duration <= $maxDuration; $duration++) $html .= '<option value="' . $duration . '"' . ($duration === ($lesson?->durationPeriods ?? 1) ? ' selected' : '') . '>' . $duration . ' period' . ($duration === 1 ? '' : 's') . '</option>';
+            $html .= '</select></label>';
+        } else $html .= '<input type="hidden" name="duration_periods" value="1"><p class="muted">Conjoined periods are disabled in Settings.</p>';
+        $html .= '<div class="form-actions"><button>Save assignment</button><a class="button secondary" href="' . $cancel . '">Cancel</a></div></form>';
+        if ($lesson) $html .= '<form method="post" class="delete-form"><input type="hidden" name="action" value="resource_delete_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="view" value="' . $view . '"><input type="hidden" name="resource" value="' . $resource . '"><input type="hidden" name="lesson_id" value="' . $lesson->id . '"><button class="danger">Remove assignment</button></form>';
+        $createUrl = '/admin/timetable?version=' . $version->id . '&view=' . $view . '&resource=' . $resource . '&return_view=' . $view . '&return_resource=' . $resource . '&return_day=' . $day . '&return_start_slot=' . $slot . '&create=';
+        return $html . '</dialog><script>document.addEventListener("DOMContentLoaded",function(){var dialog=document.getElementById("assignment-editor");if(!dialog)return;var origin=document.querySelector("[data-cell=\"' . $day . '-' . $slot . '\"]");if(typeof dialog.showModal==="function"){dialog.close();dialog.showModal();}var first=dialog.querySelector("select, input:not([type=hidden]), button");if(first)first.focus();dialog.addEventListener("close",function(){if(origin)origin.focus();});});document.addEventListener("change",function(e){if(e.target.value!=="__new__")return;var type=e.target.name==="teacher_user_id"?"teacher":(e.target.name==="room_id"?"room":"class");location.href="' . $createUrl . '"+type;});</script>';
+    }
+
+    private function legacyResourceLessonEditor(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource, int $edit, array $query, array $users, array $rooms, array $classes): string
     {
         $lesson = $edit > 0 ? $store->findLesson($edit) : null;
         $day = $lesson?->dayOfWeek ?? (int) ($query['day'] ?? 1);
@@ -175,9 +224,34 @@ final class AdminTimetablePage
 
     private function resourceSelect(string $name, int $selected, array $rows, string $addLabel): string
     {
-        $html = '<select name="' . $name . '"><option value="0">Select...</option>';
+        $html = '<select id="' . $name . '" name="' . $name . '"><option value="0">Select...</option>';
         foreach ($rows as $row) { $id = (int) $row['id']; $label = $row['code'] ?? ($row['staff_identifier'] ?: $row['display_name']); $html .= '<option value="' . $id . '"' . ($id === $selected ? ' selected' : '') . '>' . $this->e((string) $label) . '</option>'; }
         return $html . '<option value="__new__">' . $this->e($addLabel) . '</option></select>';
+    }
+
+    private function resourceName(string $view, int $resource, array $users, array $rooms, array $classes): string
+    {
+        $rows = $view === 'teacher' ? $users : ($view === 'room' ? $rooms : $classes);
+        foreach ($rows as $row) if ((int) $row['id'] === $resource) return (string) ($row['code'] ?? ($row['staff_identifier'] ?: $row['display_name']));
+        return 'selected ' . $view;
+    }
+
+    /** @param list<TimetableSlot> $slots */
+    private function slotLabelById(array $slots, int $slotId): string
+    {
+        foreach ($slots as $slot) if ($slot->id === $slotId) return $slot->isTeaching() ? $this->periodLabel($slot) : $this->separatorLabel($slot);
+        return 'period';
+    }
+
+    private function separatorLabel(TimetableSlot $slot): string
+    {
+        $label = trim((string) ($slot->label ?? ''));
+        if ($label !== '') return $label;
+        return match ($slot->kind) {
+            'break' => 'Break',
+            'lunch' => 'Lunch',
+            default => 'Other',
+        };
     }
 
     private function seedVersionStructure(ResourceTimetableStore $store, int $versionId): void
@@ -203,10 +277,12 @@ final class AdminTimetablePage
                 $clock = $end;
                 if (isset($separators[$period])) {
                     $separator = $separators[$period];
-                    $kind = ($separator['type'] ?? '') === 'Lunchtime' ? 'lunch' : (($separator['type'] ?? '') === 'Break' ? 'break' : 'non_teaching');
+                    $type = (string) ($separator['type'] ?? 'Other');
+                    $kind = $type === 'Lunchtime' ? 'lunch' : ($type === 'Break' ? 'break' : 'non_teaching');
+                    $label = trim((string) ($separator['label'] ?? '')) ?: ($type === 'Lunchtime' ? 'Lunch' : $type);
                     $minutes = max(1, (int) ($separator['duration_minutes'] ?? 15));
                     $separatorEnd = $clock->modify('+' . $minutes . ' minutes');
-                    $service->create($versionId, $day, $sequence++, $kind, null, (string) ($separator['type'] ?? 'Other'), $clock->format('H:i'), $separatorEnd->format('H:i'));
+                    $service->create($versionId, $day, $sequence++, $kind, null, $label, $clock->format('H:i'), $separatorEnd->format('H:i'));
                     $clock = $separatorEnd;
                 }
             }
@@ -321,7 +397,7 @@ final class AdminTimetablePage
         ksort($columns);
         $teacherName = $this->teacherName($teacher, $users);
         $html = '<section class="editor-section"><div class="section-heading"><div><p class="eyebrow">Weekly view</p><h2>' . $this->e($teacherName) . '</h2></div><p class="muted">Click an empty period to add a lesson. Click a lesson to edit it.</p></div><div class="timetable-scroll"><table class="admin-week-grid"><thead><tr><th>Day</th>';
-        foreach ($columns as $slot) $html .= '<th' . ($slot->isTeaching() ? '' : ' class="separator-column"') . '>' . $this->e($slot->isTeaching() ? $this->periodLabel($slot) : ($slot->label ?: ucfirst($slot->kind))) . '</th>';
+        foreach ($columns as $slot) $html .= '<th' . ($slot->isTeaching() ? '' : ' class="separator-column"') . '>' . $this->e($slot->isTeaching() ? $this->periodLabel($slot) : $this->separatorLabel($slot)) . '</th>';
         $html .= '</tr></thead><tbody>';
         foreach ($days as $day) {
             $html .= '<tr><th class="day-label">' . $this->e($this->dayName($day)) . '</th>';
@@ -330,7 +406,7 @@ final class AdminTimetablePage
                 $sequence = $sequenceNumbers[$index];
                 $slot = $byDay[$day][$sequence] ?? null;
                 if ($slot === null) { $html .= '<td class="empty-cell">—</td>'; continue; }
-                if (!$slot->isTeaching()) { $html .= '<td class="separator-cell">' . $this->e($slot->label ?: ucfirst($slot->kind)) . '</td>'; continue; }
+                if (!$slot->isTeaching()) { $html .= '<td class="separator-cell">' . $this->e($this->separatorLabel($slot)) . '</td>'; continue; }
                 $lesson = null;
                 foreach ($lessons as $candidate) if ($candidate->dayOfWeek === $day && $candidate->startSlotId === $slot->id) { $lesson = $candidate; break; }
                 if ($lesson !== null) {

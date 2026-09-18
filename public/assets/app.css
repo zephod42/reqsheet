@@ -184,11 +184,18 @@ dialog .close { float: right; }
 .timetable-toolbar label { flex: 1 1 10rem; margin: 0; }
 .timetable-toolbar select { min-width: 9rem; }
 .resource-create { max-width: 34rem; margin: var(--space-5) 0; border-top: 1px solid var(--rule); padding-top: var(--space-4); }
-.admin-resource-grid table { min-width: 52rem; }
-.admin-resource-grid th, .admin-resource-grid td { min-width: 9rem; height: 6.4rem; padding: .35rem; vertical-align: top; }
+.admin-resource-grid table { width: 100%; min-width: 52rem; border-collapse: collapse; table-layout: fixed; }
+.admin-resource-grid th, .admin-resource-grid td { min-width: 9rem; height: 6.4rem; border: 1px solid var(--rule); padding: .35rem; vertical-align: top; }
 .admin-resource-grid th:first-child { min-width: 6rem; width: 6rem; }
 .admin-resource-grid .timetable-separator th, .admin-resource-grid .timetable-separator td { height: 2.1rem; background: #f7f7f7; color: var(--muted); font-size: .78rem; }
 .admin-resource-grid .admin-lesson { height: 5.45rem; }
+.admin-resource-grid .empty-cell { background: #fff; }
+.admin-resource-grid .empty-period { min-height: 5.2rem; }
+.fixed-resource { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--primary-pale); padding: .55rem .7rem; }
+.fixed-resource span { color: var(--muted); font-size: .82rem; }
+.assignment-dialog, .resource-dialog { position: fixed; top: 50%; left: calc(10.5rem + 1rem); right: 1rem; width: auto; max-width: 38rem; max-height: calc(100vh - 3rem); margin: 0 auto; transform: translateY(-50%); }
+.assignment-dialog form, .resource-dialog form { max-width: none; margin: 0; }
+.assignment-dialog .lesson-context { margin-top: .9rem; }
 .technician-placeholder { padding-top: var(--space-5); }
 
 @media (max-width: 48rem) {
@@ -204,6 +211,7 @@ dialog .close { float: right; }
     .timetable-toolbar form { display: grid; grid-template-columns: 1fr; }
     .timetable-toolbar label, .timetable-toolbar .button { width: 100%; box-sizing: border-box; }
     dialog { width: calc(100% - 1rem); max-height: calc(100vh - 1rem); margin: .5rem auto; padding: 1rem; }
+    .assignment-dialog, .resource-dialog { top: .5rem; left: .5rem; right: .5rem; width: auto; max-width: none; max-height: calc(100vh - 1rem); transform: none; }
 }
 
 @media print {

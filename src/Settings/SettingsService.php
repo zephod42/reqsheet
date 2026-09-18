@@ -63,15 +63,17 @@ final class SettingsService
         $types = (array) ($input['separator_type'] ?? []);
         $after = (array) ($input['separator_after'] ?? []);
         $duration = (array) ($input['separator_duration'] ?? []);
+        $labels = (array) ($input['separator_label'] ?? []);
         foreach ($types as $index => $type) {
             $type = trim((string) $type);
             $period = (int) ($after[$index] ?? 0);
             $minutes = trim((string) ($duration[$index] ?? ''));
+            $label = trim((string) ($labels[$index] ?? ''));
             if ($type === '' && $period === 0 && $minutes === '') continue;
             if (!in_array($type, self::SEPARATOR_TYPES, true)) $errors[] = 'Separator type is invalid.';
             if ($period < 1 || $period >= $periods) $errors[] = 'Separators must be placed between valid periods.';
             if ($minutes !== '' && (int) $minutes < 1) $errors[] = 'Separator duration must be positive when supplied.';
-            $separators[] = ['type' => $type, 'after_period' => $period, 'duration_minutes' => $minutes];
+            $separators[] = ['type' => $type, 'label' => $label, 'after_period' => $period, 'duration_minutes' => $minutes];
         }
         if ($errors !== []) throw new SettingsValidationException(array_values(array_unique($errors)));
 
