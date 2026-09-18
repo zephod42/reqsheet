@@ -15,10 +15,16 @@ Future implementation must at minimum address:
 - separate runtime and migration database identities, with the runtime identity denied schema-changing privileges;
 - migration review, backup procedures, and explicit handling of MySQL's non-atomic DDL before production application;
 - audit logging appropriate to requisition and approval changes.
+- tenant resolution and isolation for every school host, including strict validation of editable tenant slugs and uniqueness checks within Reqsheet’s database;
+- host/base-domain configuration that avoids deriving tenant identity from an untrusted or hard-coded assumption;
 
 Never commit credentials, `.env` files, logs, runtime data, or production configuration to this repository. The example environment files contain placeholders only; real runtime and migration secrets must be supplied from protected host configuration outside the repository. The health endpoint never returns connection details or exception messages.
 
 The web runtime can load configuration only when `REQSHEET_ENV_FILE` explicitly names one absolute file outside the repository. The parser accepts literal `KEY=value` entries only, preserves already-defined process variables, and supports no shell execution or interpolation. Missing or malformed configured files fail as generic unhealthy application state; contents and credentials are not exposed.
+
+School subdomains are a tenant-routing concern, not a registrar lookup. The application must resolve a validated slug under the configured parent/base domain, enforce organisation isolation on every request and database access path, and support equivalent staging hosts under DuckDNS. The root domain is a generic public route; once a tenant is resolved, the school name may be shown on its landing/login page. Tenant data and host routing must remain portable when the base domain changes.
+
+Admin theming must remain limited to Primary and Secondary accent values. Arbitrary custom CSS is prohibited; theme accents must not be allowed to alter the black/white base, timetable grid, automatic class colours, or technician print output.
 
 The pilot onboarding design temporarily permits a new Teacher or Technician account to exist in an explicit `awaiting-first-login` state without a password. At first login the user sets the password. This is a consciously accepted pilot weakness, not a production-ready authentication design; it requires a security review and a safer activation/reset flow before broader deployment. The state must never be represented by ambiguous blank-password handling.
 

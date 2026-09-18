@@ -32,7 +32,17 @@ This gate applies consistently wherever normal application use would otherwise b
 
 ### Visual direction
 
-The overall appearance is intentionally restrained: white background, black text, and minimal decoration. Reqsheet-owned navigation, menus, buttons, and other UI chrome use a clear, slightly bold sans-serif. Operational timetable and requisition data uses a visually distinct technical/data-oriented font, with Codex-like typography as the reference feel. Tables use thin black rules, with selectively heavier rules for major boundaries such as periods, days, or week structure.
+The overall appearance is intentionally restrained: white background, black structural lines, and black priority/body text. Reqsheet should remain fully understandable in black and white; colour is supplemental guidance. Reqsheet-owned navigation, menus, buttons, and other UI chrome use a clear, slightly bold sans-serif. Operational timetable and requisition data uses a distinct technical/data-oriented font, with Codex-like typography as the reference feel. Tables use thin, crisp square rules, with selectively heavier rules for meaningful boundaries such as periods, days, or week structure. Interactive/stateful components may use low-radius corners and a very faint shadow or soft lift; grid intersections remain sharp.
+
+Colour is subtle: near-transparent or pastel background accents and deep near-black coloured text such as dark green, dark blue, or dark red. Accent colours are defined centrally using CSS variables/tokens. School-specific differences come from stored configuration, never hard-coded school logic. Desktop is the principal visual reference; mobile and tablet adapt responsively using the same application and data model.
+
+### School themes and application chrome
+
+Admin-configurable school theming is intentionally limited to exactly two stored values: a Primary accent and a Secondary accent. Arbitrary custom CSS is not permitted. The Primary accent is used for selected/current state, the active sidebar item, current/selected day or week indicators, primary/save buttons, and subtle selected-state background tints. The Secondary accent is used sparingly for supporting emphasis, secondary actions, discreet badges, and hover/detail accents.
+
+Automatic class colours, timetable grid colours, and technician print styling are independent from school theme accents. Primary actions such as Save use a friendly medium-tone accent with rounded corners and white text, never a near-black primary button. Selected/current items use a filled, softly rounded accent rectangle or pill behind the full selected area.
+
+The persistent left sidebar is narrow, text-only, visually plain, and limited to role-appropriate destinations so it preserves timetable width. Its active entry uses the Primary accent’s pale fill with slight rounding. Settings remains visible in the Admin sidebar; decorative sidebar icons are not required.
 
 ## Current database boundary
 
@@ -59,13 +69,15 @@ Break and lunch appear as narrow grey separator columns in the grid rather than 
 
 Each lesson tile has a header bar with the class code on the left and room on the right. The body displays only the free-text Requisitions content. Tiles have a fixed size; overflowing content is truncated with an ellipsis, with the full text available on click and optionally on hover.
 
-Each distinct class is assigned a light pastel background colour in the spirit of Google Calendar, and the same class colour is used consistently. This treatment is primarily for the teacher timetable; the technician on-screen view remains neutral. Technician print output remains black-and-white.
+The structural grid is neutral black and white. Empty and non-teaching areas remain visibly blank. Scheduled lessons appear as separate white cards sitting on top of the grid, with slightly rounded corners and a very soft, class-specific coloured outline/glow/accent rather than a strong coloured fill. Each distinct class receives a stable automatic class colour, used consistently in both teacher week and day views. Disabled/unavailable cells remain structurally visible but visually quieter, never illegible. The technician on-screen view remains neutral and technician print output remains black-and-white.
 
-The lesson block top strip/header makes the class code prominent and bold on the left and the room code prominent on the right. Both use the technical/data font. A slightly heavier horizontal rule sits beneath the strip; unnecessary text colours are not added. The block below the header remains visually quiet.
+Each lesson card has a very slim top bar with class code and room code. The class code uses regular rather than necessarily bold weight, a deep/dark green, and remains readable for long or complex codes. The room code uses a contrasting deep wine/dark red. Other lesson body text remains black. A slightly heavier horizontal rule may sit beneath the strip.
 
 Only requisition free text appears directly in the teacher weekly planner, and it is the same content technicians need to see. Lesson outline and risk assessment remain inside the lesson editing UI.
 
-Clicking or tapping a lesson block opens a large pop-out, approximately the full available screen width. It is neither an inline expansion nor a separate page. The pop-out contains three editable, optional areas: Lesson outline, Requisitions, and Risk assessment. Requisitions may genuinely remain blank. An explicit `Nothing required` checkbox/action sits beneath the requisitions area; selecting it populates the requisitions free-text field with `Nothing required`. This state is not pre-filled by default.
+Clicking or tapping a lesson block opens a centred large pop-out/panel. It is neither an inline expansion nor a separate page, and it does not cover the persistent left navigation. The panel is white with low-radius rounded corners, a faint shadow, and a clean friendly/technical appearance; its header gives context such as class, room, day, and period. It contains exactly three principal editable free-text areas: Lesson outline, Requisitions, and Risk assessment. Requisitions is largest and dominant, Lesson outline slightly smaller, and Risk assessment smaller again. Text areas remain fixed and reasonably compact rather than autosizing. No structured quantity, class-size, student-count, draft/submitted/status, or other forced workflow fields are added. Requisitions may genuinely remain blank. An explicit `Nothing required` checkbox/action sits beneath the requisitions area; selecting it populates the requisitions free-text field with `Nothing required`. This state is never pre-filled by default.
+
+Lesson duplication is a first-class teacher workflow. For lessons visible in the current week/day, drag-and-drop performs a copy, never a move; an occupied target asks for simple overwrite confirmation, and a quick undo is provided where practical. Drag/drop is never the only mechanism: the pop-out exposes a visible `Duplicate lesson...` fallback action. Copying to another/future week uses a clear list of future target lessons with enough context such as date, day, period, and class code; empty targets copy immediately and occupied targets ask for overwrite confirmation. Desktop may expose the action through a right-click context menu and touch/mobile through long-press. The interaction model is tap/click to edit, drag to quick copy, right-click/long-press for contextual actions, and the visible pop-out action as the universal accessible fallback.
 
 ## Teacher day view
 
@@ -87,7 +99,7 @@ Conceptually: week view answers “What am I teaching this week?”, day view an
 
 ## Technician day and inspection views
 
-The technician view is day-oriented. Rooms/labs run across the top and teaching periods run down the left. Break and lunch appear as narrow grey separator rows. Technician cells display only free-text Requisitions; teacher and class context is available where needed to identify a lesson, but the cell’s requisition content is not duplicated or re-entered.
+The technician view is day-oriented and intentionally neutral and functional. Rooms/labs run across the top and teaching periods run down the left. Break and lunch appear as narrow grey separator rows. Technician cells display the requisition description exactly as the teacher entered it; teacher and class context is available where needed to identify a lesson, but the cell’s requisition content is not duplicated or re-entered. Teacher class-colour glows/cards are not used. Any future technician statuses use restrained status cues rather than teacher class colours.
 
 The day heading has previous/next day controls and a Today control. A technician may save a personal default subset of rooms for the landing view, switch easily between My rooms, All rooms, and a custom room selection, and still access every room. Personal room preferences are not a permission boundary.
 
@@ -115,6 +127,7 @@ The same screen also offers optional settings:
 - A `Custom day` facility so individual days may use different timings or period lengths.
 - Separators/breaks with type Break, Lunchtime, or Other, the periods between which they occur, and an optional duration.
 - An `Allow double periods` toggle, disabled by default. Its help text explains that adjoining periods with the same class code and room code are combined when enabled. Configured breaks, lunch, and other separators prevent merging across them.
+- Primary accent colour and Secondary accent colour only. White/black base, timetable grid, automatic class colours, and technician print styling remain independent from these settings; arbitrary school CSS is not exposed.
 
 The timetable structure remains an ordered editor that can add, move, and rename periods and separators. Each teaching period has a configurable label/name, order, start time, and end time; separators have configurable names, timing, and order. Admins can manage rooms/labs by adding, renaming, reordering, and deactivating/archiving them.
 - Manage people by creating a Teacher or Technician. The person’s name is used as the login name; an optional abbreviation such as JSM may be recorded; Admin is an optional additional permission.
@@ -124,6 +137,12 @@ The first pilot may create an account with no password until its first login, wh
 ## Timetable versions and editor
 
 Timetables are effective-dated versions. Each version has a label/name and effective start date; a later version supersedes an earlier version from its start date. The design supports mid-year revisions and future academic-year timetables being entered and edited in advance. Historical versions are preserved, and dated occurrences retain their historical snapshots.
+
+## Multi-tenant school URL design
+
+School-specific subdomains are a high-priority architecture/product item. The shared production pattern is `<school>.reqsheet.uk`, for example `kwc.reqsheet.uk` and `ballakermeen.reqsheet.uk`, with all subdomains using the same shared application/server and tenant isolation. The root `reqsheet.uk` is the generic public entry, sign-up, and school-selection route. During school signup/setup, the system captures or suggests a tenant/subdomain slug derived from the school name, lets the Admin edit it, validates its format, and checks uniqueness in Reqsheet’s own database. This is internal tenant-slug uniqueness, not a registrar availability lookup.
+
+The parent/base domain is configurable and is not hard-coded into tenant logic. During staging/Pumba, equivalent subdomains under the current DuckDNS hostname should be supported where practical, such as `<school>.reqsheet.duckdns.org`, so real tenant routing can be exercised before production. Moving from DuckDNS to `reqsheet.uk` should ideally require DNS, TLS, and base-domain configuration changes only, not a tenant/data-model redesign. A later enhancement may remember a user’s chosen school/subdomain and redirect generic-root visitors directly to it. Once tenant context is resolved, the school landing/login page visibly shows the school name near or below the Reqsheet branding.
 
 An admin can copy/clone an existing timetable as the basis of a new version. “Edit timetable” opens a clickable timetable maker. Viewing and editing can be organised by staff member, room, or day, with staff-member view as the default. Lesson entry remains simple: class code, room, and period/span. The configured structure drives teacher week/day layouts, separator positioning, occurrence generation, chronological ordering, determination of true period adjacency, and double/multi-period merge eligibility. Start/end times are stored even when normal teacher day labels show only the period name. The existing service-level timetable validation rules remain authoritative for all entry paths: a multi-period lesson may cross only contiguous teaching periods and may not cross any configured break, lunch, or other non-teaching interval; periods separated by such an interval are separate lesson blocks.
 
@@ -156,4 +175,4 @@ The existing database and service rules remain authoritative: ISO weekdays, vali
 
 ## Not designed yet
 
-Production-grade authentication and authorization hardening, timetable cloning, approval workflow, reporting, and detailed requisition workflow remain open design work. The current setup/login/session flow is deliberately pilot-grade. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.
+Production-grade authentication and authorization hardening, tenant subdomain routing, school-theme settings, approval workflow, reporting, and detailed requisition workflow remain open design work. The current setup/login/session flow is deliberately pilot-grade. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.
