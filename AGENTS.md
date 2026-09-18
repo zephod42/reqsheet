@@ -70,6 +70,8 @@ Before considering a task complete:
 - report exactly what tests/checks were run;
 - do not claim anything passed unless it actually ran.
 
+For any task that changes public routes, forms, signup/login/logout, sessions/authentication, redirects, setup gating, settings/onboarding, or teacher/technician interactive routes, completion also requires a live HTTP smoke test against the Apache-served Reqsheet application from Pumba. Prefer `curl` with `--resolve reqsheet.duckdns.org:443:127.0.0.1` so the real hostname, TLS, and Apache vhost behaviour are exercised. Use a cookie jar and retrieve/submit CSRF tokens when the application uses them. Unit and integration tests do not replace this smoke test, and direct PHP route rendering is not equivalent. If live HTTP testing is genuinely impossible, explicitly report the limitation and do not claim end-to-end route verification.
+
 ## Git
 
 - Never commit secrets, `.env` files, credentials, logs, caches, or runtime data.
