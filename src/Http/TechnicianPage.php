@@ -25,7 +25,8 @@ final class TechnicianPage
         }
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
         $defaults = array_column($rooms, 'id');
-        $mode = in_array(($query['rooms'] ?? 'my'), ['all', 'my', 'custom'], true) ? (string) $query['rooms'] : 'my';
+        $requestedMode = (string) ($query['rooms'] ?? 'my');
+        $mode = in_array($requestedMode, ['all', 'my', 'custom'], true) ? $requestedMode : 'my';
         $selected = $mode === 'all' ? array_column($rooms, 'id') : ($mode === 'custom' ? array_values(array_intersect(array_map('intval', (array) ($query['room_ids'] ?? [])), array_column($rooms, 'id'))) : array_values(array_intersect($defaults, array_column($rooms, 'id'))));
         if ($mode === 'my' && $selected === []) $selected = array_column($rooms, 'id');
         if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician selected week', $this->weekPrint($date, $selected), $this->user);
@@ -33,6 +34,8 @@ final class TechnicianPage
         $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . '&rooms=' . $mode . '&print=week">Print Selected Week</a></div></section>';
         $body .= '<div class="technician-controls"><a class="week-arrow" href="/technician?date=' . $date->modify('-1 day')->format('Y-m-d') . '&rooms=' . $mode . '">‹</a><strong class="technician-date">' . $this->e($date->format('l j F Y')) . '</strong><a class="week-arrow" href="/technician?date=' . $date->modify('+1 day')->format('Y-m-d') . '&rooms=' . $mode . '">›</a><a class="button secondary" href="/technician?date=' . (new DateTimeImmutable('today'))->format('Y-m-d') . '&rooms=' . $mode . '">Today</a></div>';
         $body .= $message === null ? '' : '<p class="notice">' . $this->e($message) . '</p>';
+        if ($rooms === []) $body .= '<p class="notice">No rooms have been configured for this school yet. Add rooms in the timetable settings to use the technician grid.</p>';
+        elseif (($data['version'] ?? null) === null) $body .= '<p class="notice">No active timetable is configured for this school yet.</p>';
         $body .= $this->roomControls($rooms, $defaults, $mode, $selected);
         $body .= $this->grid($date, $rooms, $selected, $data['slots'], $data['occurrences']);
         $body .= $this->inspectionLinks($date);

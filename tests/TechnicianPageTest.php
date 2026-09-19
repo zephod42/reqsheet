@@ -14,6 +14,25 @@ final class TechnicianPageTest
     {
         $store = new TechnicianPageStoreFake();
         $page = new TechnicianPage($store, 1, 20, ['display_name' => 'Tech', 'roles' => ['technician']]);
+        $warning = null;
+        set_error_handler(static function (int $severity, string $message): bool {
+            throw new \ErrorException($message, 0, $severity);
+        }, E_WARNING);
+        try {
+            $page->handle('GET', ['date' => '2026-09-21'], []);
+        } catch (\ErrorException $exception) {
+            $warning = $exception->getMessage();
+        } finally {
+            restore_error_handler();
+        }
+        assertSameValue(null, $warning, 'Technician navigation without a rooms query parameter emitted a warning.');
+        $store->rooms = [];
+        $empty = $page->handle('GET', ['date' => '2026-09-21'], []);
+        assertContainsValue('No rooms have been configured', $empty, 'Technician view did not provide an empty-room state.');
+        $store->rooms = [['id' => 1, 'code' => 'LAB-A'], ['id' => 2, 'code' => 'LAB-B']];
+        $store->hasActiveTimetable = false;
+        assertContainsValue('No active timetable is configured', $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []), 'Technician view did not provide an inactive-timetable state.');
+        $store->hasActiveTimetable = true;
         $day = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
         assertContainsValue('JSM', $day, 'Technician grid did not show teacher initials.');
         assertContainsValue('Very long requisition text', $day, 'Technician grid did not show the saved requisition.');
@@ -32,8 +51,10 @@ final class TechnicianPageTest
 
 final class TechnicianPageStoreFake implements TechnicianPlanningStore
 {
+    public array $rooms = [['id' => 1, 'code' => 'LAB-A'], ['id' => 2, 'code' => 'LAB-B']];
+    public bool $hasActiveTimetable = true;
     public function technicianBelongsToOrganisation(int $userId, int $organisationId): bool { return $userId === 20 && $organisationId === 1; }
-    public function roomsForOrganisation(int $organisationId): array { return [['id' => 1, 'code' => 'LAB-A'], ['id' => 2, 'code' => 'LAB-B']]; }
+    public function roomsForOrganisation(int $organisationId): array { return $this->rooms; }
     public function teachersForOrganisation(int $organisationId): array { return [['id' => 10, 'name' => 'John Smith']]; }
     public function defaultRoomIds(int $organisationId, int $userId): array { return [1]; }
     public function saveDefaultRoomIds(int $organisationId, int $userId, array $roomIds): void {}
@@ -42,7 +63,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array
     {
         return [
-            'version' => ['id' => 1],
+            'version' => $this->hasActiveTimetable ? ['id' => 1] : null,
             'slots' => [
                 ['id' => 1, 'sequence_number' => 1, 'kind' => 'teaching', 'label' => 'P1'],
                 ['id' => 2, 'sequence_number' => 2, 'kind' => 'teaching', 'label' => 'P2'],
