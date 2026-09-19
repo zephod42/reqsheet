@@ -28,7 +28,7 @@ final class TenantSlug
     {
         $value = strtolower(trim($value));
         if (!self::isValid($value)) {
-            throw new AccountValidationException(['Tenant slug must be a lowercase hostname label using letters, digits, and hyphens; it must not start or end with a hyphen.']);
+            throw new AccountValidationException(['School short code must use lowercase letters, digits, and hyphens; it must not start or end with a hyphen.']);
         }
         return $value;
     }

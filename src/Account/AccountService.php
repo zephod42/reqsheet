@@ -204,7 +204,7 @@ final class AccountService
         } catch (AccountValidationException $exception) {
             throw $exception;
         }
-        if ($this->store->organisationTenantSlugExists($slug)) throw new AccountValidationException(['That tenant slug is already in use. Choose another slug.']);
+        if ($this->store->organisationTenantSlugExists($slug)) throw new AccountValidationException(['That school short code is already in use. Choose another school short code.']);
         return $slug;
     }
 }

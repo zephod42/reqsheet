@@ -82,6 +82,12 @@ final class SettingsTest
         $signup = new SignupPage($signupAccounts, 'reqsheet.test', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $signupView = $signup->handle('GET', []);
         assertContainsValue('School name', $signupView, 'Signup did not ask for a school name.');
+        assertContainsValue('School short code', $signupView, 'Signup did not use school-facing short-code language.');
+        assertContainsValue("Choose a short code for your school. This will form part of your school's unique Reqsheet address.", $signupView, 'Signup short-code guidance was not rendered.');
+        assertContainsValue('sch4', $signupView, 'Signup did not show a short-code example.');
+        assertContainsValue('sch4.reqsheet.test', $signupView, 'Signup did not show the configured public domain in its example.');
+        assertNotContainsValue('Tenant slug', $signupView, 'Signup exposed internal tenant-slug terminology.');
+        assertNotContainsValue('tenant identity', strtolower($signupView), 'Signup exposed internal tenant terminology.');
         assertNotContainsValue('email', strtolower($signupView), 'Signup unexpectedly requires email.');
         $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilot-school', 'display_name' => 'Pilot Admin', 'staff_identifier' => 'PAD', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
         assertContainsValue('https://pilot-school.reqsheet.test/onboarding?token=', $created, 'Successful signup did not hand off to the tenant host.');
