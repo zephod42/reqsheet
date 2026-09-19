@@ -165,8 +165,8 @@ class ConfigurationStore implements TimetableConfigurationStore
     public array $organisations = [1 => 1, 2 => 1];
     /** @var list<array{id:int,display_name:string,staff_identifier:?string,is_active:bool}> */
     public array $users = [
-        ['id' => 10, 'display_name' => 'Teacher A', 'staff_identifier' => 'TA', 'is_active' => true],
-        ['id' => 11, 'display_name' => 'Teacher B', 'staff_identifier' => 'TB', 'is_active' => true],
+        ['id' => 10, 'display_name' => 'Teacher A', 'staff_identifier' => 'TAA', 'is_active' => true],
+        ['id' => 11, 'display_name' => 'Teacher B', 'staff_identifier' => 'TBB', 'is_active' => true],
     ];
     /** @var array<int, int> */
     public array $occurrences = [];

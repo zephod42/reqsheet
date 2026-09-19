@@ -88,7 +88,7 @@ if ($tenantOrganisationId !== null && $currentUser !== null && (int) $currentUse
 }
 
 if ($route === ApplicationRoute::LOGIN) {
-    $loginPage = new LoginPage();
+    $loginPage = new LoginPage($tenantContext?->organisation);
     $current = SessionAuth::current();
     if ($current !== null) {
         header('Location: ' . SessionAuth::landingPath($current), true, 302);

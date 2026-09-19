@@ -16,6 +16,7 @@ require __DIR__ . '/OnboardingHandoffTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/MyAccountTest.php';
 require __DIR__ . '/AdminPeoplePageTest.php';
+require __DIR__ . '/LoginPageTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -193,5 +194,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\OnboardingHandoffTest::run();
 \Reqsheet\Tests\MyAccountTest::run();
 \Reqsheet\Tests\AdminPeoplePageTest::run();
+\Reqsheet\Tests\LoginPageTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

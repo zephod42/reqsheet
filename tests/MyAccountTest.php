@@ -45,14 +45,14 @@ final class MyAccountStore implements AccountStore
     public function organisationTenantSlugExists(string $tenantSlug): bool { return false; }
     public function findOrganisationTenantSlug(int $organisationId): ?string { return $organisationId === 3 ? 'school' : null; }
     public function findOrganisationByTenantSlug(string $tenantSlug): ?array { return $tenantSlug === 'school' ? ['id' => 3, 'name' => 'School', 'tenant_slug' => 'school'] : null; }
-    public function findLogin(string $login): ?array { return $login === 'Alex Smith' ? $this->account : null; }
+    public function findLogin(string $login, ?int $organisationId = null): ?array { return $login === 'Alex Smith' ? $this->account : null; }
     public function findUserById(int $userId): ?array { return $userId === 7 ? $this->account : null; }
     public function findPeopleForOrganisation(int $organisationId): array { return $organisationId === 3 ? [$this->account] : []; }
     public function activeAdministratorCount(int $organisationId): int { return 0; }
-    public function createPerson(int $organisationId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): int { return 8; }
-    public function updatePerson(int $organisationId, int $userId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): void {}
-    public function createFirstOrganisation(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { return 3; }
-    public function createOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { return 3; }
+    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, ?string $email, array $roles): int { return 8; }
+    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, ?string $email, array $roles): void {}
+    public function createFirstOrganisation(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { return 3; }
+    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { return 3; }
     public function createUser(int $organisationId, string $displayName, ?string $staffIdentifier, string $role, bool $isAdmin): int { return 8; }
     public function claimFirstLogin(int $userId, string $passwordHash): void {}
     public function updatePassword(int $userId, int $organisationId, string $passwordHash): void { $this->account['password_hash'] = $passwordHash; }

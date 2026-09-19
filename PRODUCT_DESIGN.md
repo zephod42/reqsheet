@@ -183,6 +183,12 @@ The existing database and service rules remain authoritative: ISO weekdays, vali
 
 ## Not designed yet
 
+## School login and staff initials (2026-09-19)
+
+- A school-hosted login identifies the resolved organisation by its registered name and tenant short code; the generic public host does not invent a school identity.
+- Staff log in with exactly three uppercase A–Z initials, unique within their organisation and independent of internal user IDs. The same initials may be used by different schools.
+- The initials field is compact and applies the same server-side validation to setup, signup, People, timetable resources, and login.
+
 ## People and navigation milestone (2026-09-19)
 
 - Authenticated navigation separates general information links from application functions with a simple black rule. The teacher destination is labelled “View My Timetable”.

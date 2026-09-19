@@ -78,19 +78,19 @@ final class SettingsTest
 
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
         $signupAccounts = new \Reqsheet\Account\AccountService($signupStore);
-        $signupAccounts->createFirstOrganisation('Existing School', 'Existing Admin', null, 'teacher', 'existing-pass', 'existing-pass');
+        $signupAccounts->createFirstOrganisation('Existing School', 'Existing Admin', 'EAD', 'teacher', 'existing-pass', 'existing-pass');
         $signup = new SignupPage($signupAccounts, 'reqsheet.test', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $signupView = $signup->handle('GET', []);
         assertContainsValue('School name', $signupView, 'Signup did not ask for a school name.');
         assertNotContainsValue('email', strtolower($signupView), 'Signup unexpectedly requires email.');
-        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilot-school', 'display_name' => 'Pilot Admin', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
+        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilot-school', 'display_name' => 'Pilot Admin', 'staff_identifier' => 'PAD', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
         assertContainsValue('https://pilot-school.reqsheet.test/onboarding?token=', $created, 'Successful signup did not hand off to the tenant host.');
         assertSameValue(true, (bool) $signupStore->accounts['Pilot Admin']['is_admin'], 'Signup did not create an admin account.');
         assertSameValue(2, $signupStore->accounts['Pilot Admin']['organisation_id'], 'Public signup did not create a second organisation.');
         assertSameValue('pilot-school', $signupStore->accounts['Pilot Admin']['tenant_slug'], 'Public signup did not store the tenant slug.');
         assertSameValue(1, $signupStore->accounts['Existing Admin']['organisation_id'], 'Public signup leaked or changed the existing tenant.');
         assertSameValue(null, \Reqsheet\Http\SessionAuth::current(), 'Public signup left a generic-host session active during tenant handoff.');
-        self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', null, 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');
+        self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', 'TAD', 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');
         \Reqsheet\Http\SessionAuth::logout();
         assertContainsValue('action="/login"', (new HomePage())->render(), 'Home login form did not post to /login.');
 

@@ -15,7 +15,7 @@ interface AccountStore extends TenantStore
     public function findOrganisationTenantSlug(int $organisationId): ?string;
 
     /** @return array<string, mixed>|null */
-    public function findLogin(string $login): ?array;
+    public function findLogin(string $login, ?int $organisationId = null): ?array;
 
     /** @return array<string, mixed>|null */
     public function findUserById(int $userId): ?array;
@@ -24,17 +24,17 @@ interface AccountStore extends TenantStore
     public function findPeopleForOrganisation(int $organisationId): array;
 
     /** @param list<string> $roles */
-    public function createPerson(int $organisationId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): int;
+    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, ?string $email, array $roles): int;
 
     /** @param list<string> $roles */
-    public function updatePerson(int $organisationId, int $userId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): void;
+    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, ?string $email, array $roles): void;
 
     public function activeAdministratorCount(int $organisationId): int;
 
     public function createFirstOrganisation(
         string $organisationName,
         string $displayName,
-        ?string $staffIdentifier,
+        string $staffIdentifier,
         string $role,
         string $passwordHash,
         string $tenantSlug = '',
@@ -43,7 +43,7 @@ interface AccountStore extends TenantStore
     public function createOrganisationAdmin(
         string $organisationName,
         string $displayName,
-        ?string $staffIdentifier,
+        string $staffIdentifier,
         string $role,
         string $passwordHash,
         string $tenantSlug = '',
@@ -52,7 +52,7 @@ interface AccountStore extends TenantStore
     public function createUser(
         int $organisationId,
         string $displayName,
-        ?string $staffIdentifier,
+        string $staffIdentifier,
         string $role,
         bool $isAdmin,
     ): int;

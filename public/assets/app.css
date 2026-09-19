@@ -81,7 +81,8 @@ small { font-size: .82rem; }
 .site-nav li a { display: block; border-radius: var(--corner); padding: .38rem .5rem; text-decoration: none; }
 .site-nav li a:hover, .site-nav li a:focus-visible { background: var(--secondary-pale); }
 .site-nav .nav-disabled { display: block; border-radius: var(--corner); padding: .38rem .5rem; color: var(--muted); cursor: not-allowed; }
-.site-nav li a.active, .selected-state { background: var(--primary-pale); box-shadow: inset 3px 0 0 var(--primary-accent), 0 1px 3px rgb(0 0 0 / 6%); font-weight: 700; color: var(--ink); }
+.site-nav li a.active, .selected-state { background: var(--primary-pale); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); font-weight: 700; color: var(--ink); }
+.staff-identifier { width: 5rem; max-width: 5rem; text-transform: uppercase; }
 .site-main { width: min(100%, 78rem); padding: var(--space-5) clamp(1rem, 4vw, 4rem); }
 .tenant-name { margin: -.8rem 0 var(--space-4); color: var(--muted); font-size: .95rem; font-weight: 650; }
 .content-narrow { max-width: 38rem; }

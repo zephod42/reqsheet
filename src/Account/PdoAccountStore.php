@@ -52,14 +52,16 @@ final class PdoAccountStore implements AccountStore
         ];
     }
 
-    public function findLogin(string $login): ?array
+    public function findLogin(string $login, ?int $organisationId = null): ?array
     {
         $statement = $this->prepare(
             'SELECT id, organisation_id, display_name, staff_identifier, email, operational_role, is_admin,
                     is_teacher, is_technician, teacher_number, password_hash, account_state, is_active
-             FROM users WHERE display_name = :login LIMIT 1',
+             FROM users WHERE staff_identifier = :login
+               AND (:organisation_id_filter IS NULL OR organisation_id = :organisation_id_match)
+             ORDER BY id LIMIT 1',
         );
-        $statement->execute(['login' => $login]);
+        $statement->execute(['login' => $login, 'organisation_id_filter' => $organisationId, 'organisation_id_match' => $organisationId]);
         $row = $statement->fetch();
         return $row === false ? null : $this->account($row);
     }
@@ -94,7 +96,7 @@ final class PdoAccountStore implements AccountStore
         return (int) $statement->fetchColumn();
     }
 
-    public function createPerson(int $organisationId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): int
+    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, ?string $email, array $roles): int
     {
         return $this->withOrganisationLock($organisationId, function () use ($organisationId, $displayName, $staffIdentifier, $email, $roles): int {
             $teacherNumber = in_array('teacher', $roles, true) ? $this->nextTeacherNumber($organisationId) : null;
@@ -108,7 +110,7 @@ final class PdoAccountStore implements AccountStore
         });
     }
 
-    public function updatePerson(int $organisationId, int $userId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): void
+    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, ?string $email, array $roles): void
     {
         $this->withOrganisationLock($organisationId, function () use ($organisationId, $userId, $displayName, $staffIdentifier, $email, $roles): void {
             $current = $this->findUserById($userId);
@@ -126,7 +128,7 @@ final class PdoAccountStore implements AccountStore
         });
     }
 
-    public function createFirstOrganisation(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
+    public function createFirstOrganisation(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin first-run setup.');
         try {
@@ -140,7 +142,7 @@ final class PdoAccountStore implements AccountStore
         }
     }
 
-    public function createOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
+    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin organisation signup.');
         try {

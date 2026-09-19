@@ -48,3 +48,9 @@ People and navigation milestone completed 2026-09-19:
 - Migration `0008_add_people_roles_and_teacher_numbers.sql` adds optional email, independent operational-role flags, and immutable organisation-local teacher numbers. Existing users are backfilled by organisation and existing database IDs/relationships are preserved.
 
 The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services provide the validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Product behaviour and the remaining UI/admin scope are canonical in `PRODUCT_DESIGN.md`; authentication/authorization and exception handling remain future work.
+
+Bounded login refinement completed 2026-09-19:
+
+- Tenant login shows only the trusted registered school name and short code; the generic host remains school-neutral.
+- Staff initials are now exactly three A–Z letters, normalised to uppercase and unique per organisation. They are the organisation-scoped login identifier and remain separate from internal IDs and teacher numbers.
+- Billing, subscriptions, payment processing, email verification, and password recovery remain deferred.

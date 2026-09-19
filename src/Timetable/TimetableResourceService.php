@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Reqsheet\Timetable;
 
+use Reqsheet\Account\StaffIdentifier;
+
 final class TimetableResourceService
 {
     public function __construct(private readonly ResourceTimetableStore $store)
@@ -22,8 +24,7 @@ final class TimetableResourceService
 
     public function createTeacher(int $organisationId, string $code, string $displayName): int
     {
-        $code = trim($code);
-        if ($code === '') throw new TimetableValidationException(['Teacher initials/code must not be blank.']);
+        try { $code = StaffIdentifier::normalise($code); } catch (\Reqsheet\Account\AccountValidationException $exception) { throw new TimetableValidationException($exception->errors()); }
         foreach ($this->store->usersForOrganisation($organisationId) as $user) if (strcasecmp((string) ($user['staff_identifier'] ?? ''), $code) === 0) throw new TimetableValidationException(['Teacher initials/code already exists.']);
         return $this->store->createTeacher($organisationId, $code, $displayName);
     }
