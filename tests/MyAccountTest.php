@@ -20,7 +20,8 @@ final class MyAccountTest
         assertContainsValue('My Account', $view, 'My Account heading was not rendered.');
         assertContainsValue('Alex Smith', $view, 'Own identity was not rendered.');
         assertContainsValue('AS', $view, 'Own staff code was not rendered.');
-        assertContainsValue('No email address has been entered.', $view, 'Missing optional email was not explained.');
+        assertContainsValue('Roles</dt><dd>Teacher, Technician', $view, 'Assigned roles were not rendered as human-readable labels.');
+        assertNotContainsValue('email', strtolower($view), 'Individual staff email content remained on My Account.');
         self::expectValidation(static fn () => $service->changePassword(7, 3, 'wrong', 'new-pass', 'new-pass'));
         self::expectValidation(static fn () => $service->changePassword(7, 3, 'old-pass', 'short', 'short'));
         self::expectValidation(static fn () => $service->changePassword(7, 3, 'old-pass', 'new-pass', 'different'));
@@ -39,7 +40,7 @@ final class MyAccountTest
 final class MyAccountStore implements AccountStore
 {
     public array $account;
-    public function __construct() { $this->account = ['id' => 7, 'organisation_id' => 3, 'display_name' => 'Alex Smith', 'staff_identifier' => 'AS', 'operational_role' => 'teacher', 'is_admin' => false, 'is_active' => true, 'password_hash' => password_hash('old-pass', PASSWORD_DEFAULT), 'account_state' => 'claimed']; }
+    public function __construct() { $this->account = ['id' => 7, 'organisation_id' => 3, 'display_name' => 'Alex Smith', 'staff_identifier' => 'AS', 'operational_role' => 'teacher', 'roles' => ['teacher', 'technician'], 'is_admin' => false, 'is_active' => true, 'password_hash' => password_hash('old-pass', PASSWORD_DEFAULT), 'account_state' => 'claimed']; }
     public function organisationCount(): int { return 1; }
     public function organisationExists(int $organisationId): bool { return $organisationId === 3; }
     public function organisationTenantSlugExists(string $tenantSlug): bool { return false; }
