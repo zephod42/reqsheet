@@ -16,10 +16,46 @@ final class TenantHostResolver
     /** @param array<string, mixed> $environment @param array<string, mixed> $server */
     public static function configuredBaseHost(array $environment, array $server): ?string
     {
-        $configured = $environment['REQSHEET_BASE_HOST'] ?? null;
-        if (is_string($configured) && trim($configured) !== '') return self::normaliseHost($configured, true);
+        $hosts = self::configuredBaseHosts($environment, $server);
+        return $hosts[0] ?? null;
+    }
+
+    /** @param array<string, mixed> $environment @param array<string, mixed> $server @return list<string> */
+    public static function configuredBaseHosts(array $environment, array $server): array
+    {
+        $configured = $environment['REQSHEET_BASE_HOSTS'] ?? ($environment['REQSHEET_BASE_HOST'] ?? null);
+        if (is_string($configured) && trim($configured) !== '') {
+            $hosts = [];
+            foreach (preg_split('/\s*,\s*/', trim($configured)) ?: [] as $candidate) {
+                if ($candidate === '') continue;
+                $host = self::normaliseHost($candidate, true);
+                if (!in_array($host, $hosts, true)) $hosts[] = $host;
+            }
+            return $hosts;
+        }
         $serverName = $server['SERVER_NAME'] ?? '';
-        if (is_string($serverName) && in_array(strtolower(trim($serverName)), ['localhost', '127.0.0.1'], true)) return self::normaliseHost($serverName, true);
+        if (is_string($serverName) && in_array(strtolower(trim($serverName)), ['localhost', '127.0.0.1'], true)) return [self::normaliseHost($serverName, true)];
+        return [];
+    }
+
+    /** @param array<string, mixed> $environment @param list<string> $baseHosts */
+    public static function canonicalPublicHost(array $environment, array $baseHosts): ?string
+    {
+        $configured = $environment['REQSHEET_CANONICAL_HOST'] ?? null;
+        $canonical = is_string($configured) && trim($configured) !== '' ? self::normaliseHost($configured, true) : ($baseHosts[0] ?? null);
+        if ($canonical === null) return null;
+        if (!in_array($canonical, $baseHosts, true)) throw new TenantHostException('Canonical host is not an allowed base host.');
+        return $canonical;
+    }
+
+    /** @param list<string> $baseHosts */
+    public static function baseHostForRequest(string $requestHost, array $baseHosts): ?string
+    {
+        foreach ($baseHosts as $baseHost) {
+            $baseHost = self::normaliseHost($baseHost, true);
+            $normalised = self::normaliseHost($requestHost, false);
+            if ($normalised === $baseHost || str_ends_with($normalised, '.' . $baseHost)) return $baseHost;
+        }
         return null;
     }
 

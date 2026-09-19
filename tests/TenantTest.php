@@ -27,6 +27,13 @@ final class TenantTest
         assertSameValue(1, $known->organisation['id'], 'Known tenant resolved to the wrong organisation.');
         $otherBase = $resolver->resolve('kwc.example.test', 'example.test');
         assertSameValue(1, $otherBase->organisation['id'], 'Tenant slug did not work with another configured base domain.');
+        $allowedBases = TenantHostResolver::configuredBaseHosts(['REQSHEET_BASE_HOSTS' => 'reqsheet.com, reqsheet.duckdns.org', 'REQSHEET_CANONICAL_HOST' => 'reqsheet.com'], ['SERVER_NAME' => 'untrusted.example']);
+        assertSameValue(['reqsheet.com', 'reqsheet.duckdns.org'], $allowedBases, 'Both configured public domains were not retained.');
+        assertSameValue('reqsheet.com', TenantHostResolver::canonicalPublicHost(['REQSHEET_CANONICAL_HOST' => 'reqsheet.com'], $allowedBases), 'Canonical public host was not selected.');
+        assertSameValue('reqsheet.com', TenantHostResolver::baseHostForRequest('kwc.reqsheet.com', $allowedBases), 'New-domain tenant host was not matched.');
+        assertSameValue('reqsheet.duckdns.org', TenantHostResolver::baseHostForRequest('kwc.reqsheet.duckdns.org', $allowedBases), 'DuckDNS tenant host was not retained.');
+        $newDomain = $resolver->resolve('kwc.reqsheet.com', 'reqsheet.com');
+        assertSameValue($known->organisation, $newDomain->organisation, 'The same tenant did not retain its organisation identity across domains.');
 
         foreach (['missing.reqsheet.test', 'a.b.reqsheet.test', 'kwc.other.test', 'bad_slug.reqsheet.test'] as $host) {
             assertThrows(static fn () => $resolver->resolve($host, 'reqsheet.test'), 'Invalid or unknown tenant host was accepted: ' . $host);
@@ -34,6 +41,7 @@ final class TenantTest
         assertSameValue('reqsheet.test', TenantHostResolver::configuredBaseHost(['REQSHEET_BASE_HOST' => 'reqsheet.test'], ['SERVER_NAME' => 'wrong.test']), 'Configured base host was ignored.');
         assertSameValue('localhost', TenantHostResolver::configuredBaseHost([], ['SERVER_NAME' => 'localhost']), 'Local server-name fallback failed.');
         assertSameValue(null, TenantHostResolver::configuredBaseHost([], ['SERVER_NAME' => 'reqsheet.example']), 'Unconfigured public server-name was trusted.');
+        assertThrows(static fn () => TenantHostResolver::canonicalPublicHost(['REQSHEET_CANONICAL_HOST' => 'other.example'], $allowedBases), 'Canonical host outside the allowlist was accepted.');
     }
 }
 

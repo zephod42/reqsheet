@@ -53,11 +53,14 @@ try {
 
 $tenantContext = null;
 try {
-    $baseHost = TenantHostResolver::configuredBaseHost($environment, $_SERVER);
-    if ($baseHost === null) {
-        $tenantContext = new TenantHostContext($baseHost, null, null);
+    $baseHosts = TenantHostResolver::configuredBaseHosts($environment, $_SERVER);
+    $canonicalHost = TenantHostResolver::canonicalPublicHost($environment, $baseHosts);
+    if ($baseHosts === []) {
+        $tenantContext = new TenantHostContext(null, null, null);
     } else {
         $requestHost = TenantHostResolver::requestHost($_SERVER);
+        $baseHost = TenantHostResolver::baseHostForRequest($requestHost, $baseHosts);
+        if ($baseHost === null) throw new TenantHostException('Host is outside the configured base hosts.');
         $tenantSlug = TenantHostResolver::tenantSlugForHost($requestHost, $baseHost);
         if ($tenantSlug === null) {
             $tenantContext = new TenantHostContext($baseHost, null, null);
@@ -151,7 +154,7 @@ if ($route === ApplicationRoute::SIGNUP) {
         $connection = (new Database($config))->connection();
         $page = new SignupPage(
             new AccountService(new PdoAccountStore($connection)),
-            $tenantContext?->baseHost ?? '',
+            $canonicalHost ?? $tenantContext?->baseHost ?? '',
             new OnboardingHandoffService(new PdoOnboardingHandoffStore($connection)),
         );
         header('Content-Type: text/html; charset=UTF-8');
@@ -236,7 +239,7 @@ if ($route === ApplicationRoute::SETUP) {
     }
     try {
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new SetupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $tenantContext?->baseHost ?? '');
+        $page = new SetupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $canonicalHost ?? $tenantContext?->baseHost ?? '');
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
     } catch (\Throwable) {

@@ -1,0 +1,13 @@
+# Administrator example. Install as /etc/apache2/sites-available/reqsheet-com.conf
+# after confirming the certificate/DNS plan. This file is not loaded by Reqsheet.
+<VirtualHost *:80>
+    ServerName reqsheet.com
+    ServerAlias www.reqsheet.com *.reqsheet.com
+
+    RewriteEngine On
+    RewriteCond %{HTTP_HOST} ^www\.reqsheet\.com$ [NC]
+    RewriteRule ^ https://reqsheet.com%{REQUEST_URI} [END,NE,R=permanent]
+    RewriteCond %{HTTP_HOST} ^([^.]+)\.reqsheet\.com$ [NC]
+    RewriteRule ^ https://%1.reqsheet.com%{REQUEST_URI} [END,NE,R=permanent]
+    RewriteRule ^ https://reqsheet.com%{REQUEST_URI} [END,NE,R=permanent]
+</VirtualHost>

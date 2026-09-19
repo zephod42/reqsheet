@@ -1,0 +1,38 @@
+# Administrator example. Replace certificate paths with the issued certificate
+# paths that contain both reqsheet.com and *.reqsheet.com.
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+    ServerName reqsheet.com
+    ServerAlias *.reqsheet.com
+
+    SetEnv REQSHEET_ENV_FILE /etc/reqsheet/reqsheet-runtime.env
+    DocumentRoot /var/www/reqsheet/public
+    <Directory /var/www/reqsheet/public>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+        FallbackResource /index.php
+    </Directory>
+    DirectoryIndex index.php index.html
+    ErrorLog ${APACHE_LOG_DIR}/reqsheet-com-error.log
+    CustomLog ${APACHE_LOG_DIR}/reqsheet-com-access.log combined
+    <FilesMatch "\.php$">
+        SetHandler "proxy:unix:/run/php/php8.5-fpm.sock|fcgi://localhost/"
+    </FilesMatch>
+
+    SSLEngine on
+    SSLCertificateFile /path/to/reqsheet-com-fullchain.pem
+    SSLCertificateKeyFile /path/to/reqsheet-com-privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName www.reqsheet.com
+    SSLEngine on
+    SSLCertificateFile /path/to/reqsheet-com-fullchain.pem
+    SSLCertificateKeyFile /path/to/reqsheet-com-privkey.pem
+    RewriteEngine On
+    RewriteRule ^ https://reqsheet.com%{REQUEST_URI} [END,NE,R=permanent]
+    Include /etc/letsencrypt/options-ssl-apache.conf
+</VirtualHost>
+</IfModule>

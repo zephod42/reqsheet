@@ -118,6 +118,11 @@ final class SettingsTest
         assertNotContainsValue('email', strtolower($signupView), 'Signup unexpectedly requires email.');
         $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilot-school', 'display_name' => 'Pilot Admin', 'staff_identifier' => 'PAD', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
         assertContainsValue('https://pilot-school.reqsheet.test/onboarding?token=', $created, 'Successful signup did not hand off to the tenant host.');
+        $newDomainSignup = new SignupPage($signupAccounts, 'reqsheet.com', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
+        $newDomainPreview = $newDomainSignup->handle('GET', []);
+        assertContainsValue('sch4.reqsheet.com', $newDomainPreview, 'Signup did not use the canonical new public domain.');
+        $newDomainCreated = $newDomainSignup->handle('POST', ['school_name' => 'New Domain School', 'tenant_slug' => 'new-domain-school', 'display_name' => 'New Domain Admin', 'staff_identifier' => 'NDA', 'operational_role' => 'teacher', 'password' => 'new-domain-pass', 'password_confirmation' => 'new-domain-pass']);
+        assertContainsValue('https://new-domain-school.reqsheet.com/onboarding?token=', $newDomainCreated, 'Signup from the new domain did not generate a canonical tenant handoff.');
         assertSameValue(true, (bool) $signupStore->accounts['Pilot Admin']['is_admin'], 'Signup did not create an admin account.');
         assertSameValue(2, $signupStore->accounts['Pilot Admin']['organisation_id'], 'Public signup did not create a second organisation.');
         assertSameValue('pilot-school', $signupStore->accounts['Pilot Admin']['tenant_slug'], 'Public signup did not store the tenant slug.');
