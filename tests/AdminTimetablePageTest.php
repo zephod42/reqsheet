@@ -101,6 +101,9 @@ final class AdminTimetablePageTest
         assertContains('admin-resource-grid', $grid, 'Resource grid was not rendered.');
         assertContains('/admin/timetable/export.csv?version=1', $grid, 'Selected timetable did not expose the blank CSV export action.');
         assertContains('Export Blank CSV', $grid, 'Blank CSV export action used the wrong label.');
+        assertContains('/admin/timetable/resources.csv', $grid, 'Timetable resource reference export was not exposed.');
+        assertContains('action="/admin/timetable/import"', $grid, 'Empty timetable did not expose CSV upload.');
+        assertContains('name="csrf_token"', $grid, 'CSV upload did not include CSRF protection.');
         assertContains('<h2>Teacher A</h2>', $grid, 'Selected teacher heading did not show the resource name.');
         assertNotContains('Versioned timetable by teacher/class/room', $grid, 'Redundant generic timetable heading remained.');
         assertContains('class="empty-period"', $grid, 'Empty teaching cells were not clickable.');
@@ -157,8 +160,9 @@ final class ResourceConfigurationStore extends ConfigurationStore implements Res
     public array $classes = [];
     public int $lessonReads = 0;
 
+    public function usersForOrganisation(int $organisationId): array { return array_values(array_filter($this->users, static fn (array $user): bool => !isset($user['organisation_id']) || (int) $user['organisation_id'] === $organisationId)); }
     public function roomsForOrganisation(int $organisationId): array { return array_values(array_filter($this->rooms, static fn (array $room): bool => !isset($room['organisation_id']) || (int) $room['organisation_id'] === $organisationId)); }
-    public function classesForOrganisation(int $organisationId): array { return $this->classes; }
+    public function classesForOrganisation(int $organisationId): array { return array_values(array_filter($this->classes, static fn (array $class): bool => !isset($class['organisation_id']) || (int) $class['organisation_id'] === $organisationId)); }
     public function lessonsForVersion(int $versionId): array { $this->lessonReads++; return parent::lessonsForVersion($versionId); }
     public function createRoom(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->rooms[] = ['id' => $id, 'code' => trim($code)]; return $id; }
     public function createClass(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->classes[] = ['id' => $id, 'code' => trim($code)]; return $id; }

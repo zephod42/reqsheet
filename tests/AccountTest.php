@@ -67,7 +67,7 @@ final class AccountTest
         assertSameValue('claimed', $resetClaim['account_state'], 'Reset account could not choose a replacement password.');
         self::expectValidation(static fn () => $accounts->authenticate('NTE', 'new-pass', 1));
 
-        session_save_path(sys_get_temp_dir());
+        if (session_status() !== PHP_SESSION_ACTIVE) session_save_path(sys_get_temp_dir());
         SessionAuth::login($account);
         assertSameValue($account['id'], SessionAuth::current()['id'], 'Authenticated session did not retain the user.');
         assertSameValue('NEV', SessionAuth::current()['staff_identifier'], 'Authenticated session did not retain teacher initials.');

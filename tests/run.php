@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+ini_set('session.save_path', sys_get_temp_dir());
+
 require dirname(__DIR__) . '/vendor/autoload.php';
 require __DIR__ . '/ExternalEnvironmentTest.php';
 require __DIR__ . '/RoutingTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 require __DIR__ . '/AdminTimetablePageTest.php';
 require __DIR__ . '/BlankTimetableCsvExporterTest.php';
+require __DIR__ . '/TimetableCsvImportTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
 require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
 require __DIR__ . '/AccountTest.php';
@@ -197,6 +200,7 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\RoutingTest::run();
 \Reqsheet\Tests\AdminTimetablePageTest::run();
 \Reqsheet\Tests\BlankTimetableCsvExporterTest::run();
+\Reqsheet\Tests\TimetableCsvImportTest::run();
 \Reqsheet\Tests\AccountTest::run();
 \Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();

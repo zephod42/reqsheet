@@ -14,6 +14,8 @@ use Reqsheet\Auth\OnboardingHandoffService;
 use Reqsheet\Auth\PdoOnboardingHandoffStore;
 use Reqsheet\Http\AdminAccess;
 use Reqsheet\Http\AdminTimetableCsvExport;
+use Reqsheet\Http\AdminTimetableCsvImport;
+use Reqsheet\Http\AdminTimetableResourceCsvExport;
 use Reqsheet\Http\AdminTimetablePage;
 use Reqsheet\Http\ApplicationRoute;
 use Reqsheet\Http\TeacherAccess;
@@ -39,6 +41,10 @@ use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Technician\PdoTechnicianPlanningStore;
 use Reqsheet\Timetable\PdoTimetableConfigurationStore;
 use Reqsheet\Timetable\BlankTimetableCsvExporter;
+use Reqsheet\Timetable\TimetableCsvImportDraftStore;
+use Reqsheet\Timetable\TimetableCsvImportPreviewService;
+use Reqsheet\Timetable\TimetableCsvParser;
+use Reqsheet\Timetable\TimetableResourceCsvExporter;
 use Reqsheet\Timetable\TimetableCsvExportException;
 use Reqsheet\Settings\PdoOrganisationSettingsStore;
 use Reqsheet\Settings\SettingsService;
@@ -372,7 +378,7 @@ if ($route === ApplicationRoute::SETTINGS) {
     exit;
 }
 
-if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT], true)) {
+if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES], true)) {
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -522,6 +528,74 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE_EXPORT) {
         }
     } catch (\Throwable $exception) {
         $logRequestFailure('timetable-csv-export', $exception);
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if ($route === ApplicationRoute::ADMIN_TIMETABLE_RESOURCES) {
+    $user = SessionAuth::current();
+    if (!SessionAuth::isAdmin($user)) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $export = (new AdminTimetableResourceCsvExport(
+            new TimetableResourceCsvExporter(new PdoTimetableConfigurationStore((new Database($config))->connection())),
+            (int) $user['organisation_id'],
+            $user,
+        ))->create();
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $export->filename . '"');
+        header('Cache-Control: no-store, private, max-age=0');
+        header('X-Content-Type-Options: nosniff');
+        echo $export->content;
+    } catch (TimetableCsvExportException $exception) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Administrator access required\n";
+    } catch (\Throwable $exception) {
+        $logRequestFailure('timetable-resource-csv-export', $exception);
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if ($route === ApplicationRoute::ADMIN_TIMETABLE_IMPORT) {
+    $user = SessionAuth::current();
+    if (!SessionAuth::isAdmin($user)) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $database = new Database($config);
+        $store = new PdoTimetableConfigurationStore($database->connection());
+        $settings = (new SettingsService(new PdoOrganisationSettingsStore($database->connection())))->load((int) $user['organisation_id']);
+        $response = (new AdminTimetableCsvImport(
+            new TimetableCsvParser(),
+            new TimetableCsvImportPreviewService($store),
+            new TimetableCsvImportDraftStore(),
+            (int) $user['organisation_id'],
+            $user,
+            (bool) ($settings['allow_double_periods'] ?? false),
+        ))->handle($_POST, $_FILES);
+        http_response_code($response->status);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $response->html;
+    } catch (\Throwable $exception) {
+        $logRequestFailure('timetable-csv-import-preview', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";

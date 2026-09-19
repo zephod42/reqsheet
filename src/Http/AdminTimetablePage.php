@@ -112,10 +112,11 @@ final class AdminTimetablePage
         $classes = $store->classesForOrganisation($this->organisationId);
         $resource = (int) ($query['resource'] ?? 0);
         if ($resource < 1) $resource = $view === 'teacher' ? (int) ($users[0]['id'] ?? 0) : ($view === 'room' ? (int) ($rooms[0]['id'] ?? 0) : (int) ($classes[0]['id'] ?? 0));
-        $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable builder</h1></div><div class="form-actions">' . ($version === null ? '' : '<a class="button secondary" href="/admin/timetable/export.csv?version=' . $version->id . '">Export Blank CSV</a>') . '<a class="button" href="/admin/people">Manage people</a></div></section>';
+        $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable builder</h1></div><div class="form-actions">' . ($version === null ? '' : '<a class="button secondary" href="/admin/timetable/export.csv?version=' . $version->id . '">Export Blank CSV</a>') . '<a class="button secondary" href="/admin/timetable/resources.csv">Export Resource Reference</a><a class="button" href="/admin/people">Manage people</a></div></section>';
         $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
         $body .= $this->resourceToolbar($versions, $version?->id, $view, $resource, $users, $rooms, $classes);
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
+        if ($version !== null) $body .= $this->importPanel($store, $version);
         if (!empty($query['create'])) $body .= $this->resourceCreationForm($version?->id, $view, $resource, (string) $query['create'], $query);
         elseif ($version !== null && $resource > 0) {
             $body .= $this->resourceGrid($store, $version, $view, $resource, $users);
@@ -369,6 +370,15 @@ final class AdminTimetablePage
     {
         foreach ($users as $user) if ((int) $user['id'] === $selected && (bool) $user['is_active']) return true;
         return false;
+    }
+
+    private function importPanel(ResourceTimetableStore $store, TimetableVersion $version): string
+    {
+        $html = '<details class="editor-section"><summary><strong>Import CSV</strong></summary><p>Upload a completed Reqsheet CSV for deterministic validation and a read-only preview.</p>';
+        if ($store->lessonsForVersion($version->id) !== []) {
+            return $html . '<p class="notice">CSV import is available only for an empty timetable. Create or select an empty timetable before importing.</p></details>';
+        }
+        return $html . AdminTimetableCsvImport::uploadForm($version->id) . '</details>';
     }
 
     /** @param list<TimetableVersion> $versions */

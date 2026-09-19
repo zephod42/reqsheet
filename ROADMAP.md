@@ -45,6 +45,13 @@ Canonical timetable CSV milestone 1 completed 2026-09-19:
 - Export includes only ordered teaching slots and current organisation rooms; Class and Teacher remain blank, separators are omitted, and existing assignments or historical planning data are never queried.
 - The later import is documented as deterministic upload/validation, no-write preview, and a separately confirmed atomic insert into the existing recurring-lesson model. Empty-template revalidation and manual activation remain mandatory boundaries.
 
+Canonical timetable CSV milestone 2 completed 2026-09-19:
+
+- The timetable builder accepts the exact Reqsheet CSV through an admin-only, CSRF-protected, 2 MiB/20,000-row bounded upload and produces an escaped read-only preview without database writes.
+- Validation regenerates the complete version/room structure, rejects missing, duplicate, extra and cross-tenant references, resolves only existing eligible teachers/classes/rooms, and checks teacher/class/room occupancy conflicts.
+- Consecutive identical entries become separator-aware multi-period proposals under the organisation's conjoined-period setting; previews are held as user/tenant-bound 15-minute session drafts and remain non-authoritative.
+- A separate admin resource-reference CSV lists eligible teacher codes/names, class codes and room codes without staff emails or account/security data.
+
 Upcoming implementation sequence:
 
 1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, account/password workflows, technician workflows, and printing with representative schools.
@@ -53,7 +60,7 @@ Upcoming implementation sequence:
 4. Production deployment configuration: application support for `reqsheet.com` plus retained DuckDNS domains is implemented; DNS/web-server wildcard acceptance and production TLS coverage remain administrator deployment work.
 5. Teacher lesson duplication: accessible copy workflows for visible and future lessons, overwrite confirmation, and practical undo.
 6. Admin theme settings: exactly Primary and Secondary accent values, centrally applied without arbitrary CSS or coupling to class/grid/print colours.
-7. Canonical timetable CSV import: deterministic parsing and validation, no-write preview, and separately confirmed atomic import into an empty template. Blank export is complete.
+7. Canonical timetable CSV final import: add explicit confirmation and a narrow transactional bulk insert that revalidates the session proposal, resource ownership, structure, conflicts and empty-template condition under lock. Blank export and no-write upload/preview are complete.
 8. Authentication/authorization security hardening: replace pilot access and first-login handling with reviewed production mechanisms.
 9. Pilot-driven UI iteration and polish: improve wording, layout, and workflow while preserving the simple server-rendered architecture.
 
