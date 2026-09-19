@@ -56,7 +56,7 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
 
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array
     {
-        $version = $this->version($organisationId);
+        $version = $this->version($organisationId, $date);
         if ($version === null) return ['version' => null, 'slots' => [], 'occurrences' => []];
         if ($date >= new DateTimeImmutable('today')) (new TimetableOccurrenceGenerator(new PdoTimetableGenerationStore($this->pdo)))->generate($organisationId, (int) $version['id'], $date->format('Y-m-d'), $date->format('Y-m-d'));
         $slots = $this->slots((int) $version['id'], (int) $date->format('N'));
@@ -81,6 +81,17 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
         $s->execute(['organisation_id' => $organisationId, 'value' => $value, 'start' => $start->format('Y-m-d'), 'end' => $start->modify('+6 days')->format('Y-m-d')]); return $s->fetchAll();
     }
 
-    private function version(int $organisationId): ?array { $s = $this->pdo->prepare('SELECT tv.id, tv.label, tv.first_day_of_week FROM organisations o JOIN timetable_versions tv ON tv.id = o.active_timetable_version_id WHERE o.id = :id'); $s->execute(['id' => $organisationId]); $r = $s->fetch(); return $r === false ? null : $r; }
+    public function workingWeekStart(int $organisationId, DateTimeImmutable $date): DateTimeImmutable
+    {
+        $version = $this->version($organisationId, $date);
+        $first = $version === null ? 1 : (int) $version['first_day_of_week'];
+        return $date->modify('-' . (((int) $date->format('N') - $first + 7) % 7) . ' days');
+    }
+
+    private function version(int $organisationId, DateTimeImmutable $date): ?array
+    {
+        $s = $this->pdo->prepare('SELECT tv.id, tv.label, tv.first_day_of_week FROM timetable_versions tv JOIN organisations o ON o.id = tv.organisation_id AND o.active_timetable_version_id IS NOT NULL WHERE tv.organisation_id = :id AND tv.effective_from <= :lesson_date AND (tv.effective_to IS NULL OR tv.effective_to > :lesson_date) ORDER BY tv.effective_from DESC, tv.id DESC LIMIT 1');
+        $s->execute(['id' => $organisationId, 'lesson_date' => $date->format('Y-m-d')]); $r = $s->fetch(); return $r === false ? null : $r;
+    }
     private function slots(int $versionId, int $day): array { $s = $this->pdo->prepare('SELECT id, sequence_number, kind, teaching_period_number, label FROM timetable_slots WHERE timetable_version_id = :version_id AND day_of_week = :day ORDER BY sequence_number'); $s->execute(['version_id' => $versionId, 'day' => $day]); return $s->fetchAll(); }
 }

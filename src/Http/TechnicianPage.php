@@ -30,7 +30,7 @@ final class TechnicianPage
         if ($mode === 'my' && $selected === []) $selected = array_column($rooms, 'id');
         if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician selected week', $this->weekPrint($date, $selected), $this->user);
         $data = $this->store->daily($this->organisationId, $date, $selected);
-        $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" href="/technician?date=' . $date->format('Y-m-d') . '&rooms=' . $mode . '&print=week">Print Selected Week</a></div></section>';
+        $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . '&rooms=' . $mode . '&print=week">Print Selected Week</a></div></section>';
         $body .= '<div class="technician-controls"><a class="week-arrow" href="/technician?date=' . $date->modify('-1 day')->format('Y-m-d') . '&rooms=' . $mode . '">‹</a><strong class="technician-date">' . $this->e($date->format('l j F Y')) . '</strong><a class="week-arrow" href="/technician?date=' . $date->modify('+1 day')->format('Y-m-d') . '&rooms=' . $mode . '">›</a><a class="button secondary" href="/technician?date=' . (new DateTimeImmutable('today'))->format('Y-m-d') . '&rooms=' . $mode . '">Today</a></div>';
         $body .= $message === null ? '' : '<p class="notice">' . $this->e($message) . '</p>';
         $body .= $this->roomControls($rooms, $defaults, $mode, $selected);
@@ -77,28 +77,29 @@ final class TechnicianPage
     private function inspectionPage(DateTimeImmutable $date, array $rows): string
     {
         $html = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Week inspection</h1></div><a class="button secondary" href="/technician?date=' . $date->format('Y-m-d') . '">Day View</a></section><p class="context">Week beginning ' . $this->e($this->weekStart($date)->format('j F Y')) . '</p><div class="timetable-scroll"><table class="people-table"><thead><tr><th>Date</th><th>Period</th><th>Class</th><th>Room</th><th>Requisition</th></tr></thead><tbody>';
-        foreach ($rows as $row) $html .= '<tr><td>' . $this->e((string) $row['lesson_date']) . '</td><td>' . $this->e((string) $row['period_label']) . '</td><td>' . $this->e((string) $row['snapshot_class_code']) . '</td><td>' . $this->e((string) $row['snapshot_room_code']) . '</td><td>' . $this->e((string) (($row['requirements_text'] ?? '') ?: 'Not requisitioned')) . '</td></tr>';
+        foreach ($rows as $row) $html .= '<tr><td>' . $this->e($this->dateLabel((string) $row['lesson_date'])) . '</td><td>' . $this->e((string) $row['period_label']) . '</td><td>' . $this->e((string) $row['snapshot_class_code']) . '</td><td>' . $this->e((string) $row['snapshot_room_code']) . '</td><td>' . $this->e((string) (($row['requirements_text'] ?? '') ?: 'Not requisitioned')) . '</td></tr>';
         return $html . '</tbody></table></div>';
     }
 
     private function cell(array $occurrence): string
     {
         $text = trim((string) ($occurrence['requirements_text'] ?? '')); $label = $text === '' ? (($occurrence['state'] ?? '') === 'nothing_required' ? 'Nothing required' : 'Not requisitioned') : $text;
-        return '<details class="technician-cell"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) $occurrence['period_label']) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p><details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
+        return '<details class="technician-cell"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition" title="' . $this->e($label) . '">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) $occurrence['period_label']) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p><details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
     }
 
     private function weekPrint(DateTimeImmutable $date, array $selected): string
     {
         $days = method_exists($this->store, 'workingDays') ? $this->store->workingDays($this->organisationId) : [1, 2, 3, 4, 5];
         $first = (int) ($days[0] ?? 1);
-        $start = $date->modify('-' . ((int) $date->format('N') - $first + 7) % 7 . ' days');
+        $start = method_exists($this->store, 'workingWeekStart') ? $this->store->workingWeekStart($this->organisationId, $date) : $date->modify('-' . (((int) $date->format('N') - $first + 7) % 7) . ' days');
         $html = '<main class="technician-week-print">';
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
         foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->grid($dayDate, $rooms, $selected, $data['slots'], $data['occurrences']); }
-        return $html . '</main>';
+        return $html . '</main><script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
     }
 
     private function date(string $value): DateTimeImmutable { if ($value === 'today' || $value === '') return new DateTimeImmutable('today'); $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value); return $date !== false && $date->format('Y-m-d') === $value ? $date : new DateTimeImmutable('today'); }
+    private function dateLabel(string $value): string { $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value); return $date === false ? $value : $date->format('d-m-Y D'); }
     private function weekStart(DateTimeImmutable $date): DateTimeImmutable { return $date->modify('-' . ((int) $date->format('N') - 1) . ' days'); }
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 }

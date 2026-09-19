@@ -123,7 +123,8 @@ small { font-size: .82rem; }
 
 .lesson-block {
     display: flex;
-    height: 6.35rem;
+    min-height: 6.35rem;
+    height: 100%;
     flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--lesson-accent, var(--rule));
@@ -217,7 +218,11 @@ dialog .close { float: right; }
 .assignment-dialog, .resource-dialog { position: fixed; top: 50%; left: calc(10.5rem + 1rem); right: 1rem; width: auto; max-width: 38rem; max-height: calc(100vh - 3rem); margin: 0 auto; transform: translateY(-50%); }
 .room-free { display: grid; min-height: 4rem; place-items: center; color: var(--muted); font-size: .75rem; letter-spacing: .04em; }
 .technician-cell-heading { display: flex; justify-content: space-between; gap: 1rem; }
+.technician-cell-heading span { font-weight: 700; }
 .technician-requisition { display: block; white-space: normal; }
+.technician-cell { font-family: Arial, Helvetica, sans-serif; }
+.technician-cell summary { font-size: 12px; line-height: 1.25; }
+.technician-requisition { display: -webkit-box; overflow: hidden; margin-top: .25rem; -webkit-line-clamp: 4; -webkit-box-orient: vertical; text-overflow: ellipsis; }
 .technician-week-print .technician-sheet { break-after: page; }
 @media print { .technician-week-print .technician-sheet { min-height: 100vh; break-after: page; } .technician-week-print .technician-sheet:last-child { break-after: auto; } .site-nav, .page-header, .technician-controls, .technician-room-controls, .technician-secondary { display: none !important; } }
 .assignment-dialog form, .resource-dialog form { max-width: none; margin: 0; }
@@ -275,4 +280,5 @@ dialog .close { float: right; }
     .technician-grid th, .technician-grid td { padding: 2mm; }
     .technician-cell { display: block; }
     .technician-cell summary { display: block; white-space: normal; }
+    .technician-requisition { display: block; overflow: visible; -webkit-line-clamp: unset; }
 }

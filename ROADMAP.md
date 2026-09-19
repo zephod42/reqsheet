@@ -31,6 +31,14 @@ Staff account and pilot workflow refinement completed 2026-09-19:
 
 The pilot first-login workflow retains an account-claiming risk: anyone who knows a newly created staff member’s initials may claim the account before the intended person. It is not identity verification and remains unsuitable as a final public authentication design.
 
+Technician and timetable presentation refinement completed 2026-09-19:
+
+- Technician requisition cells now retain full accessible text, emphasise teacher initials, distinguish free rooms, and print complete requisitions.
+- Selected-week printing renders configured working days from the selected date and invokes the native browser print dialog automatically.
+- Teacher and technician planning resolve effective timetable versions by lesson date, preserving historical occurrence slot relationships across version boundaries.
+- Teacher multi-period cards fill their row-spanned planner cells, and all resource-builder lesson modes return to the builder after successful creation.
+- Base-domain requests remain public splash pages even when a tenant session cookie is present; tenant hosts continue to route to tenant login.
+
 Upcoming implementation sequence:
 
 1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, account/password workflows, technician workflows, and printing with representative schools.

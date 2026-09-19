@@ -81,7 +81,7 @@ final class AdminTimetablePage
                         else $service->createResource($versionId, (int) ($input['teacher_user_id'] ?? 0), (int) ($input['day_of_week'] ?? 0), (int) ($input['start_slot_id'] ?? 0), (int) ($input['duration_periods'] ?? 1), (int) ($input['class_id'] ?? 0), (int) ($input['room_id'] ?? 0));
                         $message = $lessonId > 0 ? 'Lesson updated.' : 'Lesson created.';
                     }
-                    $query = array_replace($query, ['version' => $versionId, 'view' => (string) ($input['view'] ?? 'teacher'), 'resource' => (int) ($input['resource'] ?? 0), 'edit' => 0]);
+                    $query = array_replace($query, ['version' => $versionId, 'view' => (string) ($input['view'] ?? 'teacher'), 'resource' => (int) ($input['resource'] ?? 0), 'edit' => 0, 'day' => 0, 'start_slot' => 0]);
                 } elseif ($action === 'create_version') {
                     $id = (new TimetableTemplateService($store))->create($this->organisationId, null, $this->nullable($input['label'] ?? null), null, $this->settings);
                     $query = array_replace($query, ['version' => $id]);

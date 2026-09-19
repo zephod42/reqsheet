@@ -30,11 +30,15 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
         $statement = $this->prepare(
             'SELECT tv.id, tv.organisation_id, tv.label, tv.effective_from, tv.effective_to, tv.first_day_of_week
              FROM timetable_versions tv
-             JOIN organisations o ON o.active_timetable_version_id = tv.id
-             WHERE tv.organisation_id = :organisation_id LIMIT 1',
+             JOIN organisations o ON o.id = tv.organisation_id AND o.active_timetable_version_id IS NOT NULL
+             WHERE tv.organisation_id = :organisation_id
+               AND tv.effective_from <= :lesson_date
+               AND (tv.effective_to IS NULL OR tv.effective_to > :lesson_date)
+             ORDER BY tv.effective_from DESC, tv.id DESC LIMIT 1',
         );
         $statement->execute([
             'organisation_id' => $organisationId,
+            'lesson_date' => $date->format('Y-m-d'),
         ]);
         $row = $statement->fetch();
         if ($row === false) return null;

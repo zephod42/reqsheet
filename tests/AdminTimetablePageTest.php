@@ -125,6 +125,8 @@ final class AdminTimetablePageTest
 
         $created = $page->handle('POST', [], ['action' => 'resource_save_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 10, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 1, 'class_id' => 501, 'room_id' => 401]);
         assertContains('Lesson created.', $created, 'Resource assignment creation was not handled.');
+        $classCreated = $page->handle('POST', [], ['action' => 'resource_save_lesson', 'version' => 1, 'view' => 'class', 'resource' => 501, 'teacher_user_id' => 11, 'day_of_week' => 1, 'start_slot_id' => 103, 'duration_periods' => 1, 'class_id' => 501, 'room_id' => 402]);
+        assertNotContains('id="assignment-editor"', $classCreated, 'Class-view lesson creation left the Add Lesson pop-up open.');
         $lessonId = $store->lessons[0]->id;
         $updated = $page->handle('POST', [], ['action' => 'resource_save_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 10, 'lesson_id' => $lessonId, 'teacher_user_id' => 10, 'day_of_week' => 2, 'start_slot_id' => 201, 'duration_periods' => 3, 'class_id' => 501, 'room_id' => 402]);
         assertContains('Lesson updated.', $updated, 'Resource assignment update was not handled.');
@@ -137,6 +139,7 @@ final class AdminTimetablePageTest
         assertContains('conflict', strtolower($clash), 'Resource clash validation was not surfaced in the editor.');
         $deleted = $page->handle('POST', [], ['action' => 'resource_delete_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 10, 'lesson_id' => $lessonId]);
         assertContains('Lesson removed.', $deleted, 'Resource assignment deletion was not handled.');
+        $page->handle('POST', [], ['action' => 'resource_delete_lesson', 'version' => 1, 'view' => 'class', 'resource' => 501, 'lesson_id' => $store->lessons[0]->id]);
         assertSameValue([], $store->lessons, 'Deleted resource assignment remained in the store.');
     }
 }

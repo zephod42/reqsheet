@@ -156,7 +156,9 @@ if ($route === ApplicationRoute::ROOT) {
         exit;
     }
     header('Content-Type: text/html; charset=UTF-8');
-    echo (new HomePage())->render($currentUser);
+    // The recognised base host is always public. A tenant session must not turn
+    // the base URL into a remembered-school redirect or private landing page.
+    echo (new HomePage())->render(null);
     exit;
 }
 
