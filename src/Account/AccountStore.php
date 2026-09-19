@@ -47,4 +47,6 @@ interface AccountStore extends TenantStore
     ): int;
 
     public function claimFirstLogin(int $userId, string $passwordHash): void;
+
+    public function updatePassword(int $userId, int $organisationId, string $passwordHash): void;
 }

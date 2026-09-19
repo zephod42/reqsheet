@@ -34,6 +34,12 @@ final class SessionAuth
         ];
     }
 
+    public static function regenerate(): void
+    {
+        self::start();
+        session_regenerate_id(true);
+    }
+
     /** @return array{id:int,organisation_id:int,display_name:string,staff_identifier:?string,operational_role:string,is_admin:bool}|null */
     public static function current(): ?array
     {

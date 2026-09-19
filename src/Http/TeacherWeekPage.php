@@ -59,40 +59,52 @@ final class TeacherWeekPage
 
     private function render(TeacherWeek $week, ?string $message, ?array $editing): string
     {
-        $columns = [];
-        foreach ($week->days as $day) foreach ($day['slots'] as $slot) $columns[$slot->sequenceNumber] = $slot;
-        ksort($columns);
+        $periods = [];
+        foreach ($week->days as $day) foreach ($day['slots'] as $slot) $periods[$slot->sequenceNumber] = $slot;
+        ksort($periods);
         $classTones = [];
         foreach ($week->days as $day) foreach ($day['occurrences'] as $occurrence) {
             $class = (string) $occurrence['snapshot_class_code'];
             $classTones[$class] ??= $this->classTone($class);
         }
-        $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1><a class="this-week" href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
+        $isCurrentWeek = $this->today >= $week->start && $this->today <= $week->end;
+        $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1><a class="this-week' . ($isCurrentWeek ? ' selected-state' : '') . '"' . ($isCurrentWeek ? ' aria-current="date"' : '') . ' href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
         $identity = trim((string) ($this->user['display_name'] ?? ''));
         $initials = trim((string) ($this->user['staff_identifier'] ?? ''));
         $identityLabel = $identity !== '' ? $identity . ($initials !== '' ? ' (' . $initials . ')' : '') : ($initials !== '' ? $initials : 'Teacher');
         $body .= '<p class="teacher-identity">' . $this->e($identityLabel) . '</p>';
-        $body .= '<div class="timetable-scroll"><table class="week-grid"><caption class="visually-hidden">Teacher timetable week</caption><thead><tr><th scope="col">Day</th>';
-        foreach ($columns as $slot) $body .= '<th class="' . ($slot->isTeaching() ? 'teaching-column' : 'separator-column') . '">' . $this->e($slot->isTeaching() ? $this->periodLabel($slot) : $this->separatorLabel($slot)) . '</th>';
-        $body .= '</tr></thead><tbody>';
+        $body .= '<div class="timetable-scroll"><table class="week-grid"><caption class="visually-hidden">Teacher timetable week</caption><thead><tr><th scope="col">Period</th>';
         foreach ($week->days as $day) {
             $date = $day['date'];
-            $body .= '<tr class="' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'today-row' : '') . '"><th scope="row" class="day-label">' . $this->e($date->format('D')) . '<br><small>' . $date->format('j M') . '</small></th>';
+            $body .= '<th scope="col" class="day-label ' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'today-heading' : '') . '">' . $this->e($date->format('D')) . '<br><small>' . $date->format('j M') . '</small></th>';
+        }
+        $body .= '</tr></thead><tbody>';
+        foreach ($periods as $sequence => $axisSlot) {
+            $body .= '<tr><th scope="row" class="period-label ' . ($axisSlot->isTeaching() ? '' : 'separator-axis') . '">' . $this->e($axisSlot->isTeaching() ? $this->periodLabel($axisSlot) : $this->separatorLabel($axisSlot)) . '</th>';
+            foreach ($week->days as $day) {
+                $date = $day['date'];
             $bySequence = [];
             foreach ($day['slots'] as $slot) $bySequence[$slot->sequenceNumber] = $slot;
             $byStart = [];
             foreach ($day['occurrences'] as $occurrence) $byStart[(int) $occurrence['snapshot_start_slot_id']] = $occurrence;
-            $sequences = array_keys($columns);
-            for ($index = 0; $index < count($sequences); $index++) {
-                $slot = $bySequence[$sequences[$index]] ?? null;
-                if ($slot === null) { $body .= '<td></td>'; continue; }
-                if (!$slot->isTeaching()) { $body .= '<td class="separator-cell" aria-label="' . $this->e($this->separatorLabel($slot)) . '">' . $this->e($this->separatorLabel($slot)) . '</td>'; continue; }
+            $slot = $bySequence[$sequence] ?? null;
+            $covered = false;
+            foreach ($day['occurrences'] as $occurrence) {
+                foreach ($bySequence as $candidateSequence => $candidateSlot) {
+                    if ($candidateSlot->id === (int) $occurrence['snapshot_start_slot_id'] && $sequence > $candidateSequence && $sequence < $candidateSequence + max(1, (int) $occurrence['snapshot_duration_periods'])) {
+                        $covered = true;
+                        break 2;
+                    }
+                }
+            }
+            if ($covered) continue;
+            if ($slot === null) { $body .= '<td></td>'; continue; }
+            if (!$slot->isTeaching()) { $body .= '<td class="separator-cell" aria-label="' . $this->e($this->separatorLabel($slot)) . '"></td>'; continue; }
                 $occurrence = $byStart[$slot->id] ?? null;
                 if ($occurrence === null) { $body .= '<td class="empty-cell"></td>'; continue; }
                 $duration = max(1, (int) $occurrence['snapshot_duration_periods']);
-                $body .= '<td colspan="' . $duration . '">' . $this->lessonBlock($occurrence, $date, $slot, $classTones[(string) $occurrence['snapshot_class_code']]) . '</td>';
-                $index += $duration - 1;
+                $body .= '<td rowspan="' . $duration . '">' . $this->lessonBlock($occurrence, $date, $slot, $classTones[(string) $occurrence['snapshot_class_code']]) . '</td>';
             }
             $body .= '</tr>';
         }
@@ -133,7 +145,6 @@ final class TeacherWeekPage
     private function separatorLabel(TimetableSlot $slot): string
     {
         $label = trim((string) ($slot->label ?? ''));
-        if ($slot->kind === 'lunch' && strtolower($label) === 'lunchtime') return 'Lunch';
         if ($label !== '') return $label;
         return match ($slot->kind) { 'break' => 'Break', 'lunch' => 'Lunch', default => 'Other' };
     }

@@ -19,6 +19,7 @@ use Reqsheet\Http\TeacherAccess;
 use Reqsheet\Http\TeacherWeekPage;
 use Reqsheet\Http\AdminPeoplePage;
 use Reqsheet\Http\LoginPage;
+use Reqsheet\Http\MyAccountPage;
 use Reqsheet\Http\HomePage;
 use Reqsheet\Http\PageLayout;
 use Reqsheet\Http\SessionAuth;
@@ -198,7 +199,7 @@ if ($route === ApplicationRoute::ONBOARDING) {
 if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::DEMO, ApplicationRoute::CONTACT], true)) {
     $heading = ucfirst($route);
     header('Content-Type: text/html; charset=UTF-8');
-    echo PageLayout::render($heading, '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>');
+    echo PageLayout::render($heading, '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>', $currentUser);
     exit;
 }
 
@@ -269,6 +270,27 @@ if ($route === ApplicationRoute::HEALTH) {
         ['status' => $healthy ? 'ok' : 'unhealthy'],
         JSON_THROW_ON_ERROR,
     ) . PHP_EOL;
+    exit;
+}
+
+if ($route === ApplicationRoute::MY_ACCOUNT) {
+    if ($currentUser === null) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $page = new MyAccountPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $currentUser);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $page->handle($method, $_POST);
+    } catch (\Throwable) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
     exit;
 }
 

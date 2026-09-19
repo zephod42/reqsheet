@@ -24,7 +24,7 @@ Agreed design decisions recorded on 2026-09-18:
 
 Upcoming implementation sequence:
 
-1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, technician workflows, and printing with representative schools.
+1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, account/password workflows, technician workflows, and printing with representative schools.
 2. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
 3. Technician print/PDF workflow: future-week selection, one A4 page per day, selected-room layouts, and practical page fitting.
 4. Production deployment configuration when a domain is selected: configure DNS/web-server wildcard acceptance and production TLS coverage. The tenant architecture is already implemented and remains independent of the eventual domain.
@@ -33,5 +33,12 @@ Upcoming implementation sequence:
 7. Canonical timetable CSV import/export: Reqsheet template export, deterministic validation/preview, and confirmed import.
 8. Authentication/authorization security hardening: replace pilot access and first-login handling with reviewed production mechanisms.
 9. Pilot-driven UI iteration and polish: improve wording, layout, and workflow while preserving the simple server-rendered architecture.
+
+Bounded usability milestone completed 2026-09-19:
+
+- Teacher week now shows configured separator names once in the left period axis, with grey non-teaching cells and preserved conjoined-period behaviour.
+- Shared navigation applies consistent selected-state styling, removes Sign up for authenticated users, preserves authenticated navigation on About/Demo/Contact, and adds My Account for every authenticated role.
+- My Account renders only the current user’s identity and supports CSRF-protected self-service password changes under the existing password policy. Identity fields remain administrator-managed.
+- Administrator Settings now contains the “Reqsheet account” placeholder section. Membership status, plans, pricing, renewals, payment management, and billing integration remain future work and must be specified before implementation.
 
 The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services provide the validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Product behaviour and the remaining UI/admin scope are canonical in `PRODUCT_DESIGN.md`; authentication/authorization and exception handling remain future work.

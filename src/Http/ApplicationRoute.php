@@ -22,6 +22,7 @@ final class ApplicationRoute
     public const ADMIN_PEOPLE = 'admin_people';
     public const NOT_FOUND = 'not_found';
     public const ONBOARDING = 'onboarding';
+    public const MY_ACCOUNT = 'my_account';
 
     public static function match(string $method, string $path): string
     {
@@ -42,6 +43,7 @@ final class ApplicationRoute
         if ($path === '/signup') return self::SIGNUP;
         if ($path === '/onboarding') return self::ONBOARDING;
         if ($path === '/settings') return self::SETTINGS;
+        if ($path === '/account') return self::MY_ACCOUNT;
         if ($path === '/about') return self::ABOUT;
         if ($path === '/demo') return self::DEMO;
         if ($path === '/contact') return self::CONTACT;

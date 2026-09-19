@@ -24,6 +24,7 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::SIGNUP, ApplicationRoute::match('GET', '/signup'), 'Signup route was not recognised.');
         assertSameValue(ApplicationRoute::ONBOARDING, ApplicationRoute::match('GET', '/onboarding'), 'Onboarding route was not recognised.');
         assertSameValue(ApplicationRoute::SETTINGS, ApplicationRoute::match('GET', '/settings'), 'Settings route was not recognised.');
+        assertSameValue(ApplicationRoute::MY_ACCOUNT, ApplicationRoute::match('GET', '/account'), 'My Account route was not recognised.');
 
         foreach ([
             '/unknown',

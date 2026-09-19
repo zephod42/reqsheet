@@ -183,4 +183,13 @@ The existing database and service rules remain authoritative: ISO weekdays, vali
 
 ## Not designed yet
 
+## Navigation and account milestone (2026-09-19)
+
+- Teacher week places each configured period or separator name once in the left-hand period axis. Separator rows are neutral grey across the day columns and contain no repeated separator text; custom separator labels are preserved.
+- Selected/current navigation states use the Primary accent treatment consistently across the shared authenticated navigation and timetable controls.
+- Sign up belongs to the generic public splash page only. Authenticated pages retain About, Demo, and Contact in the shared layout without exposing organisation creation as ordinary navigation.
+- Every authenticated user has a read-only My Account identity page for their own name and initials/code, with an explicit absent-email indication when no optional email has been entered. Users may change only their own password; identity details remain administrator-managed.
+- Administrator Settings includes a restrained “Reqsheet account” membership section. Membership status, pricing, billing, renewals, and payment integration are future work and are not represented as current data.
+- Authenticated informational pages retain the same shared sidebar, including My Account and the appropriate administrator destinations.
+
 Production-grade authentication and authorization hardening, school-theme settings, approval workflow, reporting, and detailed requisition workflow remain open design work. The current setup/login/session flow is deliberately pilot-grade. The first UI should be an intentionally skeletal, easy-to-change pilot implementation rather than final visual polish. Occurrence exceptions, holidays, cancellations, recurring-lesson edits after materialised history, and scheduled generation remain deferred.

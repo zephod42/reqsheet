@@ -29,7 +29,7 @@ final class SettingsPage
             }
         }
         $data = $this->settings->load($this->organisationId);
-        return PageLayout::render('Settings', $this->form($data, $message), $this->user);
+        return PageLayout::render('Settings', $this->form($data, $message) . $this->accountSection(), $this->user);
     }
 
     /** @param array<string, mixed> $input */
@@ -83,7 +83,7 @@ final class SettingsPage
             if ($active !== null) $body .= '<form method="post"><input type="hidden" name="action" value="edit_template"><button class="secondary">Edit template</button></form>';
             $body .= '</div>';
         }
-        return $body . '</section>';
+        return $body . $this->accountSection() . '</section>';
     }
 
     /** @param array<string, mixed>|null $active */
@@ -178,4 +178,9 @@ final class SettingsPage
     }
 
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+
+    private function accountSection(): string
+    {
+        return '<section class="settings-section account-management"><h2>Reqsheet account</h2><p>This school’s membership and account with the Reqsheet service.</p><p class="notice">Membership and payment management will be available here.</p></section>';
+    }
 }

@@ -151,6 +151,16 @@ final class PdoAccountStore implements AccountStore
         if ($statement->rowCount() !== 1) throw new AccountValidationException(['This account has already been claimed or is unavailable.']);
     }
 
+    public function updatePassword(int $userId, int $organisationId, string $passwordHash): void
+    {
+        $statement = $this->prepare(
+            "UPDATE users SET password_hash = :password_hash, account_state = 'claimed'
+             WHERE id = :id AND organisation_id = :organisation_id AND is_active = TRUE",
+        );
+        $statement->execute(['id' => $userId, 'organisation_id' => $organisationId, 'password_hash' => $passwordHash]);
+        if ($statement->rowCount() !== 1) throw new AccountValidationException(['This account is unavailable.']);
+    }
+
     private function prepare(string $sql): PDOStatement
     {
         $statement = $this->pdo->prepare($sql);

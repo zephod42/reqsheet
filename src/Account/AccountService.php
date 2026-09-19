@@ -108,6 +108,19 @@ final class AccountService
         return $account;
     }
 
+    public function changePassword(int $userId, int $organisationId, string $currentPassword, string $newPassword, string $confirmation): void
+    {
+        $account = $this->store->findUserById($userId);
+        if ($account === null || (int) ($account['organisation_id'] ?? 0) !== $organisationId || !($account['is_active'] ?? false)) {
+            throw new AccountValidationException(['Your account is unavailable.']);
+        }
+        if (!is_string($account['password_hash'] ?? null) || !password_verify($currentPassword, $account['password_hash'])) {
+            throw new AccountValidationException(['Current password is incorrect.']);
+        }
+        $this->validatePassword($newPassword, $confirmation);
+        $this->store->updatePassword($userId, $organisationId, password_hash($newPassword, PASSWORD_DEFAULT));
+    }
+
     private function validateIdentity(string $organisation, string $displayName, string $role): void
     {
         $errors = [];

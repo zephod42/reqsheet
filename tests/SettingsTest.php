@@ -99,6 +99,9 @@ final class SettingsTest
         assertContainsValue('Settings need to be configured. Contact your admin.', $blocked, 'Setup blocking message was not rendered.');
         $adminNav = \Reqsheet\Http\PageLayout::render('Admin', '<p>Admin</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
         assertContainsValue('href="/settings"', $adminNav, 'Admin navigation did not expose Settings.');
+        assertContainsValue('My Account', $adminNav, 'Authenticated navigation did not expose My Account.');
+        assertNotContainsValue('href="/signup"', $adminNav, 'Sign up remained in authenticated navigation.');
+        assertContainsValue('href="/settings"', \Reqsheet\Http\PageLayout::render('About', '<p>About</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]), 'Authenticated informational layout lost Settings.');
         $teacherNav = \Reqsheet\Http\PageLayout::render('Teacher', '<p>Teacher</p>', ['id' => 2, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => false]);
         assertContainsValue('nav-disabled', $teacherNav, 'Non-admin navigation did not retain disabled admin destinations.');
     }

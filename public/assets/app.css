@@ -80,7 +80,7 @@ small { font-size: .82rem; }
 .site-nav li a { display: block; border-radius: var(--corner); padding: .38rem .5rem; text-decoration: none; }
 .site-nav li a:hover, .site-nav li a:focus-visible { background: var(--secondary-pale); }
 .site-nav .nav-disabled { display: block; border-radius: var(--corner); padding: .38rem .5rem; color: var(--muted); cursor: not-allowed; }
-.site-nav li a.active { background: var(--primary-pale); box-shadow: inset 3px 0 0 var(--primary-accent); font-weight: 700; }
+.site-nav li a.active, .selected-state { background: var(--primary-pale); box-shadow: inset 3px 0 0 var(--primary-accent), 0 1px 3px rgb(0 0 0 / 6%); font-weight: 700; color: var(--ink); }
 .site-main { width: min(100%, 78rem); padding: var(--space-5) clamp(1rem, 4vw, 4rem); }
 .tenant-name { margin: -.8rem 0 var(--space-4); color: var(--muted); font-size: .95rem; font-weight: 650; }
 .content-narrow { max-width: 38rem; }
@@ -101,14 +101,18 @@ small { font-size: .82rem; }
 .week-grid, .admin-week-grid { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
 .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { border: 1px solid var(--rule); }
 .week-grid thead th, .admin-week-grid thead th { height: 2.5rem; border-bottom: 2px solid var(--rule-strong); padding: .35rem; }
-.week-grid thead th:first-child { width: 6rem; }
-.teaching-column { min-width: 9rem; }
-.separator-column { width: 2rem; min-width: 2rem; background: #f7f7f7; color: var(--muted); font-size: .75rem; writing-mode: vertical-rl; }
+.week-grid thead th:first-child { width: 7rem; }
+.week-grid thead .day-label { min-width: 9rem; }
+.separator-axis, .separator-cell { background: #f7f7f7; color: var(--muted); font-size: .75rem; }
+.period-label { padding: .6rem; text-align: left; white-space: nowrap; }
+.today-heading { background: var(--primary-pale); }
 .day-label { padding: .6rem; text-align: left; white-space: nowrap; font-family: var(--sans); }
 .today-row .day-label { background: var(--primary-pale); font-weight: 750; }
 .week-grid td { height: 7rem; padding: .3rem; vertical-align: top; }
-.separator-cell { background: #f7f7f7; }
 .empty-cell { background: #fff; }
+.account-identity { display: grid; grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr); gap: .45rem 1rem; }
+.account-identity dt { font-weight: 700; }
+.account-identity dd { margin: 0; }
 
 .lesson-block {
     display: flex;

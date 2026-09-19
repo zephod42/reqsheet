@@ -29,6 +29,9 @@ final class TeacherWeekPageTest
         assertContainsValue('Period One', $view, 'Configured teaching-period label was not rendered.');
         assertContainsValue('Break', $view, 'Configured separator was not rendered.');
         assertContainsValue('Lunch', $view, 'Lunch separator was not rendered in the teacher view.');
+        assertSameValue(1, substr_count($view, '>Break<'), 'Break was repeated outside the period axis.');
+        assertSameValue(1, substr_count($view, '>Lunch<'), 'Lunch was repeated outside the period axis.');
+        assertContainsValue('class="separator-cell"', $view, 'Separator cells were not visibly marked as neutral cells.');
         assertContainsValue('Niall Evans (NE)', $view, 'Authenticated teacher identity was not rendered.');
         assertContainsValue('13PHY', $view, 'Lesson class was not rendered.');
         assertContainsValue('LAB-A', $view, 'Lesson room was not rendered.');

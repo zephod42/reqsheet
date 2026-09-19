@@ -14,6 +14,7 @@ require __DIR__ . '/TenantTest.php';
 require __DIR__ . '/SettingsTest.php';
 require __DIR__ . '/OnboardingHandoffTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
+require __DIR__ . '/MyAccountTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -184,5 +185,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();
 \Reqsheet\Tests\OnboardingHandoffTest::run();
+\Reqsheet\Tests\MyAccountTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");
