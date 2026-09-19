@@ -65,11 +65,11 @@ final class TenantDataResetter
 
         $parents = [];
         $statement = $this->pdo->prepare(
-            'SELECT table_name, referenced_table_name
+            'SELECT TABLE_NAME AS table_name, REFERENCED_TABLE_NAME AS referenced_table_name
              FROM information_schema.KEY_COLUMN_USAGE
              WHERE table_schema = :table_schema
                AND referenced_table_schema = :referenced_schema
-               AND referenced_table_name IS NOT NULL',
+               AND REFERENCED_TABLE_NAME IS NOT NULL',
         );
         $statement->execute(['table_schema' => $this->databaseName, 'referenced_schema' => $this->databaseName]);
         foreach ($statement->fetchAll() as $row) {
@@ -120,9 +120,9 @@ final class TenantDataResetter
     private function tableNames(): array
     {
         $statement = $this->pdo->prepare(
-            'SELECT table_name FROM information_schema.TABLES
+            'SELECT TABLE_NAME AS table_name FROM information_schema.TABLES
              WHERE table_schema = :database_name AND table_type = \'BASE TABLE\'
-             ORDER BY table_name',
+             ORDER BY TABLE_NAME',
         );
         $statement->execute(['database_name' => $this->databaseName]);
         return array_map(static fn (array $row): string => (string) $row['table_name'], $statement->fetchAll());

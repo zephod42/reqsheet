@@ -31,5 +31,11 @@ final class TenantDataResetterTest
         assertSameValue(false, str_contains($command, 'DROP DATABASE'), 'Reset command must not drop a database.');
         assertSameValue(false, str_contains($command, 'FOREIGN_KEY_CHECKS'), 'Reset command must not disable foreign-key checks.');
         assertSameValue(false, str_contains($command, 'TRUNCATE'), 'Reset command must not truncate tables.');
+
+        $resetter = (string) file_get_contents(dirname(__DIR__) . '/src/Database/TenantDataResetter.php');
+        assertSameValue(true, str_contains($resetter, 'TABLE_NAME AS table_name'), 'Table metadata query does not explicitly alias TABLE_NAME.');
+        assertSameValue(true, str_contains($resetter, 'REFERENCED_TABLE_NAME AS referenced_table_name'), 'Foreign-key metadata query does not explicitly alias REFERENCED_TABLE_NAME.');
+        $mysqlMetadataRow = ['TABLE_NAME' => 'organisations'];
+        assertSameValue('organisations', $mysqlMetadataRow['TABLE_NAME'], 'Regression fixture did not model MySQL metadata key casing.');
     }
 }
