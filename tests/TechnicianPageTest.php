@@ -5,13 +5,22 @@ declare(strict_types=1);
 namespace Reqsheet\Tests;
 
 use DateTimeImmutable;
+use PDO;
+use PDOStatement;
 use Reqsheet\Http\TechnicianPage;
+use Reqsheet\Technician\PdoTechnicianPlanningStore;
 use Reqsheet\Technician\TechnicianPlanningStore;
 
 final class TechnicianPageTest
 {
     public static function run(): void
     {
+        $pdo = new TechnicianRecordingPdo();
+        (new PdoTechnicianPlanningStore($pdo))->daily(7, new DateTimeImmutable('2026-09-18'), []);
+        assertSameValue(['id' => 7, 'effective_from_date' => '2026-09-18', 'effective_to_date' => '2026-09-18'], $pdo->lastParameters, 'Technician effective-template lookup bound unexpected calendar parameters.');
+        preg_match_all('/:([a-z_]+)/', $pdo->lastSql, $placeholders);
+        assertSameValue(count($placeholders[1]), count(array_unique($placeholders[1])), 'Technician effective-template lookup reused a named placeholder that native MySQL PDO cannot bind.');
+
         $store = new TechnicianPageStoreFake();
         $page = new TechnicianPage($store, 1, 20, ['display_name' => 'Tech', 'roles' => ['technician']]);
         $warning = null;
@@ -46,6 +55,36 @@ final class TechnicianPageTest
         assertContainsValue('Day View · Monday 21 September 2026', $print, 'Selected week was not calculated from the selected date.');
         assertContainsValue('Day View · Thursday 24 September 2026', $print, 'Non-standard working-day print date was incorrect.');
         assertContainsValue('21-09-2026 Mon', $page->handle('GET', ['date' => '2026-09-21', 'teacher' => 10], []), 'Secondary technician date format was not UK-style.');
+    }
+}
+
+final class TechnicianRecordingPdo extends PDO
+{
+    public string $lastSql = '';
+    public array $lastParameters = [];
+
+    public function __construct() {}
+
+    public function prepare(string $query, array $options = []): PDOStatement|false
+    {
+        $this->lastSql = $query;
+        return new TechnicianRecordingStatement($this);
+    }
+}
+
+final class TechnicianRecordingStatement extends PDOStatement
+{
+    public function __construct(private readonly TechnicianRecordingPdo $pdo) {}
+
+    public function execute(?array $params = null): bool
+    {
+        $this->pdo->lastParameters = $params ?? [];
+        return true;
+    }
+
+    public function fetch(?int $mode = null, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0): mixed
+    {
+        return false;
     }
 }
 

@@ -90,8 +90,8 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
 
     private function version(int $organisationId, DateTimeImmutable $date): ?array
     {
-        $s = $this->pdo->prepare('SELECT tv.id, tv.label, tv.first_day_of_week FROM timetable_versions tv JOIN organisations o ON o.id = tv.organisation_id AND o.active_timetable_version_id IS NOT NULL WHERE tv.organisation_id = :id AND tv.effective_from <= :lesson_date AND (tv.effective_to IS NULL OR tv.effective_to > :lesson_date) ORDER BY tv.effective_from DESC, tv.id DESC LIMIT 1');
-        $s->execute(['id' => $organisationId, 'lesson_date' => $date->format('Y-m-d')]); $r = $s->fetch(); return $r === false ? null : $r;
+        $s = $this->pdo->prepare('SELECT tv.id, tv.label, tv.first_day_of_week FROM timetable_versions tv JOIN organisations o ON o.id = tv.organisation_id AND o.active_timetable_version_id IS NOT NULL WHERE tv.organisation_id = :id AND tv.effective_from <= :effective_from_date AND (tv.effective_to IS NULL OR tv.effective_to > :effective_to_date) ORDER BY tv.effective_from DESC, tv.id DESC LIMIT 1');
+        $s->execute(['id' => $organisationId, 'effective_from_date' => $date->format('Y-m-d'), 'effective_to_date' => $date->format('Y-m-d')]); $r = $s->fetch(); return $r === false ? null : $r;
     }
     private function slots(int $versionId, int $day): array { $s = $this->pdo->prepare('SELECT id, sequence_number, kind, teaching_period_number, label FROM timetable_slots WHERE timetable_version_id = :version_id AND day_of_week = :day ORDER BY sequence_number'); $s->execute(['version_id' => $versionId, 'day' => $day]); return $s->fetchAll(); }
 }

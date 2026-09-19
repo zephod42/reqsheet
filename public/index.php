@@ -22,6 +22,7 @@ use Reqsheet\Http\LoginPage;
 use Reqsheet\Http\MyAccountPage;
 use Reqsheet\Http\HomePage;
 use Reqsheet\Http\PageLayout;
+use Reqsheet\Http\RequestExceptionLogger;
 use Reqsheet\Http\SessionAuth;
 use Reqsheet\Http\SettingsPage;
 use Reqsheet\Http\SetupBlockingPage;
@@ -47,6 +48,11 @@ $route = ApplicationRoute::match($method, $path);
 // are served separately and retain normal cacheability.
 header('Cache-Control: no-store, private');
 header('Pragma: no-cache');
+$requestId = RequestExceptionLogger::requestId(isset($_SERVER['HTTP_X_REQUEST_ID']) ? (string) $_SERVER['HTTP_X_REQUEST_ID'] : null);
+header('X-Request-ID: ' . $requestId);
+$logRequestFailure = static function (string $stage, \Throwable $exception) use ($path, $requestId): void {
+    RequestExceptionLogger::log($path . ':' . $stage, $exception, $requestId);
+};
 
 $rawEnvironment = getenv();
 $rawEnvironment = is_array($rawEnvironment) ? $rawEnvironment : [];
@@ -80,7 +86,8 @@ try {
     header('Content-Type: text/plain; charset=UTF-8');
     echo "School not found\n";
     exit;
-} catch (\Throwable) {
+} catch (\Throwable $exception) {
+    $logRequestFailure('tenant-resolution', $exception);
     http_response_code(503);
     header('Content-Type: text/plain; charset=UTF-8');
     echo "Service unavailable\n";
@@ -96,8 +103,9 @@ if ($currentUser !== null) {
             SessionAuth::logout();
             $currentUser = null;
         }
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
         // Do not turn a schema/database outage into an authentication redirect.
+        $logRequestFailure('session-validation', $exception);
         SessionAuth::logout();
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
@@ -152,7 +160,8 @@ if ($route === ApplicationRoute::LOGIN) {
         }
         header('Content-Type: text/html; charset=UTF-8');
         echo $loginPage->form();
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('login', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -186,7 +195,8 @@ if ($route === ApplicationRoute::SIGNUP) {
         );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('signup', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -245,7 +255,8 @@ if ($route === ApplicationRoute::SETUP) {
     $environment = is_array($environment) ? $environment : [];
     try {
         $environment = ExternalEnvironment::load($environment);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('setup-environment', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -269,7 +280,8 @@ if ($route === ApplicationRoute::SETUP) {
         $page = new SetupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $canonicalHost ?? $tenantContext?->baseHost ?? '');
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('setup-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -292,7 +304,8 @@ if ($route === ApplicationRoute::HEALTH) {
         $environment = is_array($environment) ? $environment : [];
         $config = DatabaseConfig::fromEnvironment(ExternalEnvironment::load($environment));
         $healthy = HealthCheck::databaseIsHealthy(new Database($config));
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('health', $exception);
         $healthy = false;
     }
 
@@ -317,7 +330,8 @@ if ($route === ApplicationRoute::MY_ACCOUNT) {
         $page = new MyAccountPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $currentUser);
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('account-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -346,7 +360,8 @@ if ($route === ApplicationRoute::SETTINGS) {
         $page = new SettingsPage(new SettingsService(new PdoOrganisationSettingsStore($database->connection())), $currentUser['organisation_id'], $currentUser, new PdoTimetableConfigurationStore($database->connection()));
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('settings-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -370,7 +385,8 @@ if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, A
             echo (new SetupBlockingPage())->render($currentUser);
             exit;
         }
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('setup-gate', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -383,7 +399,8 @@ if ($route === ApplicationRoute::TEACHER_WEEK) {
     $environment = is_array($environment) ? $environment : [];
     try {
         $environment = ExternalEnvironment::load($environment);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('teacher-environment', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -411,7 +428,8 @@ if ($route === ApplicationRoute::TEACHER_WEEK) {
         );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('teacher-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -433,7 +451,8 @@ if ($route === ApplicationRoute::TECHNICIAN) {
         $page = new TechnicianPage(new PdoTechnicianPlanningStore((new Database($config))->connection()), (int) $user['organisation_id'], (int) $user['id'], $user);
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('technician-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -455,7 +474,8 @@ if ($route === ApplicationRoute::ADMIN_PEOPLE) {
         $page = new AdminPeoplePage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $user['organisation_id'], $user);
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('people-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -468,7 +488,8 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE) {
     $environment = is_array($environment) ? $environment : [];
     try {
         $environment = ExternalEnvironment::load($environment);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('timetable-environment', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";
@@ -490,7 +511,8 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE) {
         );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
-    } catch (\Throwable) {
+    } catch (\Throwable $exception) {
+        $logRequestFailure('timetable-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";

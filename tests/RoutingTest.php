@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Reqsheet\Tests;
 
 use Reqsheet\Http\ApplicationRoute;
+use Reqsheet\Http\RequestExceptionLogger;
 
 final class RoutingTest
 {
@@ -25,6 +26,16 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::ONBOARDING, ApplicationRoute::match('GET', '/onboarding'), 'Onboarding route was not recognised.');
         assertSameValue(ApplicationRoute::SETTINGS, ApplicationRoute::match('GET', '/settings'), 'Settings route was not recognised.');
         assertSameValue(ApplicationRoute::MY_ACCOUNT, ApplicationRoute::match('GET', '/account'), 'My Account route was not recognised.');
+
+        $requestId = RequestExceptionLogger::requestId('request-1234');
+        assertSameValue('request-1234', $requestId, 'A safe incoming request ID was not preserved.');
+        $log = RequestExceptionLogger::format('/teacher', new \RuntimeException("token=private-value\nquery failed"), $requestId);
+        assertContainsValue('request_id=request-1234', $log, 'Exception log omitted the request correlation ID.');
+        assertContainsValue('route=/teacher', $log, 'Exception log omitted the affected route.');
+        assertContainsValue('exception=RuntimeException', $log, 'Exception log omitted the exception class.');
+        assertContainsValue('origin=', $log, 'Exception log omitted the originating file and line.');
+        assertContainsValue('token=[redacted]', $log, 'Exception log did not redact a sensitive token value.');
+        assertNotContainsValue('private-value', $log, 'Exception log retained a sensitive token value.');
 
         foreach ([
             '/unknown',
