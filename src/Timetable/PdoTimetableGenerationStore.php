@@ -17,7 +17,7 @@ final class PdoTimetableGenerationStore implements TimetableGenerationStore
     public function findVersion(int $organisationId, int $versionId): ?TimetableVersion
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, label, effective_from, effective_to
+            'SELECT id, organisation_id, label, effective_from, effective_to, first_day_of_week
              FROM timetable_versions
              WHERE id = :id AND organisation_id = :organisation_id',
         );
@@ -30,6 +30,7 @@ final class PdoTimetableGenerationStore implements TimetableGenerationStore
             $row['label'] === null ? null : (string) $row['label'],
             self::date($row['effective_from']),
             $row['effective_to'] === null ? null : self::date($row['effective_to']),
+            (int) $row['first_day_of_week'],
         );
     }
 

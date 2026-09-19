@@ -139,14 +139,14 @@ The same screen also offers optional settings:
 - An `Allow conjoined periods` toggle, disabled by default. When enabled, one lesson may span any number of contiguous teaching periods. Configured breaks, lunch, and other separators prevent merging across them.
 - Primary accent colour and Secondary accent colour only. White/black base, timetable grid, automatic class colours, and technician print styling remain independent from these settings; arbitrary school CSS is not exposed.
 
-Settings shows the current active timetable template as a compact read-only summary by default. `Edit timetable` first shows a safety warning, then exposes the existing configuration controls; a safe successor version is created rather than mutating a protected effective version. `Create new timetable template` asks only for the version metadata needed to establish a template and seeds a safe default structure; detailed working days, periods, timings, separators, conjoined periods, and rooms are configured afterwards through the editor and timetable builder. The assignment builder does not create timetable templates or versions. Admins can manage rooms/labs by adding, renaming, reordering, and deactivating/archiving them.
+Settings shows the current active timetable template as a compact read-only summary by default. `Create new timetable template` requires only a unique timetable name, working days, first day of the week, and periods per day. `Edit timetable` exposes the detailed configuration controls; activation is an explicit administrator action and exactly one organisation template may be active. Timetable templates do not require administrator-managed effective dates; legacy internal dates remain only for historical compatibility. The assignment builder does not create timetable templates or versions. Admins can manage rooms/labs by adding, renaming, reordering, and deactivating/archiving them.
 - Manage people by creating a Teacher or Technician. The person’s name is used as the login name; an optional abbreviation such as JSM may be recorded; Admin is an optional additional permission.
 
 The first pilot may create an account with no password until its first login, when the user sets one. This must be represented explicitly as awaiting-first-login, not inferred from a blank password, and is a consciously temporary security weakness requiring review before broader production deployment.
 
 ## Timetable versions and editor
 
-Timetables are effective-dated template versions. Each version has a label/name and effective start date; a later version supersedes an earlier version from its start date. The design supports mid-year revisions and future academic-year templates being entered and edited in advance. Historical versions are preserved, and dated occurrences retain their historical snapshots. Template edits validate the successor boundary and reject changes that would invalidate protected historical occurrences.
+Timetables are named template versions with one explicit active template per organisation. A template contains its working days, week-start order, periods, separators and timing structure; administrators may switch active templates without deleting or reassigning lessons. Legacy effective-date columns are retained internally for historical compatibility, while current teacher planning always uses the persistent active-template reference. Historical versions are preserved, and dated occurrences retain their historical snapshots.
 
 ## Implemented multi-tenant school URL architecture
 
@@ -179,7 +179,7 @@ Populate the attached Reqsheet CSV template using the attached timetable export.
 
 ## Historical and validation principles
 
-Recurring timetable configuration and dated lesson/requisition records remain separate. A timetable change creates or selects an effective-dated version; it does not rewrite historical occurrences or requisitions. Multi-period lessons remain one underlying lesson and one eventual requisition even when displayed across several grid rows.
+Recurring timetable configuration and dated lesson/requisition records remain separate. A timetable change creates or activates a named template; it does not rewrite historical occurrences or requisitions. Multi-period lessons remain one underlying lesson and one eventual requisition even when displayed across several grid rows.
 
 The existing database and service rules remain authoritative: ISO weekdays, valid ordered slots, contiguous teaching-only spans, effective-date boundaries, organisation ownership, resource ownership, teacher/room/class conflicts, and non-blank resource codes must be validated before committing timetable data. Exceptions, holidays, cancellations, and other timetable overrides remain deferred.
 

@@ -106,6 +106,7 @@ final class TeacherStore implements TeacherPlanningStore
     }
 
     public function teacherBelongsToOrganisation(int $teacherId, int $organisationId): bool { return $teacherId === 10 && $organisationId === 1; }
+    public function activeFirstDayOfWeek(int $organisationId): int { return 1; }
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion { return $organisationId === 1 && $date >= $this->version->effectiveFrom ? $this->version : null; }
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
     public function slotsForVersion(int $versionId): array { return $this->slots; }

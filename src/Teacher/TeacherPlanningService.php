@@ -28,7 +28,8 @@ final class TeacherPlanningService
         if (!$this->store->teacherBelongsToOrganisation($teacherId, $organisationId)) {
             throw new TimetableValidationException(['Teacher does not belong to the requested organisation.']);
         }
-        $start = $this->weekStart($date);
+        $firstDay = $this->store->activeFirstDayOfWeek($organisationId);
+        $start = $firstDay >= 1 && $firstDay <= 7 ? $date->sub(new DateInterval('P' . (((int) $date->format('N') - $firstDay + 7) % 7) . 'D')) : $this->weekStart($date);
         $this->store->ensureOccurrencesForWeek($organisationId, $start, $start->add(new DateInterval('P6D')));
         $days = [];
         for ($offset = 0; $offset < 7; $offset++) {

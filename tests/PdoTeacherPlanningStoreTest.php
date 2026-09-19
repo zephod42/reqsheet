@@ -18,13 +18,8 @@ final class PdoTeacherPlanningStoreTest
 
         $store->effectiveVersion(7, new DateTimeImmutable('2026-09-18'));
 
-        assertSameValue([
-            'organisation_id' => 7,
-            'effective_from_date' => '2026-09-18',
-            'effective_to_date' => '2026-09-18',
-        ], $pdo->lastParameters, 'Effective-version lookup did not bind both date comparisons independently.');
-        assertContainsValue(':effective_from_date', $pdo->lastSql, 'Effective-version lookup lost its start-date parameter.');
-        assertContainsValue(':effective_to_date', $pdo->lastSql, 'Effective-version lookup lost its end-date parameter.');
+        assertSameValue(['organisation_id' => 7], $pdo->lastParameters, 'Active-template lookup bound unexpected calendar parameters.');
+        assertContainsValue('active_timetable_version_id', $pdo->lastSql, 'Teacher lookup did not use explicit activation.');
     }
 }
 

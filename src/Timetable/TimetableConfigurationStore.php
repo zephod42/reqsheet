@@ -15,6 +15,10 @@ interface TimetableConfigurationStore
     /** @return list<TimetableVersion> */
     public function versionsForOrganisation(int $organisationId): array;
 
+    public function activeVersionId(int $organisationId): ?int;
+
+    public function activateVersion(int $organisationId, int $versionId): void;
+
     /** @return list<array{id: int, display_name: string, staff_identifier: ?string, is_active: bool}> */
     public function usersForOrganisation(int $organisationId): array;
 
@@ -26,6 +30,7 @@ interface TimetableConfigurationStore
         ?string $label,
         DateTimeImmutable $effectiveFrom,
         ?DateTimeImmutable $effectiveTo,
+        int $firstDayOfWeek = 1,
     ): int;
 
     public function createSuccessorVersion(

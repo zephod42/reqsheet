@@ -104,7 +104,7 @@ try {
     cleanTestDatabase($pdo);
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 7, 'Expected all migrations to apply to the clean test database.');
+    integrationAssert($migrationCount === 9, 'Expected all migrations to apply to the clean test database.');
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         foreach (TEST_TABLES as $table) {
@@ -152,6 +152,7 @@ try {
             '2026-09-01',
             '2026-09-30',
         );
+        $configurationStore->activateVersion($organisationId, $versionId);
         $slotService = new TimetableSlotService($configurationStore);
         $slot = static function (int $day, int $sequence, string $kind, ?int $period) use ($slotService, $versionId): int {
             return $slotService->create(

@@ -80,22 +80,27 @@ final class SettingsTest
         assertNotContainsValue('name="periods_per_day"', $templateEmpty, 'Read-only template summary exposed the large editor by default.');
         $templateEditor = $templatePage->handle('POST', ['action' => 'create_template']);
         assertContainsValue('Create new timetable template', $templateEditor, 'Create-template workflow did not open from Settings.');
-        assertContainsValue('You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.', $templateEditor, 'Template creation did not explain later configuration.');
+        assertContainsValue('name="template_label"', $templateEditor, 'Template creation did not ask for a timetable name.');
+        assertContainsValue('name="working_days[]"', $templateEditor, 'Template creation did not ask for working days.');
+        assertContainsValue('name="first_day_of_week"', $templateEditor, 'Template creation did not ask for the first day.');
+        assertContainsValue('name="periods_per_day"', $templateEditor, 'Template creation did not ask for periods per day.');
         assertNotContainsValue('name="school_name"', $templateEditor, 'Template creation still asks for a school name.');
         assertNotContainsValue('name="start_time"', $templateEditor, 'Template creation still exposes timing controls.');
-        assertNotContainsValue('name="standard_period_minutes"', $templateEditor, 'Template creation still exposes period duration.');
-        assertNotContainsValue('name="separator_type[]"', $templateEditor, 'Template creation still exposes separators.');
-        assertNotContainsValue('name="allow_conjoined_periods"', $templateEditor, 'Template creation still exposes conjoined-period settings.');
+        assertNotContainsValue('name="effective_from"', $templateEditor, 'Template creation still exposes an effective date.');
         $templateSaved = $templatePage->handle('POST', [
-            'action' => 'save_template', 'template_label' => 'Autumn settings template', 'effective_from' => '2026-09-01',
+            'action' => 'save_template', 'template_label' => 'Autumn settings template',
+            'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => 6,
         ]);
-        assertContainsValue('Current active timetable template', $templateSaved, 'Saved template did not return to the active-template summary.');
+        assertContainsValue('No active timetable template exists yet.', $templateSaved, 'A template became active without explicit selection.');
         assertContainsValue('Autumn settings template', $templateSaved, 'Active template name was not summarized.');
+        $activated = $templatePage->handle('POST', ['action' => 'activate_template', 'version_id' => 1, 'csrf_token' => \Reqsheet\Http\CsrfToken::value()]);
+        assertContainsValue('Timetable activated.', $activated, 'Manual timetable activation did not complete.');
+        assertContainsValue('Current active timetable template', $activated, 'Activated timetable was not summarized.');
         $warning = $templatePage->handle('POST', ['action' => 'edit_template']);
         assertContainsValue('Before editing the timetable template', $warning, 'Editing a template did not show the safety warning.');
         $fullEditor = $templatePage->handle('POST', ['action' => 'continue_edit_template', 'source_version_id' => 1]);
         assertContainsValue('Edit timetable template', $fullEditor, 'Template editing did not open after creation.');
-        assertContainsValue('name="school_name"', $fullEditor, 'Full timetable editing lost organisation settings.');
+        assertNotContainsValue('name="school_name"', $fullEditor, 'Timetable editing exposed the organisation school-name field.');
         assertContainsValue('name="standard_period_minutes"', $fullEditor, 'Full timetable editing lost timing controls.');
 
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
@@ -160,11 +165,15 @@ final class SettingsStoreFake implements OrganisationSettingsStore
 {
     public array $saved = [];
     public array $rooms = [];
+    public array $active = [];
 
     public function find(int $organisationId): array
     {
         return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => $this->saved['periods_per_day'] ?? 6, 'start_time' => $this->saved['start_time'] ?? '', 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => $this->saved['separators'] ?? [], 'allow_double_periods' => $this->saved['allow_double_periods'] ?? false];
     }
+
+    public function activeVersionId(int $organisationId): ?int { return $this->active[$organisationId] ?? null; }
+    public function activateVersion(int $organisationId, int $versionId): void { $this->active[$organisationId] = $versionId; }
 
     public function save(int $organisationId, array $settings, ?array $rooms = null): void
     {

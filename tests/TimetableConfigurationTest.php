@@ -88,7 +88,7 @@ final class TimetableConfigurationTest
         $store = self::store();
         $service = new TimetableTemplateService($store);
         $version = $service->create(1, null, 'Autumn 2026', '2026-09-01', [
-            'working_days' => [1, 2, 3, 4, 5], 'periods_per_day' => 9, 'start_time' => '08:00',
+            'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => 9, 'start_time' => '08:00',
             'standard_period_minutes' => '50', 'custom_day_settings' => [],
             'separators' => [['type' => 'Break', 'label' => 'Break', 'after_period' => 3, 'duration_minutes' => '10'], ['type' => 'Lunchtime', 'label' => 'Lunch', 'after_period' => 6, 'duration_minutes' => '30']],
         ]);
@@ -96,11 +96,19 @@ final class TimetableConfigurationTest
         assertSameValue(9, count(array_filter($store->slotsForVersion($version), static fn (TimetableSlot $slot): bool => $slot->isTeaching() && $slot->dayOfWeek === 1)), 'Template did not seed nine teaching periods.');
         $lunch = array_values(array_filter($store->slotsForVersion($version), static fn (TimetableSlot $slot): bool => $slot->kind === 'lunch'))[0] ?? null;
         assertSameValue('Lunch', $lunch?->label, 'Template did not preserve the Lunch label.');
-        $active = $service->activeTemplate(1, new DateTimeImmutable('2026-09-10'));
-        assertSameValue('Autumn 2026', $active['version']->label, 'Active template summary selected the wrong version.');
-        $successor = $service->create(1, $version, 'Spring 2027', '2027-01-01', ['working_days' => [1], 'periods_per_day' => 2, 'start_time' => '08:00', 'standard_period_minutes' => '60', 'custom_day_settings' => [], 'separators' => []]);
-        assertSameValue('2027-01-01', $store->versions[$version]->effectiveTo->format('Y-m-d'), 'Successor creation did not close the prior version.');
-        assertSameValue('2027-01-01', $store->versions[$successor]->effectiveFrom->format('Y-m-d'), 'Successor effective date was incorrect.');
+        assertSameValue(null, $service->activeTemplate(1), 'A timetable became active without explicit selection.');
+        $service->activate(1, $version);
+        $active = $service->activeTemplate(1);
+        assertSameValue('Autumn 2026', $active['version']->label, 'Manual activation selected the wrong timetable.');
+        $successor = $service->create(1, $version, 'Spring 2027', null, ['working_days' => [1], 'first_day_of_week' => 1, 'periods_per_day' => 2, 'start_time' => '08:00', 'standard_period_minutes' => '60', 'custom_day_settings' => [], 'separators' => []]);
+        assertSameValue(null, $service->activeTemplate(1)['version']->effectiveTo, 'Activating a timetable changed historical version dates.');
+        $service->activate(1, $successor);
+        assertSameValue($successor, $service->activeTemplate(1)['version']->id, 'A second activation did not replace the organisation active template.');
+        self::expectValidation(fn () => $service->activate(2, $version));
+        self::expectValidation(fn () => $service->create(1, null, 'Autumn 2026', null, ['working_days' => [1], 'first_day_of_week' => 1, 'periods_per_day' => 2]));
+        self::expectValidation(fn () => $service->create(1, null, 'Invalid', null, ['working_days' => [], 'first_day_of_week' => 1, 'periods_per_day' => 2]));
+        $otherOrganisationVersion = $service->create(2, null, 'Autumn 2026', null, ['working_days' => [1], 'first_day_of_week' => 1, 'periods_per_day' => 2]);
+        if ($otherOrganisationVersion < 1) throw new \RuntimeException('Identical timetable names were incorrectly rejected across organisations.');
     }
 
     private static function configurationSlots(ConfigurationStore $store): void
@@ -157,6 +165,8 @@ class ConfigurationStore implements TimetableConfigurationStore
 {
     /** @var array<int, TimetableVersion> */
     public array $versions = [];
+    /** @var array<int, int> */
+    public array $active = [];
     /** @var list<TimetableSlot> */
     public array $slots = [];
     /** @var list<RecurringLesson> */
@@ -177,9 +187,11 @@ class ConfigurationStore implements TimetableConfigurationStore
     public function organisationExists(int $organisationId): bool { return isset($this->organisations[$organisationId]); }
     public function findVersion(int $versionId): ?TimetableVersion { return $this->versions[$versionId] ?? null; }
     public function versionsForOrganisation(int $organisationId): array { return array_values(array_filter($this->versions, static fn (TimetableVersion $v): bool => $v->organisationId === $organisationId)); }
+    public function activeVersionId(int $organisationId): ?int { return $this->active[$organisationId] ?? null; }
+    public function activateVersion(int $organisationId, int $versionId): void { $version = $this->findVersion($versionId); if ($version === null || $version->organisationId !== $organisationId) throw new TimetableValidationException(['Timetable template is not available for this organisation.']); $this->active[$organisationId] = $versionId; }
     public function usersForOrganisation(int $organisationId): array { return $this->users; }
     public function roomCodesForVersion(int $versionId): array { return array_values(array_unique(array_map(static fn (RecurringLesson $lesson): string => $lesson->roomCode, $this->lessonsForVersion($versionId)))); }
-    public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $from, ?DateTimeImmutable $to): int { $id = $this->nextId++; $this->versions[$id] = new TimetableVersion($id, $organisationId, $label, $from, $to); return $id; }
+    public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $from, ?DateTimeImmutable $to, int $firstDayOfWeek = 1): int { $id = $this->nextId++; $this->versions[$id] = new TimetableVersion($id, $organisationId, $label, $from, $to, $firstDayOfWeek); return $id; }
     public function createSuccessorVersion(int $organisationId, int $sourceVersionId, ?string $label, DateTimeImmutable $from): int { $source = $this->versions[$sourceVersionId]; $this->versions[$sourceVersionId] = new TimetableVersion($source->id, $source->organisationId, $source->label, $source->effectiveFrom, $from); $id = $this->nextId++; $this->versions[$id] = new TimetableVersion($id, $organisationId, $label, $from, $source->effectiveTo); return $id; }
     public function occurrenceCountForVersionFrom(int $versionId, DateTimeImmutable $date): int { return 0; }
     public function slotsForVersion(int $versionId): array { return array_values(array_filter($this->slots, static fn (TimetableSlot $s): bool => $s->timetableVersionId === $versionId)); }

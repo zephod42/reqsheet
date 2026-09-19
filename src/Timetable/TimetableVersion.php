@@ -14,6 +14,7 @@ final readonly class TimetableVersion
         public ?string $label,
         public DateTimeImmutable $effectiveFrom,
         public ?DateTimeImmutable $effectiveTo,
+        public int $firstDayOfWeek = 1,
     ) {
     }
 }

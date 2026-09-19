@@ -12,7 +12,7 @@ final class TimetableVersionService
     {
     }
 
-    public function create(int $organisationId, ?string $label, string $effectiveFrom, ?string $effectiveTo): int
+    public function create(int $organisationId, ?string $label, string $effectiveFrom, ?string $effectiveTo, int $firstDayOfWeek = 1): int
     {
         if (!$this->store->organisationExists($organisationId)) {
             throw new TimetableValidationException(['Organisation does not exist.']);
@@ -25,6 +25,9 @@ final class TimetableVersionService
         if ($label !== null && trim($label) === '') {
             throw new TimetableValidationException(['Timetable version label must not be blank.']);
         }
+        if ($firstDayOfWeek < 1 || $firstDayOfWeek > 7) {
+            throw new TimetableValidationException(['First day of the week must be between Monday and Sunday.']);
+        }
 
         foreach ($this->store->versionsForOrganisation($organisationId) as $existing) {
             $existingEndsAfterNewStart = $existing->effectiveTo === null || $existing->effectiveTo > $from;
@@ -34,7 +37,7 @@ final class TimetableVersionService
             }
         }
 
-        return $this->store->insertVersion($organisationId, $label, $from, $to);
+        return $this->store->insertVersion($organisationId, $label, $from, $to, $firstDayOfWeek);
     }
 
     public function createSuccessor(int $organisationId, int $sourceVersionId, ?string $label, string $effectiveFrom): int

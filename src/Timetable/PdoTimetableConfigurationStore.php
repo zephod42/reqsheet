@@ -24,7 +24,7 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
     public function findVersion(int $versionId): ?TimetableVersion
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, label, effective_from, effective_to
+            'SELECT id, organisation_id, label, effective_from, effective_to, first_day_of_week
              FROM timetable_versions WHERE id = :id',
         );
         $statement->execute(['id' => $versionId]);
@@ -35,18 +35,46 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
             $row['label'] === null ? null : (string) $row['label'],
             self::date((string) $row['effective_from']),
             $row['effective_to'] === null ? null : self::date((string) $row['effective_to']),
+            (int) $row['first_day_of_week'],
         );
     }
 
     public function versionsForOrganisation(int $organisationId): array
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, label, effective_from, effective_to
+            'SELECT id, organisation_id, label, effective_from, effective_to, first_day_of_week
              FROM timetable_versions WHERE organisation_id = :organisation_id
-             ORDER BY effective_from, id',
+             ORDER BY id',
         );
         $statement->execute(['organisation_id' => $organisationId]);
         return array_map(self::version(...), $statement->fetchAll());
+    }
+
+    public function activeVersionId(int $organisationId): ?int
+    {
+        $statement = $this->prepare('SELECT active_timetable_version_id FROM organisations WHERE id = :organisation_id');
+        $statement->execute(['organisation_id' => $organisationId]);
+        $value = $statement->fetchColumn();
+        return $value === false || $value === null ? null : (int) $value;
+    }
+
+    public function activateVersion(int $organisationId, int $versionId): void
+    {
+        if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin timetable activation.');
+        try {
+            $lock = $this->prepare('SELECT id FROM organisations WHERE id = :organisation_id FOR UPDATE');
+            $lock->execute(['organisation_id' => $organisationId]);
+            if ($lock->fetchColumn() === false) throw new TimetableValidationException(['Organisation is invalid.']);
+            $version = $this->prepare('SELECT id FROM timetable_versions WHERE id = :version_id AND organisation_id = :organisation_id');
+            $version->execute(['version_id' => $versionId, 'organisation_id' => $organisationId]);
+            if ($version->fetchColumn() === false) throw new TimetableValidationException(['Timetable template is not available for this organisation.']);
+            $update = $this->prepare('UPDATE organisations SET active_timetable_version_id = :version_id WHERE id = :organisation_id');
+            $update->execute(['version_id' => $versionId, 'organisation_id' => $organisationId]);
+            if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete timetable activation.');
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
     }
 
     public function usersForOrganisation(int $organisationId): array
@@ -173,17 +201,18 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
         if ($statement->rowCount() < 1) throw new \RuntimeException('Timetable resources are not available.');
     }
 
-    public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $effectiveFrom, ?DateTimeImmutable $effectiveTo): int
+    public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $effectiveFrom, ?DateTimeImmutable $effectiveTo, int $firstDayOfWeek = 1): int
     {
         $statement = $this->prepare(
-            'INSERT INTO timetable_versions (organisation_id, label, effective_from, effective_to)
-             VALUES (:organisation_id, :label, :effective_from, :effective_to)',
+            'INSERT INTO timetable_versions (organisation_id, label, effective_from, effective_to, first_day_of_week)
+             VALUES (:organisation_id, :label, :effective_from, :effective_to, :first_day_of_week)',
         );
         $statement->execute([
             'organisation_id' => $organisationId,
             'label' => $label,
             'effective_from' => $effectiveFrom->format('Y-m-d'),
             'effective_to' => $effectiveTo?->format('Y-m-d'),
+            'first_day_of_week' => $firstDayOfWeek,
         ]);
         return (int) $this->pdo->lastInsertId();
     }
@@ -196,11 +225,12 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
             if ($source === null || $source->organisationId !== $organisationId) throw new TimetableValidationException(['The source timetable template is not available for this organisation.']);
             $close = $this->prepare('UPDATE timetable_versions SET effective_to = :effective_to WHERE id = :id AND organisation_id = :organisation_id');
             $close->execute(['effective_to' => $effectiveFrom->format('Y-m-d'), 'id' => $sourceVersionId, 'organisation_id' => $organisationId]);
-            $insert = $this->prepare('INSERT INTO timetable_versions (organisation_id, label, effective_from, effective_to) VALUES (:organisation_id, :label, :effective_from, :effective_to)');
+            $insert = $this->prepare('INSERT INTO timetable_versions (organisation_id, label, effective_from, effective_to, first_day_of_week) VALUES (:organisation_id, :label, :effective_from, :effective_to, :first_day_of_week)');
             $insert->execute([
                 'organisation_id' => $organisationId, 'label' => $label,
                 'effective_from' => $effectiveFrom->format('Y-m-d'),
                 'effective_to' => $source->effectiveTo?->format('Y-m-d'),
+                'first_day_of_week' => $source->firstDayOfWeek,
             ]);
             $id = (int) $this->pdo->lastInsertId();
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete successor template creation.');
@@ -328,6 +358,7 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
             $row['label'] === null ? null : (string) $row['label'],
             self::date((string) $row['effective_from']),
             $row['effective_to'] === null ? null : self::date((string) $row['effective_to']),
+            (int) $row['first_day_of_week'],
         );
     }
 

@@ -28,17 +28,13 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, label, effective_from, effective_to
-             FROM timetable_versions
-             WHERE organisation_id = :organisation_id
-               AND effective_from <= :effective_from_date
-               AND (effective_to IS NULL OR :effective_to_date < effective_to)
-             ORDER BY effective_from DESC, id DESC LIMIT 1',
+            'SELECT tv.id, tv.organisation_id, tv.label, tv.effective_from, tv.effective_to, tv.first_day_of_week
+             FROM timetable_versions tv
+             JOIN organisations o ON o.active_timetable_version_id = tv.id
+             WHERE tv.organisation_id = :organisation_id LIMIT 1',
         );
         $statement->execute([
             'organisation_id' => $organisationId,
-            'effective_from_date' => $date->format('Y-m-d'),
-            'effective_to_date' => $date->format('Y-m-d'),
         ]);
         $row = $statement->fetch();
         if ($row === false) return null;
@@ -48,7 +44,16 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
             $row['label'] === null ? null : (string) $row['label'],
             self::date((string) $row['effective_from']),
             $row['effective_to'] === null ? null : self::date((string) $row['effective_to']),
+            (int) $row['first_day_of_week'],
         );
+    }
+
+    public function activeFirstDayOfWeek(int $organisationId): int
+    {
+        $statement = $this->prepare('SELECT tv.first_day_of_week FROM organisations o JOIN timetable_versions tv ON tv.id = o.active_timetable_version_id WHERE o.id = :organisation_id');
+        $statement->execute(['organisation_id' => $organisationId]);
+        $value = $statement->fetchColumn();
+        return $value === false ? 1 : (int) $value;
     }
 
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void

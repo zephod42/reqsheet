@@ -11,7 +11,6 @@ use Reqsheet\Timetable\TimetableRules;
 use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\TimetableValidationException;
 use Reqsheet\Timetable\TimetableVersion;
-use Reqsheet\Timetable\TimetableVersionService;
 use Reqsheet\Timetable\TimetableSlotService;
 use Reqsheet\Timetable\TimetableTemplateService;
 use Reqsheet\Timetable\ResourceTimetableStore;
@@ -40,7 +39,7 @@ final class AdminTimetablePage
         $versions = $this->store->versionsForOrganisation($this->organisationId);
         $versionId = (int) ($query['version'] ?? $input['version'] ?? ($versions[0]->id ?? 0));
         $version = $this->store->findVersion($versionId);
-        if ($version === null || $version->organisationId !== $this->organisationId) $version = $versions[0] ?? null;
+        if ($version !== null && $version->organisationId !== $this->organisationId) $version = null;
         return $this->page($versions, $version, $query, $message);
     }
 
@@ -84,7 +83,7 @@ final class AdminTimetablePage
                     }
                     $query = array_replace($query, ['version' => $versionId, 'view' => (string) ($input['view'] ?? 'teacher'), 'resource' => (int) ($input['resource'] ?? 0), 'edit' => 0]);
                 } elseif ($action === 'create_version') {
-                    $id = (new TimetableTemplateService($store))->create($this->organisationId, null, $this->nullable($input['label'] ?? null), (string) ($input['effective_from'] ?? ''), $this->settings);
+                    $id = (new TimetableTemplateService($store))->create($this->organisationId, null, $this->nullable($input['label'] ?? null), null, $this->settings);
                     $query = array_replace($query, ['version' => $id]);
                     $message = 'Timetable version created: ' . $id;
                 }
@@ -93,9 +92,9 @@ final class AdminTimetablePage
             }
         }
         $versions = $store->versionsForOrganisation($this->organisationId);
-        $versionId = array_key_exists('version', $query) ? (int) $query['version'] : ($this->activeVersion($versions)?->id ?? ($versions[0]->id ?? 0));
+        $versionId = array_key_exists('version', $query) ? (int) $query['version'] : ($this->activeVersion()?->id ?? 0);
         $version = $store->findVersion($versionId);
-        if ($version === null || $version->organisationId !== $this->organisationId) $version = $versions[0] ?? null;
+        if ($version !== null && $version->organisationId !== $this->organisationId) $version = null;
         return $this->resourcePage($store, $versions, $version, $query, $message);
     }
 
@@ -139,7 +138,7 @@ final class AdminTimetablePage
 
     private function resourceGrid(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource, array $users): string
     {
-        $days = $this->workingDays($store->slotsForVersion($version->id));
+        $days = $this->workingDays($store->slotsForVersion($version->id), $version->firstDayOfWeek);
         $slots = $store->slotsForVersion($version->id);
         $rows = [];
         foreach ($slots as $slot) $rows[$slot->sequenceNumber] = $slot->sequenceNumber;
@@ -303,7 +302,7 @@ final class AdminTimetablePage
     {
         $action = (string) ($input['action'] ?? '');
         if ($action === 'create_version') {
-            $id = (new TimetableVersionService($this->store))->create($this->organisationId, $this->nullable($input['label'] ?? null), (string) ($input['effective_from'] ?? ''), $this->nullable($input['effective_to'] ?? null));
+            $id = (new TimetableTemplateService($this->store))->create($this->organisationId, null, $this->nullable($input['label'] ?? null), null, $this->settings);
             return 'Timetable version created: ' . $id;
         }
         $versionId = (int) ($input['version'] ?? 0);
@@ -363,7 +362,7 @@ final class AdminTimetablePage
     private function versionSelect(array $versions, ?int $selected): string
     {
         $options = [];
-        foreach ($versions as $version) $options[$version->id] = ($version->label ?: 'Untitled') . ' (' . $version->effectiveFrom->format('Y-m-d') . ')';
+        foreach ($versions as $version) $options[$version->id] = ($version->label ?: 'Untitled') . ($version->id === $this->activeVersion()?->id ? ' (active)' : '');
         return $this->select('version', (string) ($selected ?? 0), $options);
     }
 
@@ -385,21 +384,15 @@ final class AdminTimetablePage
 
     private function versionContext(TimetableVersion $version): string
     {
-        $today = new \DateTimeImmutable('today');
-        $state = $version->effectiveFrom > $today ? 'future' : ($version->effectiveTo !== null && $today >= $version->effectiveTo ? 'historical' : 'current');
-        return 'Editing <strong>' . $this->e($version->label ?: 'Untitled timetable') . '</strong>, effective from ' . $version->effectiveFrom->format('Y-m-d') . ' (' . $state . ').';
+        $state = $version->id === $this->activeVersion()?->id ? 'active' : 'inactive';
+        return 'Editing <strong>' . $this->e($version->label ?: 'Untitled timetable') . '</strong> (' . $state . ').';
     }
 
     /** @param list<TimetableVersion> $versions */
-    private function activeVersion(array $versions): ?TimetableVersion
+    private function activeVersion(): ?TimetableVersion
     {
-        $today = new \DateTimeImmutable('today');
-        $active = null;
-        foreach ($versions as $version) {
-            if ($version->effectiveFrom > $today || ($version->effectiveTo !== null && $today >= $version->effectiveTo)) continue;
-            if ($active === null || $version->effectiveFrom > $active->effectiveFrom || ($version->effectiveFrom == $active->effectiveFrom && $version->id > $active->id)) $active = $version;
-        }
-        return $active;
+        $id = $this->store->activeVersionId($this->organisationId);
+        return $id === null ? null : $this->store->findVersion($id);
     }
 
     /** @param list<array{id:int,display_name:string,staff_identifier:?string,is_active:bool}> $users */
@@ -407,7 +400,7 @@ final class AdminTimetablePage
     {
         $slots = $this->store->slotsForVersion($version->id);
         $lessons = array_values(array_filter($this->store->lessonsForVersion($version->id), static fn (RecurringLesson $lesson): bool => $lesson->teacherUserId === $teacher));
-        $days = $this->workingDays($slots);
+        $days = $this->workingDays($slots, $version->firstDayOfWeek);
         $byDay = [];
         $columns = [];
         foreach ($slots as $slot) {
@@ -444,11 +437,11 @@ final class AdminTimetablePage
     }
 
     /** @param list<TimetableSlot> $slots @return list<int> */
-    private function workingDays(array $slots): array
+    private function workingDays(array $slots, ?int $templateFirstDay = null): array
     {
         $days = array_values(array_filter(array_map('intval', (array) ($this->settings['working_days'] ?? [])), static fn (int $day): bool => $day >= 1 && $day <= 7));
         if ($days === []) $days = array_values(array_unique(array_map(static fn (TimetableSlot $slot): int => $slot->dayOfWeek, $slots)));
-        $first = (int) ($this->settings['first_day_of_week'] ?? ($days[0] ?? 1));
+        $first = $templateFirstDay ?? (int) ($this->settings['first_day_of_week'] ?? ($days[0] ?? 1));
         usort($days, static fn (int $a, int $b): int => (($a - $first + 7) % 7) <=> (($b - $first + 7) % 7));
         return $days;
     }

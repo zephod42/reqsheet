@@ -5,7 +5,7 @@ This is an intentionally small, reviewable roadmap. The near-term priority is ma
 Completed foundations:
 
 - Admin configuration foundation: people, rooms, working days, week start, and ordered timetable structure.
-- Timetable-version/admin editor UI: effective-dated versions, staff-member default view, and validated timetable editing by staff member, room, or day. The current editor is intentionally skeletal and is protected by the authenticated Admin permission.
+- Timetable-version/admin editor UI: named, manually activated templates, staff-member default view, and validated timetable editing by staff member, room, or day. The current editor is intentionally skeletal and is protected by the authenticated Admin permission.
 - Documentation/code reconciliation: canonical product behaviour and the committed timetable editor have been checked for consistency in this pass.
 - Teacher week-view skeleton and dated lesson planning editor: current configured week, navigable week controls, compact occurrence blocks, and direct editing of the three planning text fields. Completed in this milestone.
 - Pilot first-run setup and login: initial organisation/admin creation, hashed passwords, sessions, operational-role landing, and explicit awaiting-first-login accounts. Completed in this milestone.
@@ -14,7 +14,7 @@ Completed foundations:
 - School tenant slug/host milestone: persistent domain-independent organisation slugs, configurable base-host resolution, tenant-aware login and protected-route consistency, unknown-tenant application 404s, cross-tenant session rejection, and school context on resolved pages. The final production domain is deliberately undecided/configurable; DuckDNS/Pumba is staging only and is not an application dependency.
 - Versioned timetable-builder redesign: existing organisation users act as teachers, organisation rooms and reusable class resources are selected by assignments, and one version-tied assignment dataset is exposed through Teacher, Room, and Class projections with resource creation and per-version clash validation.
 - Settings/timetable robustness: configurable period counts drive separators and seeded timetable structure; conjoined lessons may span any arbitrary contiguous teaching periods but never separators; fresh start time defaults to 08:00; and the authenticated shared sidebar remains consistent with admin destinations disabled for non-admins.
-- Timetable data-flow and template-management milestone: Settings owns read-only active-template summaries, warned edits, and successor template creation; the assignment builder owns versioned teacher/room/class assignments; conjoined cards span their full visual extent; teacher initials and stable pastel class cards are shared across projections; effective assignments materialise into the authenticated teacher week with preserved planning/requisition records.
+- Timetable data-flow and template-management milestone: Settings owns named-template creation, explicit activation, read-only active-template summaries, and warned edits; the assignment builder owns versioned teacher/room/class assignments; conjoined cards span their full visual extent; teacher initials and stable pastel class cards are shared across projections; active assignments materialise into the authenticated teacher week with preserved planning/requisition records.
 
 Agreed design decisions recorded on 2026-09-18:
 

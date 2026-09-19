@@ -13,14 +13,28 @@ final class TimetableTemplateService
     }
 
     /** @param array<string, mixed> $settings */
-    public function create(int $organisationId, ?int $sourceVersionId, ?string $label, string $effectiveFrom, array $settings): int
+    public function create(int $organisationId, ?int $sourceVersionId, ?string $label, ?string $effectiveFrom, array $settings): int
     {
-        $versionService = new TimetableVersionService($this->store);
-        $versionId = $sourceVersionId === null
-            ? $versionService->create($organisationId, $label, $effectiveFrom, null)
-            : $versionService->createSuccessor($organisationId, $sourceVersionId, $label, $effectiveFrom);
+        if (!$this->store->organisationExists($organisationId)) throw new TimetableValidationException(['Organisation does not exist.']);
+        $name = trim((string) $label);
+        if ($name === '') throw new TimetableValidationException(['Timetable name is required.']);
+        if (mb_strlen($name) > 255) throw new TimetableValidationException(['Timetable name must be 255 characters or fewer.']);
+        foreach ($this->store->versionsForOrganisation($organisationId) as $existing) {
+            if (strcasecmp((string) $existing->label, $name) === 0) throw new TimetableValidationException(['A timetable with this name already exists for this organisation.']);
+        }
+        $days = array_values(array_unique(array_filter(array_map('intval', (array) ($settings['working_days'] ?? [])), static fn (int $day): bool => $day >= 1 && $day <= 7)));
+        sort($days);
+        if ($days === []) throw new TimetableValidationException(['Select at least one working day.']);
+        $firstDay = (int) ($settings['first_day_of_week'] ?? 0);
+        if ($firstDay < 1 || $firstDay > 7 || !in_array($firstDay, $days, true)) throw new TimetableValidationException(['The first day of the week must be one of the selected working days.']);
+        $periods = (int) ($settings['periods_per_day'] ?? 0);
+        if ($periods < 1 || $periods > 20) throw new TimetableValidationException(['Periods per day must be a positive whole number between 1 and 20.']);
+        // Legacy effective columns remain available for historical records. New
+        // manually activated templates use a non-scheduling compatibility date.
+        $internalDate = trim((string) ($effectiveFrom ?? '')) === '' ? '1000-01-01' : $effectiveFrom;
+        $versionId = $this->store->insertVersion($organisationId, $name, new DateTimeImmutable($internalDate), null, $firstDay);
         try {
-            $this->seed($versionId, $settings);
+            $this->seed($versionId, array_replace($settings, ['working_days' => $days, 'periods_per_day' => $periods]));
         } catch (\Throwable $exception) {
             // A version with no slots is not a usable template, so surface the
             // original validation/storage failure rather than hiding it.
@@ -30,16 +44,18 @@ final class TimetableTemplateService
     }
 
     /** @return array<string, mixed>|null */
-    public function activeTemplate(int $organisationId, ?DateTimeImmutable $date = null): ?array
+    public function activeTemplate(int $organisationId): ?array
     {
-        $date ??= new DateTimeImmutable('today');
-        $active = null;
-        foreach ($this->store->versionsForOrganisation($organisationId) as $version) {
-            if ($version->effectiveFrom > $date || ($version->effectiveTo !== null && $date >= $version->effectiveTo)) continue;
-            if ($active === null || $version->effectiveFrom > $active->effectiveFrom || ($version->effectiveFrom == $active->effectiveFrom && $version->id > $active->id)) $active = $version;
-        }
-        if ($active === null) return null;
+        $id = $this->store->activeVersionId($organisationId);
+        if ($id === null) return null;
+        $active = $this->store->findVersion($id);
+        if ($active === null || $active->organisationId !== $organisationId) return null;
         return ['version' => $active, 'slots' => $this->store->slotsForVersion($active->id)];
+    }
+
+    public function activate(int $organisationId, int $versionId): void
+    {
+        $this->store->activateVersion($organisationId, $versionId);
     }
 
     /** @param array<string, mixed> $settings */
