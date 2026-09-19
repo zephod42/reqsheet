@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Reqsheet\Tests;
 
 use Reqsheet\Http\SetupBlockingPage;
+use Reqsheet\Http\SetupPage;
 use Reqsheet\Http\SignupPage;
 use Reqsheet\Http\HomePage;
 use Reqsheet\Http\SettingsPage;
@@ -20,10 +21,11 @@ final class SettingsTest
     {
         $store = new SettingsStoreFake();
         $service = new SettingsService($store);
-        self::expectValidation(static fn () => $service->save(1, [
+        $service->save(1, [
             'school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
-            'periods_per_day' => 6, 'rooms' => [],
-        ]), 'Settings accepted without a room.');
+            'periods_per_day' => 6,
+        ]);
+        assertSameValue([], $store->rooms, 'Settings unexpectedly created rooms during a minimal setup save.');
         $service->save(1, [
             'school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
             'periods_per_day' => 6, 'rooms' => ['LAB-A'], 'allow_double_periods' => '1',
@@ -50,13 +52,26 @@ final class SettingsTest
         assertContainsValue('Complete the organisation settings', $beforeSetup, 'Incomplete organisation did not render the setup form.');
         $afterSetup = $settingsPage->handle('POST', [
             'school_name' => 'Transition School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
-            'periods_per_day' => 6, 'rooms' => ['LAB-A'],
+            'periods_per_day' => 6,
         ]);
         assertContainsValue('Settings saved.', $afterSetup, 'Completed settings did not render the saved state.');
         assertNotContainsValue('Service unavailable', $afterSetup, 'Completed settings rendered an unavailable state.');
         assertContainsValue('value="Transition School"', $afterSetup, 'Completed settings were not loaded for the next page render.');
         assertContainsValue('value="08:00"', $beforeSetup, 'Fresh settings did not default the start time to 08:00.');
         assertContainsValue('Allow conjoined periods', $beforeSetup, 'Settings did not use conjoined-period wording.');
+        assertNotContainsValue('data-add-room', $beforeSetup, 'Settings still offered room creation outside the timetable builder.');
+        assertContainsValue('Standard period length', $beforeSetup, 'Optional timetable settings were not available after setup.');
+
+        $initialSetupAccounts = new \Reqsheet\Account\AccountService(new \Reqsheet\Tests\AccountStoreFake());
+        $initialSetup = new SetupPage($initialSetupAccounts, 'reqsheet.test');
+        $initialSetupView = $initialSetup->handle('GET', []);
+        assertNotContainsValue('name="rooms[]"', $initialSetupView, 'Initial setup still offered room creation.');
+        assertContainsValue('You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.', $initialSetupView, 'Initial setup did not explain later settings.');
+        $initialSetupComplete = $initialSetup->handle('POST', [
+            'organisation_name' => 'Minimal School', 'display_name' => 'Minimal Admin', 'staff_identifier' => 'MAD',
+            'operational_role' => 'teacher', 'password' => 'minimal-pass', 'password_confirmation' => 'minimal-pass', 'tenant_slug' => 'minimal-school',
+        ]);
+        assertContainsValue('Setup complete', $initialSetupComplete, 'Initial setup could not complete without rooms or optional settings.');
 
         $templateSettings = new SettingsStoreFake();
         $templatePage = new SettingsPage(new SettingsService($templateSettings), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true], new ConfigurationStore());
@@ -144,10 +159,10 @@ final class SettingsStoreFake implements OrganisationSettingsStore
         return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => $this->saved['periods_per_day'] ?? 6, 'start_time' => $this->saved['start_time'] ?? '', 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => $this->saved['separators'] ?? [], 'allow_double_periods' => $this->saved['allow_double_periods'] ?? false];
     }
 
-    public function save(int $organisationId, array $settings, array $rooms): void
+    public function save(int $organisationId, array $settings, ?array $rooms = null): void
     {
         $this->saved = $settings;
-        $this->rooms = $rooms;
+        if ($rooms !== null) $this->rooms = $rooms;
     }
 }
 
@@ -172,10 +187,10 @@ final class SettingsTransitionStoreFake implements OrganisationSettingsStore
         ];
     }
 
-    public function save(int $organisationId, array $settings, array $rooms): void
+    public function save(int $organisationId, array $settings, ?array $rooms = null): void
     {
         $this->settings = $settings;
-        $this->rooms = $rooms;
+        if ($rooms !== null) $this->rooms = $rooms;
         $this->complete = true;
     }
 }

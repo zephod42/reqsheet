@@ -19,7 +19,7 @@ Completed foundations:
 Agreed design decisions recorded on 2026-09-18:
 
 - Public landing/auth direction: restrained `Reqsheet.` wordmark landing page, left navigation, email-free pilot sign-up creating an organisation and first Admin, remembered-login intent, and consistent incomplete-settings gating for Admin and non-Admin users.
-- Settings direction: required school name, working days/week start, six default periods, and at least one explicitly added room; optional general/custom-day timings, typed separators, and disabled-by-default conjoined-period support that cannot cross separators.
+- Settings direction: required school name, working days/week start, and six default periods; rooms are created in the timetable builder, while optional general/custom-day timings, typed separators, and disabled-by-default conjoined-period support remain configurable later without blocking initial setup.
 - Visual and lesson-editing direction: restrained black-and-white Reqsheet chrome with technical timetable typography, neutral teacher grid with soft pastel lesson cards and consistent subtle class accents, neutral technician screen/black-and-white print, and a large lesson pop-out for exactly three free-text planning fields with an explicit `Nothing required` action. The pilot visual pass is implemented; further iteration remains expected.
 
 Upcoming implementation sequence:

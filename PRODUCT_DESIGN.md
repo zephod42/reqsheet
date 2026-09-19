@@ -30,6 +30,8 @@ If required organisation settings are incomplete, an Admin account lands directl
 
 This gate applies consistently wherever normal application use would otherwise be unavailable because setup is incomplete.
 
+Initial school setup establishes the school and first administrator without requiring rooms or optional timetable timings. Rooms are created in the timetable builder, while lesson lengths and other timetable settings remain available from Settings after setup.
+
 ### Visual direction
 
 The overall appearance is intentionally restrained: white background, black structural lines, and black priority/body text. Reqsheet should remain fully understandable in black and white; colour is supplemental guidance. Reqsheet-owned navigation, menus, buttons, and other UI chrome use a clear, slightly bold sans-serif. Operational timetable and requisition data uses a distinct technical/data-oriented font, with Codex-like typography as the reference feel. Tables use thin, crisp square rules, with selectively heavier rules for meaningful boundaries such as periods, days, or week structure. Interactive/stateful components may use low-radius corners and a very faint shadow or soft lift; grid intersections remain sharp.

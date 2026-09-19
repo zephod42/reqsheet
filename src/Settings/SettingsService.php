@@ -42,12 +42,14 @@ final class SettingsService
         $periodLength = trim((string) ($input['standard_period_minutes'] ?? ''));
         if ($periodLength !== '' && ((int) $periodLength < 1 || (string) (int) $periodLength !== $periodLength)) $errors[] = 'Standard period length must be a positive number of minutes.';
 
-        $rooms = [];
-        foreach ((array) ($input['rooms'] ?? []) as $room) {
-            $room = trim((string) $room);
-            if ($room !== '' && !in_array(strtolower($room), array_map('strtolower', $rooms), true)) $rooms[] = $room;
+        $rooms = null;
+        if (array_key_exists('rooms', $input)) {
+            $rooms = [];
+            foreach ((array) $input['rooms'] as $room) {
+                $room = trim((string) $room);
+                if ($room !== '' && !in_array(strtolower($room), array_map('strtolower', $rooms), true)) $rooms[] = $room;
+            }
         }
-        if ($rooms === []) $errors[] = 'Add at least one room.';
 
         $customDays = [];
         foreach (self::DAYS as $day) {

@@ -9,6 +9,6 @@ interface OrganisationSettingsStore
     /** @return array<string, mixed> */
     public function find(int $organisationId): array;
 
-    /** @param array<string, mixed> $settings @param list<string> $rooms */
-    public function save(int $organisationId, array $settings, array $rooms): void;
+    /** @param array<string, mixed> $settings @param list<string>|null $rooms Null preserves rooms managed by the timetable builder. */
+    public function save(int $organisationId, array $settings, ?array $rooms = null): void;
 }

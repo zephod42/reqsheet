@@ -90,6 +90,9 @@ final class AdminTimetablePageTest
             new TimetableSlot(205, 1, 2, 5, 'teaching', 4, 'P4', '12:45:00', '13:45:00'),
         ];
         $page = new AdminTimetablePage($store, 1, ['working_days' => [1, 2], 'first_day_of_week' => 1, 'allow_double_periods' => true]);
+        $roomAdded = $page->handle('POST', ['version' => 1, 'view' => 'room', 'resource' => 401], ['action' => 'create_resource', 'resource_type' => 'room', 'code' => 'L3', 'return_view' => 'room', 'return_resource' => 401]);
+        assertContains('Room added.', $roomAdded, 'Timetable builder no longer creates rooms.');
+        assertSameValue('L3', $store->rooms[2]['code'], 'Timetable builder did not preserve the created room.');
         $grid = $page->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10], []);
         assertContains('Break', $grid, 'Break separator label was not rendered.');
         assertContains('Lunch', $grid, 'Lunch separator label was not rendered.');

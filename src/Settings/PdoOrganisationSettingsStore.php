@@ -42,11 +42,11 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
             'separators' => $row === false ? [] : self::jsonList($row['separators']),
             'allow_double_periods' => $row !== false && (bool) $row['allow_double_periods'],
             'rooms' => $roomCodes,
-            'complete' => $row !== false && $roomCodes !== [],
+            'complete' => $row !== false,
         ];
     }
 
-    public function save(int $organisationId, array $settings, array $rooms): void
+    public function save(int $organisationId, array $settings, ?array $rooms = null): void
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin settings save.');
         try {
@@ -74,16 +74,18 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
                 'separators' => json_encode($settings['separators'], JSON_THROW_ON_ERROR),
                 'double_periods' => $settings['allow_double_periods'] ? 1 : 0,
             ]);
-            $existingRoomCodes = $this->prepare('SELECT room_code FROM organisation_rooms WHERE organisation_id = :id ORDER BY room_code');
-            $existingRoomCodes->execute(['id' => $organisationId]);
-            $existing = array_map(static fn (mixed $code): string => strtolower((string) $code), $existingRoomCodes->fetchAll(PDO::FETCH_COLUMN));
-            $requested = array_map(static fn (mixed $code): string => strtolower((string) $code), $rooms);
-            sort($existing); sort($requested);
-            if ($existing !== $requested) {
-                $delete = $this->prepare('DELETE FROM organisation_rooms WHERE organisation_id = :id');
-                $delete->execute(['id' => $organisationId]);
-                $room = $this->prepare('INSERT INTO organisation_rooms (organisation_id, room_code) VALUES (:id, :code)');
-                foreach ($rooms as $code) $room->execute(['id' => $organisationId, 'code' => $code]);
+            if ($rooms !== null) {
+                $existingRoomCodes = $this->prepare('SELECT room_code FROM organisation_rooms WHERE organisation_id = :id ORDER BY room_code');
+                $existingRoomCodes->execute(['id' => $organisationId]);
+                $existing = array_map(static fn (mixed $code): string => strtolower((string) $code), $existingRoomCodes->fetchAll(PDO::FETCH_COLUMN));
+                $requested = array_map(static fn (mixed $code): string => strtolower((string) $code), $rooms);
+                sort($existing); sort($requested);
+                if ($existing !== $requested) {
+                    $delete = $this->prepare('DELETE FROM organisation_rooms WHERE organisation_id = :id');
+                    $delete->execute(['id' => $organisationId]);
+                    $room = $this->prepare('INSERT INTO organisation_rooms (organisation_id, room_code) VALUES (:id, :code)');
+                    foreach ($rooms as $code) $room->execute(['id' => $organisationId, 'code' => $code]);
+                }
             }
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete settings save.');
         } catch (\Throwable $exception) {
