@@ -183,6 +183,13 @@ The existing database and service rules remain authoritative: ISO weekdays, vali
 
 ## Not designed yet
 
+## People and navigation milestone (2026-09-19)
+
+- Authenticated navigation separates general information links from application functions with a simple black rule. The teacher destination is labelled “View My Timetable”.
+- Administrator People opens on an organisation-scoped table of existing people. Add Person and Edit Person use accessible dialogs with optional email, initials, cumulative role checkboxes, validation, CSRF protection, and explicit cancel/save actions.
+- A person may have Teacher, Technician, Administrator, or any combination, with at least one role required. Administrator is an independent permission; it does not imply an operational role.
+- Teacher numbers are immutable, organisation-local display numbers allocated monotonically when a teacher role is first assigned. Internal database IDs remain separate and are never shown as teacher numbers.
+
 ## Navigation and account milestone (2026-09-19)
 
 - Teacher week places each configured period or separator name once in the left-hand period axis. Separator rows are neutral grey across the day columns and contain no repeated separator text; custom separator labels are preserved.

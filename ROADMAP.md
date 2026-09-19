@@ -41,4 +41,10 @@ Bounded usability milestone completed 2026-09-19:
 - My Account renders only the current user’s identity and supports CSRF-protected self-service password changes under the existing password policy. Identity fields remain administrator-managed.
 - Administrator Settings now contains the “Reqsheet account” placeholder section. Membership status, plans, pricing, renewals, payment management, and billing integration remain future work and must be specified before implementation.
 
+People and navigation milestone completed 2026-09-19:
+
+- Authenticated navigation now has a black general/application separator and labels the teacher destination “View My Timetable”.
+- People is an organisation-scoped list with accessible Add/Edit dialogs, optional email, cumulative independent roles, and CSRF-protected validation.
+- Migration `0008_add_people_roles_and_teacher_numbers.sql` adds optional email, independent operational-role flags, and immutable organisation-local teacher numbers. Existing users are backfilled by organisation and existing database IDs/relationships are preserved.
+
 The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services provide the validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Product behaviour and the remaining UI/admin scope are canonical in `PRODUCT_DESIGN.md`; authentication/authorization and exception handling remain future work.

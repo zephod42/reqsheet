@@ -29,8 +29,9 @@ final class SessionAuth
             'organisation_id' => (int) $account['organisation_id'],
             'display_name' => (string) ($account['display_name'] ?? ''),
             'staff_identifier' => $account['staff_identifier'] ?? null,
-            'operational_role' => (string) $account['operational_role'],
-            'is_admin' => (bool) $account['is_admin'],
+            'operational_role' => isset($account['operational_role']) ? (string) $account['operational_role'] : null,
+            'is_admin' => (bool) ($account['is_admin'] ?? false),
+            'roles' => array_values(array_unique(array_map('strval', (array) ($account['roles'] ?? [])))),
         ];
     }
 
@@ -40,16 +41,18 @@ final class SessionAuth
         session_regenerate_id(true);
     }
 
-    /** @return array{id:int,organisation_id:int,display_name:string,staff_identifier:?string,operational_role:string,is_admin:bool}|null */
+    /** @return array{id:int,organisation_id:int,display_name:string,staff_identifier:?string,operational_role:?string,is_admin:bool,roles:list<string>}|null */
     public static function current(): ?array
     {
         self::start();
         $user = $_SESSION['user'] ?? null;
-        if (!is_array($user) || !isset($user['id'], $user['organisation_id'], $user['operational_role'])) return null;
+        if (!is_array($user) || !isset($user['id'], $user['organisation_id'])) return null;
         return [
             'id' => (int) $user['id'], 'organisation_id' => (int) $user['organisation_id'],
             'display_name' => (string) ($user['display_name'] ?? ''), 'staff_identifier' => isset($user['staff_identifier']) ? (string) $user['staff_identifier'] : null,
-            'operational_role' => (string) $user['operational_role'], 'is_admin' => (bool) ($user['is_admin'] ?? false),
+            'operational_role' => isset($user['operational_role']) ? (string) $user['operational_role'] : null,
+            'is_admin' => (bool) ($user['is_admin'] ?? false),
+            'roles' => array_values(array_unique(array_map('strval', (array) ($user['roles'] ?? [])))),
         ];
     }
 
@@ -67,18 +70,26 @@ final class SessionAuth
     /** @param array<string, mixed>|null $user */
     public static function landingPath(?array $user): string
     {
-        return ($user['operational_role'] ?? '') === 'technician' ? '/technician' : '/teacher';
+        $roles = (array) ($user['roles'] ?? []);
+        if ($roles === [] && ($user['operational_role'] ?? null) !== null) $roles[] = (string) $user['operational_role'];
+        if (in_array('technician', $roles, true) && !in_array('teacher', $roles, true)) return '/technician';
+        if (in_array('teacher', $roles, true)) return '/teacher';
+        return '/settings';
     }
 
     /** @param array<string, mixed>|null $user */
     public static function hasRole(?array $user, string $role): bool
     {
-        return $user !== null && ($user['operational_role'] ?? null) === $role;
+        if ($user === null) return false;
+        $roles = (array) ($user['roles'] ?? []);
+        if ($roles === [] && ($user['operational_role'] ?? null) !== null) $roles[] = (string) $user['operational_role'];
+        if ($role === 'administrator' && (($user['is_admin'] ?? false) === true)) return true;
+        return in_array($role, $roles, true);
     }
 
     /** @param array<string, mixed>|null $user */
     public static function isAdmin(?array $user): bool
     {
-        return $user !== null && ($user['is_admin'] ?? false) === true;
+        return self::hasRole($user, 'administrator');
     }
 }

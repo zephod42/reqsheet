@@ -100,6 +100,8 @@ final class SettingsTest
         $adminNav = \Reqsheet\Http\PageLayout::render('Admin', '<p>Admin</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
         assertContainsValue('href="/settings"', $adminNav, 'Admin navigation did not expose Settings.');
         assertContainsValue('My Account', $adminNav, 'Authenticated navigation did not expose My Account.');
+        assertContainsValue('View My Timetable', $adminNav, 'Teacher navigation label was not updated.');
+        assertContainsValue('nav-separator', $adminNav, 'Authenticated navigation did not render its general/application separator.');
         assertNotContainsValue('href="/signup"', $adminNav, 'Sign up remained in authenticated navigation.');
         assertContainsValue('href="/settings"', \Reqsheet\Http\PageLayout::render('About', '<p>About</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]), 'Authenticated informational layout lost Settings.');
         $teacherNav = \Reqsheet\Http\PageLayout::render('Teacher', '<p>Teacher</p>', ['id' => 2, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => false]);

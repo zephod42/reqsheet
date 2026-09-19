@@ -53,7 +53,7 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
     {
         $statement = $this->prepare(
             'SELECT id, display_name, staff_identifier, is_active
-             FROM users WHERE organisation_id = :organisation_id
+             FROM users WHERE organisation_id = :organisation_id AND (is_teacher = TRUE OR operational_role = \'teacher\')
              ORDER BY display_name, id',
         );
         $statement->execute(['organisation_id' => $organisationId]);
@@ -106,12 +106,25 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
 
     public function createTeacher(int $organisationId, string $code, string $displayName): int
     {
-        $statement = $this->prepare(
-            'INSERT INTO users (organisation_id, display_name, staff_identifier, operational_role, is_admin, account_state)
-             VALUES (:organisation_id, :display_name, :code, \'teacher\', FALSE, \'awaiting_first_login\')',
-        );
-        $statement->execute(['organisation_id' => $organisationId, 'display_name' => trim($displayName) === '' ? trim($code) : trim($displayName), 'code' => trim($code)]);
-        return (int) $this->pdo->lastInsertId();
+        if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin teacher creation.');
+        try {
+            $lock = $this->prepare('SELECT id FROM organisations WHERE id = :id FOR UPDATE');
+            $lock->execute(['id' => $organisationId]);
+            if ($lock->fetchColumn() === false) throw new TimetableValidationException(['Organisation is invalid.']);
+            $number = $this->prepare('SELECT COALESCE(MAX(teacher_number), 0) + 1 FROM users WHERE organisation_id = :organisation_id');
+            $number->execute(['organisation_id' => $organisationId]);
+            $statement = $this->prepare(
+                'INSERT INTO users (organisation_id, display_name, staff_identifier, operational_role, is_admin, is_teacher, is_technician, teacher_number, account_state)
+                 VALUES (:organisation_id, :display_name, :code, \'teacher\', FALSE, TRUE, FALSE, :teacher_number, \'awaiting_first_login\')',
+            );
+            $statement->execute(['organisation_id' => $organisationId, 'display_name' => trim($displayName) === '' ? trim($code) : trim($displayName), 'code' => trim($code), 'teacher_number' => (int) $number->fetchColumn()]);
+            $id = (int) $this->pdo->lastInsertId();
+            if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete teacher creation.');
+            return $id;
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
     }
 
     public function roomBelongsToOrganisation(int $roomId, int $organisationId): bool
@@ -239,7 +252,7 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
 
     public function findTeacherOrganisation(int $teacherUserId): ?int
     {
-        $statement = $this->prepare('SELECT organisation_id FROM users WHERE id = :id');
+        $statement = $this->prepare("SELECT organisation_id FROM users WHERE id = :id AND (is_teacher = TRUE OR operational_role = 'teacher')");
         $statement->execute(['id' => $teacherUserId]);
         $value = $statement->fetchColumn();
         return $value === false ? null : (int) $value;

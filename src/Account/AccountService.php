@@ -55,9 +55,47 @@ final class AccountService
 
     public function createUser(int $organisationId, string $displayName, ?string $staffIdentifier, string $role, bool $isAdmin): int
     {
-        $this->validateIdentity('Organisation', $displayName, $role);
+        $roles = [$role];
+        if ($isAdmin) $roles[] = 'administrator';
+        return $this->createPerson($organisationId, $displayName, $staffIdentifier, null, $roles);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function people(int $organisationId): array
+    {
         if ($organisationId < 1 || !$this->store->organisationExists($organisationId)) throw new AccountValidationException(['Organisation is invalid.']);
-        return $this->store->createUser($organisationId, trim($displayName), $this->nullable($staffIdentifier), $role, $isAdmin);
+        return $this->store->findPeopleForOrganisation($organisationId);
+    }
+
+    /** @param list<string> $roles */
+    public function createPerson(int $organisationId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): int
+    {
+        $this->validatePerson($organisationId, $displayName, $email, $roles);
+        return $this->store->createPerson($organisationId, trim($displayName), $this->nullable($staffIdentifier), $this->nullable($email), $roles);
+    }
+
+    /** @param list<string> $roles */
+    public function updatePerson(int $organisationId, int $userId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): void
+    {
+        $this->validatePerson($organisationId, $displayName, $email, $roles);
+        $before = $this->store->findUserById($userId);
+        if ($before === null || (int) ($before['organisation_id'] ?? 0) !== $organisationId) throw new AccountValidationException(['That person is not part of this organisation.']);
+        $wasAdmin = in_array('administrator', (array) ($before['roles'] ?? []), true) || (bool) ($before['is_admin'] ?? false);
+        if ($wasAdmin && !in_array('administrator', $roles, true) && $this->store->activeAdministratorCount($organisationId) < 2) {
+            throw new AccountValidationException(['The organisation must retain at least one active administrator.']);
+        }
+        $this->store->updatePerson($organisationId, $userId, trim($displayName), $this->nullable($staffIdentifier), $this->nullable($email), $roles);
+    }
+
+    /** @param list<string> $roles */
+    private function validatePerson(int $organisationId, string $displayName, ?string $email, array $roles): void
+    {
+        if ($organisationId < 1 || !$this->store->organisationExists($organisationId)) throw new AccountValidationException(['Organisation is invalid.']);
+        if (trim($displayName) === '') throw new AccountValidationException(['User name/login must not be blank.']);
+        $roles = array_values(array_unique(array_map('strval', $roles)));
+        if (array_diff($roles, ['teacher', 'technician', 'administrator']) !== []) throw new AccountValidationException(['Role selection is invalid.']);
+        if ($roles === []) throw new AccountValidationException(['Select at least one role.']);
+        if ($email !== null && trim($email) !== '' && filter_var(trim($email), FILTER_VALIDATE_EMAIL) === false) throw new AccountValidationException(['Email address is invalid.']);
     }
 
     /** @return array<string, mixed> */

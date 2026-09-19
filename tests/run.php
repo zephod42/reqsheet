@@ -15,6 +15,7 @@ require __DIR__ . '/SettingsTest.php';
 require __DIR__ . '/OnboardingHandoffTest.php';
 require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/MyAccountTest.php';
+require __DIR__ . '/AdminPeoplePageTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -97,8 +98,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -145,6 +146,11 @@ if ($resourceMigration === false) throw new RuntimeException('Timetable resource
 foreach (['organisation_classes', 'class_id', 'room_id', 'recurring_lessons_class_fk', 'recurring_lessons_room_fk'] as $expectedResourceFragment) {
     if (!str_contains($resourceMigration, $expectedResourceFragment)) throw new RuntimeException('Expected timetable resource schema fragment is missing: ' . $expectedResourceFragment);
 }
+$peopleMigration = file_get_contents($migrationDirectory . '/0008_add_people_roles_and_teacher_numbers.sql');
+if ($peopleMigration === false) throw new RuntimeException('People migration could not be read.');
+foreach (['email', 'is_teacher', 'is_technician', 'teacher_number', 'users_organisation_teacher_number', 'ROW_NUMBER'] as $expectedPeopleFragment) {
+    if (!str_contains($peopleMigration, $expectedPeopleFragment)) throw new RuntimeException('Expected people schema fragment is missing: ' . $expectedPeopleFragment);
+}
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
     new MigrationFile('0002', 'earlier', 'earlier.sql', ''),
@@ -186,5 +192,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\SettingsTest::run();
 \Reqsheet\Tests\OnboardingHandoffTest::run();
 \Reqsheet\Tests\MyAccountTest::run();
+\Reqsheet\Tests\AdminPeoplePageTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

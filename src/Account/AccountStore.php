@@ -20,6 +20,17 @@ interface AccountStore extends TenantStore
     /** @return array<string, mixed>|null */
     public function findUserById(int $userId): ?array;
 
+    /** @return list<array<string, mixed>> */
+    public function findPeopleForOrganisation(int $organisationId): array;
+
+    /** @param list<string> $roles */
+    public function createPerson(int $organisationId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): int;
+
+    /** @param list<string> $roles */
+    public function updatePerson(int $organisationId, int $userId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles): void;
+
+    public function activeAdministratorCount(int $organisationId): int;
+
     public function createFirstOrganisation(
         string $organisationName,
         string $displayName,
