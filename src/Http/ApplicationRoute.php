@@ -19,6 +19,7 @@ final class ApplicationRoute
     public const ADMIN_TIMETABLE_IMPORT_CONFIRM = 'admin_timetable_import_confirm';
     public const ADMIN_TIMETABLE_RESOURCES = 'admin_timetable_resources';
     public const TEACHER_WEEK = 'teacher_week';
+    public const TEACHER_DAY = 'teacher_day';
     public const SETUP = 'setup';
     public const LOGIN = 'login';
     public const LOGOUT = 'logout';
@@ -50,6 +51,9 @@ final class ApplicationRoute
         }
         if ($path === '/teacher' || $path === '/teacher/week') {
             return self::TEACHER_WEEK;
+        }
+        if ($path === '/teacher/day') {
+            return self::TEACHER_DAY;
         }
         if ($path === '/setup') return self::SETUP;
         if ($path === '/login') return self::LOGIN;

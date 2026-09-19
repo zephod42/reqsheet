@@ -24,6 +24,7 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::ADMIN_TIMETABLE_RESOURCES, ApplicationRoute::match('GET', '/admin/timetable/resources.csv'), 'Timetable resource CSV route was not recognised.');
         assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher'), 'Teacher route was not recognised.');
         assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher/week'), 'Teacher week route was not recognised.');
+        assertSameValue(ApplicationRoute::TEACHER_DAY, ApplicationRoute::match('GET', '/teacher/day'), 'Teacher day route was not recognised.');
         assertSameValue(ApplicationRoute::SETUP, ApplicationRoute::match('GET', '/setup'), 'Setup route was not recognised.');
         assertSameValue(ApplicationRoute::LOGIN, ApplicationRoute::match('GET', '/login'), 'Login route was not recognised.');
         assertSameValue(ApplicationRoute::LOGOUT, ApplicationRoute::match('GET', '/logout'), 'Logout route was not recognised.');

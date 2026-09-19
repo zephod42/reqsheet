@@ -77,7 +77,7 @@ final class TeacherWeekPage
         $body .= '<div class="timetable-scroll"><table class="week-grid"><caption class="visually-hidden">Teacher timetable week</caption><thead><tr><th scope="col">Period</th>';
         foreach ($week->days as $day) {
             $date = $day['date'];
-            $body .= '<th scope="col" class="day-label ' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'today-heading' : '') . '">' . $this->e($date->format('D')) . '<br><small>' . $date->format('j M') . '</small></th>';
+            $body .= '<th scope="col" class="day-label ' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'today-heading' : '') . '"><a href="/teacher/day?date=' . $date->format('Y-m-d') . '">' . $this->e($date->format('D')) . '<br><small>' . $date->format('j M') . '</small></a></th>';
         }
         $body .= '</tr></thead><tbody>';
         foreach ($periods as $sequence => $axisSlot) {

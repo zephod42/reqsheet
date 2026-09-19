@@ -114,8 +114,20 @@ small { font-size: .82rem; }
 .period-label { padding: .6rem; text-align: left; white-space: nowrap; }
 .today-heading { background: var(--primary-pale); }
 .day-label { padding: .6rem; text-align: left; white-space: nowrap; font-family: var(--sans); }
+.day-label a { color: inherit; text-decoration: none; }
+.day-label a:hover, .day-label a:focus-visible { text-decoration: underline; }
 .today-row .day-label { background: var(--primary-pale); font-weight: 750; }
 .week-grid td { height: 7rem; padding: .3rem; vertical-align: top; }
+.day-view-heading { margin: .25rem 0 0; font-size: 1rem; font-weight: 500; }
+.day-picker { display: flex; align-items: end; flex-wrap: wrap; gap: .6rem; margin: var(--space-4) 0; }
+.day-picker label { margin: 0; }
+.teacher-day-table-wrap { max-width: 100%; overflow-x: auto; }
+.teacher-day-table { width: 100%; min-width: 60rem; border-collapse: collapse; font-family: var(--technical); }
+.teacher-day-table th, .teacher-day-table td { border: 1px solid var(--rule); padding: .65rem .7rem; text-align: left; vertical-align: top; }
+.teacher-day-table thead th { background: #f7f7f7; font-family: var(--sans); font-weight: 750; }
+.teacher-day-table tbody th { white-space: nowrap; }
+.teacher-day-table td a { font-family: var(--sans); white-space: nowrap; }
+.template-summary-row { margin: .35rem 0; }
 .empty-cell { background: #fff; }
 .account-identity { display: grid; grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr); gap: .45rem 1rem; }
 .account-identity dt { font-weight: 700; }

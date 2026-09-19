@@ -51,14 +51,19 @@ final class SettingsService
             }
         }
 
-        $customDays = [];
-        foreach (self::DAYS as $day) {
-            $customStart = trim((string) (($input['custom_day_start'] ?? [])[$day] ?? ''));
-            $customLength = trim((string) (($input['custom_day_length'] ?? [])[$day] ?? ''));
-            if ($customStart === '' && $customLength === '') continue;
-            if ($customStart !== '' && !$this->validTime($customStart)) $errors[] = 'Custom day start times must be valid.';
-            if ($customLength !== '' && (int) $customLength < 1) $errors[] = 'Custom day period lengths must be positive.';
-            $customDays[(string) $day] = ['start_time' => $customStart, 'period_minutes' => $customLength];
+        // Keep legacy per-day values intact when the simplified settings form
+        // is saved. Existing timetable slots remain authoritative for history.
+        $customDays = (array) ($this->store->find($organisationId)['custom_day_settings'] ?? []);
+        if (array_key_exists('custom_day_start', $input) || array_key_exists('custom_day_length', $input)) {
+            $customDays = [];
+            foreach (self::DAYS as $day) {
+                $customStart = trim((string) (($input['custom_day_start'] ?? [])[$day] ?? ''));
+                $customLength = trim((string) (($input['custom_day_length'] ?? [])[$day] ?? ''));
+                if ($customStart === '' && $customLength === '') continue;
+                if ($customStart !== '' && !$this->validTime($customStart)) $errors[] = 'Custom day start times must be valid.';
+                if ($customLength !== '' && (int) $customLength < 1) $errors[] = 'Custom day period lengths must be positive.';
+                $customDays[(string) $day] = ['start_time' => $customStart, 'period_minutes' => $customLength];
+            }
         }
 
         $separators = [];

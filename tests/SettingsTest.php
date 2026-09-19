@@ -96,12 +96,18 @@ final class SettingsTest
         $activated = $templatePage->handle('POST', ['action' => 'activate_template', 'version_id' => 1, 'csrf_token' => \Reqsheet\Http\CsrfToken::value()]);
         assertContainsValue('Timetable activated.', $activated, 'Manual timetable activation did not complete.');
         assertContainsValue('Current active timetable template', $activated, 'Activated timetable was not summarized.');
+        assertContainsValue('Working days:</strong>', $activated, 'Active timetable summary did not use separated labelled rows.');
+        assertContainsValue('Periods per day:</strong>', $activated, 'Active timetable summary omitted periods per day.');
+        assertContainsValue('Timings:</strong>', $activated, 'Active timetable summary omitted standard timings.');
+        assertNotContainsValue('Custom day timings', $activated, 'Active timetable summary exposed removed custom timing terminology.');
         $warning = $templatePage->handle('POST', ['action' => 'edit_template']);
         assertContainsValue('Before editing the timetable template', $warning, 'Editing a template did not show the safety warning.');
         $fullEditor = $templatePage->handle('POST', ['action' => 'continue_edit_template', 'source_version_id' => 1]);
         assertContainsValue('Edit timetable template', $fullEditor, 'Template editing did not open after creation.');
         assertNotContainsValue('name="school_name"', $fullEditor, 'Timetable editing exposed the organisation school-name field.');
         assertContainsValue('name="standard_period_minutes"', $fullEditor, 'Full timetable editing lost timing controls.');
+        assertNotContainsValue('custom_day_start', $fullEditor, 'Timetable editor still exposed custom day timing inputs.');
+        assertNotContainsValue('Custom day timings', $fullEditor, 'Timetable editor still exposed custom day timing controls.');
 
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
         $signupAccounts = new \Reqsheet\Account\AccountService($signupStore);

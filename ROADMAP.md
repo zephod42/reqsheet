@@ -77,6 +77,12 @@ Bounded usability milestone completed 2026-09-19:
 - My Account renders only the current user’s identity and supports CSRF-protected self-service password changes under the existing password policy. Identity fields remain administrator-managed.
 - Administrator Settings now contains the “Reqsheet account” placeholder section. Membership status, plans, pricing, renewals, payment management, and billing integration remain future work and must be specified before implementation.
 
+Teacher day view and timetable-settings refinement completed 2026-09-19:
+
+- The timetable settings editor now exposes the standard working-day, week-start, period, timing and separator controls without the legacy per-day custom timing UI; saved legacy timing data remains preserved by the backend.
+- The active timetable summary uses compact labelled rows for the saved working days, week start, periods, timings, separators and conjoined-period setting.
+- Teachers can open a tenant-scoped Day View from navigation or any Teacher Week View day heading. It retrieves the selected date through the existing effective-version/dated-occurrence path, shows complete planning text and multi-period ranges once, and links editing to the established teacher lesson editor.
+
 People and navigation milestone completed 2026-09-19:
 
 - Authenticated navigation now has a black general/application separator and labels the teacher destination “View My Timetable”.

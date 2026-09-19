@@ -21,6 +21,7 @@ use Reqsheet\Http\AdminTimetablePage;
 use Reqsheet\Http\ApplicationRoute;
 use Reqsheet\Http\TeacherAccess;
 use Reqsheet\Http\TeacherWeekPage;
+use Reqsheet\Http\TeacherDayPage;
 use Reqsheet\Http\AdminPeoplePage;
 use Reqsheet\Http\LoginPage;
 use Reqsheet\Http\MyAccountPage;
@@ -381,7 +382,7 @@ if ($route === ApplicationRoute::SETTINGS) {
     exit;
 }
 
-if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES], true)) {
+if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_DAY, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES], true)) {
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -406,7 +407,7 @@ if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, A
     }
 }
 
-if ($route === ApplicationRoute::TEACHER_WEEK) {
+if (in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_DAY], true)) {
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -428,20 +429,17 @@ if ($route === ApplicationRoute::TEACHER_WEEK) {
     }
     try {
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new TeacherWeekPage(
-            new TeacherPlanningService(
-                new PdoTeacherPlanningStore((new Database($config))->connection()),
-                TeacherAccess::firstDayOfWeek($environment),
-            ),
-            $user['organisation_id'],
-            $user['id'],
-            new \DateTimeImmutable('today'),
-            $user,
+        $planning = new TeacherPlanningService(
+            new PdoTeacherPlanningStore((new Database($config))->connection()),
+            TeacherAccess::firstDayOfWeek($environment),
         );
+        $page = $route === ApplicationRoute::TEACHER_DAY
+            ? new TeacherDayPage($planning, $user['organisation_id'], $user['id'], new \DateTimeImmutable('today'), $user)
+            : new TeacherWeekPage($planning, $user['organisation_id'], $user['id'], new \DateTimeImmutable('today'), $user);
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
     } catch (\Throwable $exception) {
-        $logRequestFailure('teacher-page', $exception);
+        $logRequestFailure($route === ApplicationRoute::TEACHER_DAY ? 'teacher-day-page' : 'teacher-page', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";

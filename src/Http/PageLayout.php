@@ -20,13 +20,14 @@ final class PageLayout
         $assetPath = dirname(__DIR__, 2) . '/public/assets/app.css';
         $assetVersion = is_file($assetPath) ? (string) filemtime($assetPath) : '1';
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-        $active = static fn (string $path): string => ($path === '/teacher' ? str_starts_with($currentPath, '/teacher') : $currentPath === $path) ? ' class="active" aria-current="page"' : '';
+        $active = static fn (string $path): string => ($path === '/teacher' ? in_array($currentPath, ['/teacher', '/teacher/week'], true) : $currentPath === $path) ? ' class="active" aria-current="page"' : '';
         $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet.</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
         if ($user !== null) {
             $nav .= '<li class="nav-separator" role="separator" aria-hidden="true"></li>';
             $landing = SessionAuth::landingPath($user);
             $landingLabel = $landing === '/technician' ? 'Technician' : ($landing === '/teacher' ? 'View My Timetable' : 'Settings');
             $nav .= '<li class="nav-divider"><a' . $active($landing) . ' href="' . $landing . '">' . $landingLabel . '</a></li>';
+            if (SessionAuth::hasRole($user, 'teacher')) $nav .= '<li><a' . $active('/teacher/day') . ' href="/teacher/day">Day View</a></li>';
             $admin = SessionAuth::isAdmin($user);
             $adminLink = fn (string $path, string $label): string => $admin ? '<a' . $active($path) . ' href="' . $path . '">' . $label . '</a>' : '<span class="nav-disabled" aria-disabled="true" title="Administrators only">' . $label . '</span>';
             $nav .= '<li>' . $adminLink('/settings', 'Settings') . '</li><li>' . $adminLink('/admin/people', 'People') . '</li><li>' . $adminLink('/admin/timetable', 'Timetable') . '</li>';

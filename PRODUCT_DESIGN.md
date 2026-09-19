@@ -134,7 +134,7 @@ Admin configuration should remain straightforward and editable. Organisation Set
 The same screen also offers optional settings:
 
 - A general start time and standard period length.
-- A `Custom day` facility so individual days may use different timings or period lengths.
+- A standard start time and period length for the configured teaching structure. Legacy per-day timing data remains readable for historical compatibility but is no longer exposed as a configuration control.
 - Separators/breaks with type Break, Lunchtime, or Other, the periods between which they occur, and an optional duration.
 - An `Allow conjoined periods` toggle, disabled by default. When enabled, one lesson may span any number of contiguous teaching periods. Configured breaks, lunch, and other separators prevent merging across them.
 - Primary accent colour and Secondary accent colour only. White/black base, timetable grid, automatic class colours, and technician print styling remain independent from these settings; arbitrary school CSS is not exposed.

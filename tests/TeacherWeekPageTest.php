@@ -7,6 +7,7 @@ namespace Reqsheet\Tests;
 use DateTimeImmutable;
 use Reqsheet\Http\TeacherAccess;
 use Reqsheet\Http\TeacherWeekPage;
+use Reqsheet\Http\TeacherDayPage;
 use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Teacher\TeacherPlanningStore;
 use Reqsheet\Timetable\TimetableSlot;
@@ -41,6 +42,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Previous week', $view, 'Previous-week navigation was not rendered.');
         assertContainsValue('Next week', $view, 'Next-week navigation was not rendered.');
         assertContainsValue('This week', $view, 'This-week control was not rendered.');
+        assertContainsValue('/teacher/day?date=2026-09-07', $view, 'Week day headings did not link to the teacher day view.');
         assertContainsValue('today-row', $view, 'Current day was not gently highlighted.');
         assertSameValue(true, $store->ensured, 'Teacher week did not prepare effective recurring assignments for the selected week.');
 
@@ -62,6 +64,20 @@ final class TeacherWeekPageTest
         assertContainsValue('Updated outline', $reloaded, 'Saved outline did not reload.');
         assertContainsValue('Updated requisitions', $reloaded, 'Saved requisitions did not reload.');
         assertContainsValue('Updated risk', $reloaded, 'Saved risk assessment did not reload.');
+
+        $dayPage = new TeacherDayPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-07'), ['display_name' => 'Niall Evans', 'staff_identifier' => 'NE', 'roles' => ['teacher']]);
+        $day = $dayPage->handle('GET', ['date' => '2026-09-07']);
+        assertContainsValue('Day View', $day, 'Teacher day view heading was not rendered.');
+        assertContainsValue("Today's lessons", $day, 'Teacher day view did not identify the selected day.');
+        assertContainsValue('1–2', $day, 'Multi-period lesson did not appear as a single period range.');
+        assertContainsValue('Plan the experiment', $day, 'Day view did not show the complete lesson outline.');
+        assertContainsValue('Bring goggles', $day, 'Day view did not show the complete requisition text.');
+        assertContainsValue('Wear eye protection', $day, 'Day view did not show the complete risk assessment.');
+        assertContainsValue('/teacher?date=2026-09-07&edit=500', $day, 'Day view did not reuse the existing lesson editor.');
+        assertContainsValue('Previous day', $day, 'Day view did not render previous-day navigation.');
+        assertContainsValue('type="date"', $day, 'Day view did not render a date picker.');
+        $emptyDay = $dayPage->handle('GET', ['date' => '2026-09-08']);
+        assertContainsValue('No lessons are scheduled for this date.', $emptyDay, 'Day view did not render its empty state.');
 
         $foreign = new TeacherWeekPage(new TeacherPlanningService($store), 2, 10, new DateTimeImmutable('2026-09-09'));
         assertContainsValue('Teacher does not belong to the requested organisation.', $foreign->handle('GET', [], []), 'Foreign organisation was not rejected.');
