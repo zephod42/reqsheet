@@ -45,14 +45,16 @@ final class AccountService
         string $password,
         string $confirmation,
         ?string $tenantSlug = null,
+        ?string $contactEmail = null,
     ): int {
         $this->validateIdentity($organisationName, $displayName, $role);
         $staffIdentifier = StaffIdentifier::normalise($staffIdentifier);
         $this->validatePassword($password, $confirmation);
+        $contactEmail = $this->validateContactEmail($contactEmail);
         $tenantSlug = $this->validatedTenantSlug($organisationName, $tenantSlug);
         return $this->store->createOrganisationAdmin(
             trim($organisationName), trim($displayName), $staffIdentifier, $role,
-            password_hash($password, PASSWORD_DEFAULT), $tenantSlug,
+            password_hash($password, PASSWORD_DEFAULT), $tenantSlug, $contactEmail,
         );
     }
 
@@ -173,6 +175,22 @@ final class AccountService
         $this->store->updatePassword($userId, $organisationId, password_hash($newPassword, PASSWORD_DEFAULT));
     }
 
+    public function resetPassword(int $administratorId, int $organisationId, int $userId): void
+    {
+        $admin = $this->store->findUserById($administratorId);
+        $account = $this->store->findUserById($userId);
+        if ($admin === null || (int) ($admin['organisation_id'] ?? 0) !== $organisationId || !(bool) ($admin['is_active'] ?? false) || !((bool) ($admin['is_admin'] ?? false) || in_array('administrator', (array) ($admin['roles'] ?? []), true))) {
+            throw new AccountValidationException(['You are not authorised to reset passwords.']);
+        }
+        if ($account === null || (int) ($account['organisation_id'] ?? 0) !== $organisationId || !(bool) ($account['is_active'] ?? false)) {
+            throw new AccountValidationException(['That person is not part of this organisation.']);
+        }
+        if ((bool) ($account['is_admin'] ?? false) || in_array('administrator', (array) ($account['roles'] ?? []), true)) {
+            throw new AccountValidationException(['Administrator passwords require the existing administrator recovery process.']);
+        }
+        $this->store->resetPassword($userId, $organisationId);
+    }
+
     private function validateIdentity(string $organisation, string $displayName, string $role): void
     {
         $errors = [];
@@ -186,6 +204,13 @@ final class AccountService
     {
         if (strlen($password) < self::MIN_PASSWORD_LENGTH) throw new AccountValidationException(['Password must be at least 8 characters.']);
         if ($password !== $confirmation) throw new AccountValidationException(['Password confirmation does not match.']);
+    }
+
+    private function validateContactEmail(?string $email): ?string
+    {
+        $email = $this->nullable($email);
+        if ($email !== null && filter_var($email, FILTER_VALIDATE_EMAIL) === false) throw new AccountValidationException(['Organisation contact email is invalid.']);
+        return $email;
     }
 
     private function nullable(?string $value): ?string

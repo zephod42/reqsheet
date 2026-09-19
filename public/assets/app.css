@@ -215,6 +215,11 @@ dialog .close { float: right; }
 .fixed-resource { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--primary-pale); padding: .55rem .7rem; }
 .fixed-resource span { color: var(--muted); font-size: .82rem; }
 .assignment-dialog, .resource-dialog { position: fixed; top: 50%; left: calc(10.5rem + 1rem); right: 1rem; width: auto; max-width: 38rem; max-height: calc(100vh - 3rem); margin: 0 auto; transform: translateY(-50%); }
+.room-free { display: grid; min-height: 4rem; place-items: center; color: var(--muted); font-size: .75rem; letter-spacing: .04em; }
+.technician-cell-heading { display: flex; justify-content: space-between; gap: 1rem; }
+.technician-requisition { display: block; white-space: normal; }
+.technician-week-print .technician-sheet { break-after: page; }
+@media print { .technician-week-print .technician-sheet { min-height: 100vh; break-after: page; } .technician-week-print .technician-sheet:last-child { break-after: auto; } .site-nav, .page-header, .technician-controls, .technician-room-controls, .technician-secondary { display: none !important; } }
 .assignment-dialog form, .resource-dialog form { max-width: none; margin: 0; }
 .assignment-dialog .lesson-context { margin-top: .9rem; }
 .technician-placeholder { padding-top: var(--space-5); }

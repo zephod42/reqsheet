@@ -24,6 +24,11 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
         $s = $this->pdo->prepare('SELECT id, room_code AS code FROM organisation_rooms WHERE organisation_id = :organisation_id ORDER BY room_code');
         $s->execute(['organisation_id' => $organisationId]); return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'code' => (string) $r['code']], $s->fetchAll());
     }
+    public function workingDays(int $organisationId): array
+    {
+        $s = $this->pdo->prepare('SELECT working_days FROM organisation_settings WHERE organisation_id = :id'); $s->execute(['id' => $organisationId]);
+        $value = $s->fetchColumn(); return $value === false ? [1, 2, 3, 4, 5] : array_values(array_filter(array_map('intval', explode(',', (string) $value)), static fn (int $day): bool => $day >= 1 && $day <= 7));
+    }
 
     public function teachersForOrganisation(int $organisationId): array
     {
@@ -62,7 +67,7 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
             foreach ($this->roomsForOrganisation($organisationId) as $room) if (in_array((int) $room['id'], $roomIds, true)) $codes[] = $room['code'];
             $roomSql = $codes === [] ? ' AND 1 = 0' : ' AND o.snapshot_room_code IN (' . implode(',', array_fill(0, count($codes), '?')) . ')';
         } else $codes = [];
-        $sql = 'SELECT o.id, o.lesson_date, o.snapshot_teacher_user_id, u.display_name AS teacher_name, o.snapshot_class_code, o.snapshot_room_code, o.snapshot_start_slot_id, o.snapshot_duration_periods, s.sequence_number, s.label AS period_label, r.state, r.requirements_text, r.planning_notes, r.risk_assessment_text FROM lesson_occurrences o JOIN users u ON u.id = o.snapshot_teacher_user_id JOIN timetable_slots s ON s.id = o.snapshot_start_slot_id LEFT JOIN requisitions r ON r.lesson_occurrence_id = o.id WHERE o.organisation_id = ? AND o.lesson_date = ?' . $roomSql . ' ORDER BY s.sequence_number, o.snapshot_room_code, o.id';
+        $sql = 'SELECT o.id, o.lesson_date, o.snapshot_teacher_user_id, u.display_name AS teacher_name, u.staff_identifier AS teacher_initials, o.snapshot_class_code, o.snapshot_room_code, o.snapshot_start_slot_id, o.snapshot_duration_periods, s.sequence_number, s.label AS period_label, r.state, r.requirements_text, r.planning_notes, r.risk_assessment_text FROM lesson_occurrences o JOIN users u ON u.id = o.snapshot_teacher_user_id JOIN timetable_slots s ON s.id = o.snapshot_start_slot_id LEFT JOIN requisitions r ON r.lesson_occurrence_id = o.id WHERE o.organisation_id = ? AND o.lesson_date = ?' . $roomSql . ' ORDER BY s.sequence_number, o.snapshot_room_code, o.id';
         $statement = $this->pdo->prepare($sql); $statement->execute(array_merge([$organisationId, $date->format('Y-m-d')], $codes));
         return ['version' => $version, 'slots' => $slots, 'occurrences' => $statement->fetchAll()];
     }

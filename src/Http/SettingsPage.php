@@ -24,14 +24,14 @@ final class SettingsPage
         $message = null;
         if ($method === 'POST') {
             try {
-                $this->settings->save($this->organisationId, $input);
-                $message = 'Settings saved.';
+                if (($input['action'] ?? '') === 'save_contact_email') { if (!CsrfToken::valid($input['csrf_token'] ?? null)) throw new SettingsValidationException(['The form expired. Please try again.']); $this->settings->saveContactEmail($this->organisationId, (string) ($input['contact_email'] ?? '')); $message = 'Contact email saved.'; }
+                else { $this->settings->save($this->organisationId, $input); $message = 'Settings saved.'; }
             } catch (SettingsValidationException $exception) {
                 $message = implode(' ', $exception->errors());
             }
         }
         $data = $this->settings->load($this->organisationId);
-        return PageLayout::render('Settings', $this->form($data, $message) . $this->accountSection(), $this->user);
+        return PageLayout::render('Settings', $this->form($data, $message) . $this->contactSection() . $this->accountSection(), $this->user);
     }
 
     /** @param array<string, mixed> $input */
@@ -63,8 +63,8 @@ final class SettingsPage
                     $label = trim((string) ($input['template_label'] ?? ''));
                     if ($source === 0) $data = array_replace($data, ['working_days' => $input['working_days'] ?? [], 'first_day_of_week' => $input['first_day_of_week'] ?? 0, 'periods_per_day' => $input['periods_per_day'] ?? 0]);
                     $service = new TimetableTemplateService($this->timetable);
-                    if ($source > 0) { $service->update($this->organisationId, $source, $label, $data); $message = 'Timetable template updated.'; }
-                    else { $id = $service->create($this->organisationId, null, $label, null, $data); $message = 'Timetable template saved as version ' . $id . '.'; }
+                    if ($source > 0) { $service->update($this->organisationId, $source, $label, $data); $message = 'Timetable saved.'; }
+                    else { $service->create($this->organisationId, null, $label, null, $data); $message = 'Timetable saved.'; }
                 } catch (SettingsValidationException | \Reqsheet\Timetable\TimetableValidationException $exception) {
                     $message = implode(' ', $exception->errors());
                     $editor = ((int) ($input['source_version_id'] ?? 0)) > 0 ? 'edit' : 'create';
@@ -85,7 +85,7 @@ final class SettingsPage
         $timetable = $this->timetable;
         $templateService = new TimetableTemplateService($timetable);
         $active = $templateService->activeTemplate($this->organisationId);
-        $notice = $message === null ? '' : '<p class="notice ' . (str_starts_with($message, 'Timetable template saved') || $message === 'Timetable activated.' ? '' : 'error') . '">' . $this->e($message) . '</p>';
+        $notice = $message === null ? '' : '<p class="notice ' . (str_starts_with($message, 'Timetable saved') || $message === 'Timetable activated.' ? '' : 'error') . '">' . $this->e($message) . '</p>';
         $body = '<section class="content-narrow"><h1>Settings</h1><p>Organisation settings and timetable templates.</p>' . $notice;
         if ($editor === 'warning') {
             $target = $targetVersionId > 0 ? $timetable->findVersion($targetVersionId) : ($active['version'] ?? null);
@@ -100,7 +100,7 @@ final class SettingsPage
             $body .= $this->templateList($timetable->versionsForOrganisation($this->organisationId), $active['version']->id ?? null);
             $body .= '<div class="form-actions"><form method="post"><input type="hidden" name="action" value="create_template"><button>Create new timetable template</button></form></div>';
         }
-        return $body . $this->accountSection() . '</section>';
+        return $body . $this->contactSection() . $this->accountSection() . '</section>';
     }
 
     private function templateList(array $versions, ?int $activeId): string
@@ -221,5 +221,10 @@ final class SettingsPage
     private function accountSection(): string
     {
         return '<section class="settings-section account-management"><h2>Reqsheet account</h2><p>This school’s membership and account with the Reqsheet service.</p><p class="notice">Membership and payment management will be available here.</p></section>';
+    }
+
+    private function contactSection(): string
+    {
+        return '<section class="settings-section"><h2>Contact email</h2><p>This organisation-level address is used for school contact, not as a requirement for individual staff accounts.</p><form method="post"><input type="hidden" name="action" value="save_contact_email"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><label>Contact email<input type="email" name="contact_email" value="' . $this->e((string) ($this->settings->contactEmail($this->organisationId) ?? '')) . '"></label><button>Save contact email</button></form></section>';
     }
 }

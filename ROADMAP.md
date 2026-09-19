@@ -22,6 +22,15 @@ Agreed design decisions recorded on 2026-09-18:
 - Settings direction: required school name, working days/week start, and six default periods; rooms are created in the timetable builder, while optional general/custom-day timings, typed separators, and disabled-by-default conjoined-period support remain configurable later without blocking initial setup.
 - Visual and lesson-editing direction: restrained black-and-white Reqsheet chrome with technical timetable typography, neutral teacher grid with soft pastel lesson cards and consistent subtle class accents, neutral technician screen/black-and-white print, and a large lesson pop-out for exactly three free-text planning fields with an explicit `Nothing required` action. The pilot visual pass is implemented; further iteration remains expected.
 
+Staff account and pilot workflow refinement completed 2026-09-19:
+
+- Known tenant roots route to school login while recognised base roots retain the public landing page.
+- People creates email-free staff accounts with explicit awaiting-first-login state; staff choose a password after initials-plus-blank-password entry, and administrators can reset ordinary staff accounts with tenant-scoped CSRF protection and session revocation.
+- Organisation signup collects an organisation contact email, editable under Settings; it is not an individual staff requirement.
+- Technician day/week labels and selected-week browser printing use configured working days, while room display defaults to all rooms and no longer exposes personal room saving.
+
+The pilot first-login workflow retains an account-claiming risk: anyone who knows a newly created staff member’s initials may claim the account before the intended person. It is not identity verification and remains unsuitable as a final public authentication design.
+
 Upcoming implementation sequence:
 
 1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, account/password workflows, technician workflows, and printing with representative schools.

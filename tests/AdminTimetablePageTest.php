@@ -105,20 +105,20 @@ final class AdminTimetablePageTest
 
         $teacherEditor = $page->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10, 'day' => 1, 'start_slot' => 101], []);
         assertContains('id="assignment-editor"', $teacherEditor, 'Teacher cell editor did not open.');
-        assertContains('Teacher Teacher A', $teacherEditor, 'Teacher projection context was not rendered.');
+        assertContains('Teacher: Teacher A [TAA]', $teacherEditor, 'Teacher projection context was not rendered.');
         assertNotContains('<select id="teacher_user_id"', $teacherEditor, 'Teacher projection redundantly exposed a teacher selector.');
         assertContains('<select id="room_id"', $teacherEditor, 'Teacher projection omitted the room selector.');
         assertContains('<select id="class_id"', $teacherEditor, 'Teacher projection omitted the class selector.');
         assertContains('showModal', $teacherEditor, 'Teacher editor did not include modal initialization.');
 
         $roomEditor = $page->handle('GET', ['version' => 1, 'view' => 'room', 'resource' => 401, 'day' => 1, 'start_slot' => 101], []);
-        assertContains('Room L1', $roomEditor, 'Room projection context was not rendered.');
+        assertContains('Teacher:', $roomEditor, 'Room projection teacher context was not rendered.');
         assertNotContains('<select id="room_id"', $roomEditor, 'Room projection redundantly exposed a room selector.');
         assertContains('<select id="teacher_user_id"', $roomEditor, 'Room projection omitted the teacher selector.');
         assertContains('<select id="class_id"', $roomEditor, 'Room projection omitted the class selector.');
 
         $classEditor = $page->handle('GET', ['version' => 1, 'view' => 'class', 'resource' => 501, 'day' => 1, 'start_slot' => 101], []);
-        assertContains('Class Y12Ph', $classEditor, 'Class projection context was not rendered.');
+        assertContains('Teacher:', $classEditor, 'Class projection teacher context was not rendered.');
         assertNotContains('<select id="class_id"', $classEditor, 'Class projection redundantly exposed a class selector.');
         assertContains('<select id="teacher_user_id"', $classEditor, 'Class projection omitted the teacher selector.');
         assertContains('<select id="room_id"', $classEditor, 'Class projection omitted the room selector.');

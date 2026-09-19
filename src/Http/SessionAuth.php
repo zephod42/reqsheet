@@ -32,6 +32,7 @@ final class SessionAuth
             'operational_role' => isset($account['operational_role']) ? (string) $account['operational_role'] : null,
             'is_admin' => (bool) ($account['is_admin'] ?? false),
             'roles' => array_values(array_unique(array_map('strval', (array) ($account['roles'] ?? [])))),
+            'auth_version' => (int) ($account['auth_version'] ?? 1),
         ];
     }
 
@@ -53,6 +54,7 @@ final class SessionAuth
             'operational_role' => isset($user['operational_role']) ? (string) $user['operational_role'] : null,
             'is_admin' => (bool) ($user['is_admin'] ?? false),
             'roles' => array_values(array_unique(array_map('strval', (array) ($user['roles'] ?? [])))),
+            'auth_version' => (int) ($user['auth_version'] ?? 1),
         ];
     }
 

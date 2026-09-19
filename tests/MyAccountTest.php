@@ -52,8 +52,9 @@ final class MyAccountStore implements AccountStore
     public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, ?string $email, array $roles): int { return 8; }
     public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, ?string $email, array $roles): void {}
     public function createFirstOrganisation(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { return 3; }
-    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { return 3; }
+    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = '', ?string $contactEmail = null): int { return 3; }
     public function createUser(int $organisationId, string $displayName, ?string $staffIdentifier, string $role, bool $isAdmin): int { return 8; }
     public function claimFirstLogin(int $userId, string $passwordHash): void {}
     public function updatePassword(int $userId, int $organisationId, string $passwordHash): void { $this->account['password_hash'] = $passwordHash; }
+    public function resetPassword(int $userId, int $organisationId): void { $this->account['password_hash'] = null; $this->account['account_state'] = 'awaiting_first_login'; }
 }

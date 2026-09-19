@@ -84,6 +84,17 @@ try {
 
 $tenantOrganisationId = $tenantContext?->organisation['id'] ?? null;
 $currentUser = SessionAuth::current();
+if ($currentUser !== null) {
+    try {
+        $sessionAccount = (new PdoAccountStore((new Database(DatabaseConfig::fromEnvironment($environment)))->connection()))->findUserById((int) $currentUser['id']);
+        if ($sessionAccount === null || !(bool) ($sessionAccount['is_active'] ?? false) || (int) ($sessionAccount['organisation_id'] ?? 0) !== (int) $currentUser['organisation_id'] || (int) ($sessionAccount['auth_version'] ?? 1) !== (int) ($currentUser['auth_version'] ?? 1)) {
+            SessionAuth::logout();
+            $currentUser = null;
+        }
+    } catch (\Throwable) {
+        // Existing public routing behaviour remains available when no runtime database is configured.
+    }
+}
 if ($tenantOrganisationId !== null && $currentUser !== null && (int) $currentUser['organisation_id'] !== (int) $tenantOrganisationId) {
     http_response_code(404);
     header('Content-Type: text/plain; charset=UTF-8');
@@ -140,6 +151,10 @@ if ($route === ApplicationRoute::LOGIN) {
 }
 
 if ($route === ApplicationRoute::ROOT) {
+    if ($tenantOrganisationId !== null) {
+        header('Location: /login', true, 302);
+        exit;
+    }
     header('Content-Type: text/html; charset=UTF-8');
     echo (new HomePage())->render($currentUser);
     exit;

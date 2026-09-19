@@ -47,6 +47,7 @@ interface AccountStore extends TenantStore
         string $role,
         string $passwordHash,
         string $tenantSlug = '',
+        ?string $contactEmail = null,
     ): int;
 
     public function createUser(
@@ -60,4 +61,6 @@ interface AccountStore extends TenantStore
     public function claimFirstLogin(int $userId, string $passwordHash): void;
 
     public function updatePassword(int $userId, int $organisationId, string $passwordHash): void;
+
+    public function resetPassword(int $userId, int $organisationId): void;
 }

@@ -25,6 +25,11 @@ final class AdminPeoplePage
                 $error = true;
             } else {
                 try {
+                    if (($input['action'] ?? '') === 'reset_password') {
+                        if (($input['confirm_reset'] ?? '') !== 'yes') throw new AccountValidationException(['Confirm the password reset before continuing.']);
+                        $this->accounts->resetPassword((int) ($this->user['id'] ?? 0), $this->organisationId, (int) ($input['person_id'] ?? 0));
+                        $message = 'Password reset. The account is ready for initial password setup.';
+                    } else {
                     $roles = is_array($input['roles'] ?? null) ? array_values(array_map('strval', $input['roles'])) : [];
                     $email = isset($input['email']) ? (string) $input['email'] : null;
                     if (($input['action'] ?? '') === 'edit') {
@@ -33,6 +38,7 @@ final class AdminPeoplePage
                     } else {
                         $id = $this->accounts->createPerson($this->organisationId, (string) ($input['display_name'] ?? ''), (string) ($input['staff_identifier'] ?? ''), $email, $roles);
                         $message = 'Person created. They can set a password on first login.';
+                    }
                     }
                 } catch (AccountValidationException $exception) {
                     $message = implode(' ', $exception->errors());
@@ -52,7 +58,8 @@ final class AdminPeoplePage
         foreach ($people as $person) {
             $id = (int) $person['id'];
             $roles = $this->roles($person);
-            $rows .= '<tr><th scope="row">' . $this->e((string) $person['display_name']) . '</th><td>' . (!empty($person['staff_identifier']) ? $this->e((string) $person['staff_identifier']) : '<span class="muted">—</span>') . '</td><td>' . (!empty($person['email']) ? $this->e((string) $person['email']) : '<span class="muted">Not entered</span>') . '</td><td>' . $this->e($this->roleLabels($roles)) . '</td><td><button type="button" class="secondary" data-open-dialog="person-' . $id . '">Edit</button></td></tr>';
+            $reset = ($person['is_admin'] ?? false) ? '' : '<form method="post" class="inline-form" onsubmit="return confirm(\'Reset this password?\')"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="reset_password"><input type="hidden" name="person_id" value="' . $id . '"><input type="hidden" name="confirm_reset" value="yes"><button type="submit" class="secondary">Reset password</button></form>';
+            $rows .= '<tr><th scope="row">' . $this->e((string) $person['display_name']) . '</th><td>' . (!empty($person['staff_identifier']) ? $this->e((string) $person['staff_identifier']) : '<span class="muted">—</span>') . '</td><td>' . (!empty($person['email']) ? $this->e((string) $person['email']) : '<span class="muted">Not entered</span>') . '</td><td>' . $this->e($this->roleLabels($roles)) . '</td><td><button type="button" class="secondary" data-open-dialog="person-' . $id . '">' . 'Edit</button>' . $reset . '</td></tr>';
             $dialogs .= str_replace('pattern="[A-Za-z]{3}" autocomplete="username"', 'pattern="[A-Z]{3}" title="Please use three capital letters." autocomplete="username"', $this->personDialog($person, $roles));
         }
         if ($rows === '') $rows = '<tr><td colspan="5">No people have been added yet.</td></tr>';

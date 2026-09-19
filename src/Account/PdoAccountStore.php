@@ -56,7 +56,7 @@ final class PdoAccountStore implements AccountStore
     {
         $statement = $this->prepare(
             'SELECT id, organisation_id, display_name, staff_identifier, email, operational_role, is_admin,
-                    is_teacher, is_technician, teacher_number, password_hash, account_state, is_active
+                    is_teacher, is_technician, teacher_number, password_hash, account_state, auth_version, is_active
              FROM users WHERE staff_identifier = :login
                AND (:organisation_id_filter IS NULL OR organisation_id = :organisation_id_match)
              ORDER BY id LIMIT 1',
@@ -70,7 +70,7 @@ final class PdoAccountStore implements AccountStore
     {
         $statement = $this->prepare(
             'SELECT id, organisation_id, display_name, staff_identifier, email, operational_role, is_admin,
-                    is_teacher, is_technician, teacher_number, password_hash, account_state, is_active
+                    is_teacher, is_technician, teacher_number, password_hash, account_state, auth_version, is_active
              FROM users WHERE id = :id LIMIT 1',
         );
         $statement->execute(['id' => $userId]);
@@ -82,7 +82,7 @@ final class PdoAccountStore implements AccountStore
     {
         $statement = $this->prepare(
             'SELECT id, organisation_id, display_name, staff_identifier, email, operational_role, is_admin,
-                    is_teacher, is_technician, teacher_number, password_hash, account_state, is_active
+                    is_teacher, is_technician, teacher_number, password_hash, account_state, auth_version, is_active
              FROM users WHERE organisation_id = :organisation_id ORDER BY display_name, id',
         );
         $statement->execute(['organisation_id' => $organisationId]);
@@ -142,11 +142,11 @@ final class PdoAccountStore implements AccountStore
         }
     }
 
-    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
+    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = '', ?string $contactEmail = null): int
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin organisation signup.');
         try {
-            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash, $tenantSlug);
+            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash, $tenantSlug, $contactEmail);
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete organisation signup.');
             return $organisationId;
         } catch (\Throwable $exception) {
@@ -165,7 +165,7 @@ final class PdoAccountStore implements AccountStore
     public function claimFirstLogin(int $userId, string $passwordHash): void
     {
         $statement = $this->prepare(
-            "UPDATE users SET password_hash = :password_hash, account_state = 'claimed'
+            "UPDATE users SET password_hash = :password_hash, account_state = 'claimed', auth_version = auth_version + 1
              WHERE id = :id AND is_active = TRUE
                AND account_state = 'awaiting_first_login' AND password_hash IS NULL",
         );
@@ -176,11 +176,18 @@ final class PdoAccountStore implements AccountStore
     public function updatePassword(int $userId, int $organisationId, string $passwordHash): void
     {
         $statement = $this->prepare(
-            "UPDATE users SET password_hash = :password_hash, account_state = 'claimed'
+            "UPDATE users SET password_hash = :password_hash, account_state = 'claimed', auth_version = auth_version + 1
              WHERE id = :id AND organisation_id = :organisation_id AND is_active = TRUE",
         );
         $statement->execute(['id' => $userId, 'organisation_id' => $organisationId, 'password_hash' => $passwordHash]);
         if ($statement->rowCount() !== 1) throw new AccountValidationException(['This account is unavailable.']);
+    }
+
+    public function resetPassword(int $userId, int $organisationId): void
+    {
+        $statement = $this->prepare("UPDATE users SET password_hash = NULL, account_state = 'awaiting_first_login', auth_version = auth_version + 1 WHERE id = :id AND organisation_id = :organisation_id AND is_active = TRUE AND is_admin = FALSE");
+        $statement->execute(['id' => $userId, 'organisation_id' => $organisationId]);
+        if ($statement->rowCount() !== 1) throw new AccountValidationException(['That person is not available for password reset.']);
     }
 
     private function prepare(string $sql): PDOStatement
@@ -208,6 +215,7 @@ final class PdoAccountStore implements AccountStore
             'teacher_number' => $row['teacher_number'] === null ? null : (int) $row['teacher_number'],
             'password_hash' => $row['password_hash'] === null ? null : (string) $row['password_hash'],
             'account_state' => (string) $row['account_state'], 'is_active' => (bool) $row['is_active'],
+            'auth_version' => (int) ($row['auth_version'] ?? 1),
         ];
     }
 
@@ -247,10 +255,10 @@ final class PdoAccountStore implements AccountStore
         }
     }
 
-    private function insertOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug): int
+    private function insertOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug, ?string $contactEmail = null): int
     {
-        $organisation = $this->prepare('INSERT INTO organisations (name, tenant_slug) VALUES (:name, :tenant_slug)');
-        $organisation->execute(['name' => $organisationName, 'tenant_slug' => $tenantSlug]);
+        $organisation = $this->prepare('INSERT INTO organisations (name, tenant_slug, contact_email) VALUES (:name, :tenant_slug, :contact_email)');
+        $organisation->execute(['name' => $organisationName, 'tenant_slug' => $tenantSlug, 'contact_email' => $contactEmail]);
         $organisationId = (int) $this->pdo->lastInsertId();
         $user = $this->prepare(
             'INSERT INTO users
