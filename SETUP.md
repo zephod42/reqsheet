@@ -131,6 +131,8 @@ The public HTTPS routing has been verified by an administrator: `GET /`, `GET /l
 
 The skeletal admin timetable editor requires a logged-in account with Admin permission and uses the session organisation; it no longer relies on an environment-selected user or organisation. It supports staff, room, and day inspection plus validated recurring-lesson creation/editing/removal. Lessons with historical occurrences are immutable.
 
+For a selected template, **Export Blank CSV** downloads the canonical `Day,Period,Room,Class,Teacher` structure from `/admin/timetable/export.csv`. The export contains current organisation rooms and teaching slots only; Class and Teacher are blank and existing lessons are deliberately ignored. At least one room and one teaching period are required. CSV import/preview/commit is documented in `TIMETABLE_CSV.md` but is not implemented in this milestone.
+
 The skeletal teacher week view requires a logged-in Teacher account. Open `/teacher` (or `/teacher/week`) through the local server or protected vhost to review the current configured week. On load, the view uses the effective timetable version and materialises missing dated occurrences for that selected week through the existing occurrence generator; planning/requisition data remains stored against those dated snapshots. `REQSHEET_FIRST_DAY_OF_WEEK` may be supplied as an ISO weekday number for temporary development review and defaults to `1` (Monday); it remains scaffolding until organisation timetable settings own it.
 
 ## Pilot first-run setup and login

@@ -7,6 +7,7 @@ require __DIR__ . '/ExternalEnvironmentTest.php';
 require __DIR__ . '/RoutingTest.php';
 require __DIR__ . '/TimetableConfigurationTest.php';
 require __DIR__ . '/AdminTimetablePageTest.php';
+require __DIR__ . '/BlankTimetableCsvExporterTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
 require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
 require __DIR__ . '/AccountTest.php';
@@ -195,6 +196,7 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\ExternalEnvironmentTest::run();
 \Reqsheet\Tests\RoutingTest::run();
 \Reqsheet\Tests\AdminTimetablePageTest::run();
+\Reqsheet\Tests\BlankTimetableCsvExporterTest::run();
 \Reqsheet\Tests\AccountTest::run();
 \Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();

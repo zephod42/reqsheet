@@ -13,6 +13,7 @@ use Reqsheet\Account\PdoAccountStore;
 use Reqsheet\Auth\OnboardingHandoffService;
 use Reqsheet\Auth\PdoOnboardingHandoffStore;
 use Reqsheet\Http\AdminAccess;
+use Reqsheet\Http\AdminTimetableCsvExport;
 use Reqsheet\Http\AdminTimetablePage;
 use Reqsheet\Http\ApplicationRoute;
 use Reqsheet\Http\TeacherAccess;
@@ -37,6 +38,8 @@ use Reqsheet\Teacher\PdoTeacherPlanningStore;
 use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Technician\PdoTechnicianPlanningStore;
 use Reqsheet\Timetable\PdoTimetableConfigurationStore;
+use Reqsheet\Timetable\BlankTimetableCsvExporter;
+use Reqsheet\Timetable\TimetableCsvExportException;
 use Reqsheet\Settings\PdoOrganisationSettingsStore;
 use Reqsheet\Settings\SettingsService;
 
@@ -369,7 +372,7 @@ if ($route === ApplicationRoute::SETTINGS) {
     exit;
 }
 
-if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE], true)) {
+if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT], true)) {
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -476,6 +479,49 @@ if ($route === ApplicationRoute::ADMIN_PEOPLE) {
         echo $page->handle($method, $_POST);
     } catch (\Throwable $exception) {
         $logRequestFailure('people-page', $exception);
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if ($route === ApplicationRoute::ADMIN_TIMETABLE_EXPORT) {
+    $user = SessionAuth::current();
+    if (!SessionAuth::isAdmin($user)) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    $versionId = (int) ($_GET['version'] ?? 0);
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $export = (new AdminTimetableCsvExport(
+            new BlankTimetableCsvExporter(new PdoTimetableConfigurationStore((new Database($config))->connection())),
+            (int) $user['organisation_id'],
+            $user,
+        ))->create($versionId);
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $export->filename . '"');
+        header('Cache-Control: no-store, private, max-age=0');
+        header('X-Content-Type-Options: nosniff');
+        echo $export->content;
+    } catch (TimetableCsvExportException $exception) {
+        if ($exception->reason === TimetableCsvExportException::VERSION_UNAVAILABLE) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo "Timetable template not found\n";
+        } elseif ($exception->reason === TimetableCsvExportException::UNAUTHORISED) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo "Administrator access required\n";
+        } else {
+            header('Location: /admin/timetable?version=' . $versionId . '&csv_error=' . rawurlencode($exception->reason), true, 302);
+        }
+    } catch (\Throwable $exception) {
+        $logRequestFailure('timetable-csv-export', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";

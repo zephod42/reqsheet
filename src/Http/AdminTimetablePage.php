@@ -100,6 +100,11 @@ final class AdminTimetablePage
 
     private function resourcePage(ResourceTimetableStore $store, array $versions, ?TimetableVersion $version, array $query, ?string $message): string
     {
+        $message ??= match ((string) ($query['csv_error'] ?? '')) {
+            'no_rooms' => 'Add at least one room before exporting a blank timetable CSV.',
+            'no_teaching_periods' => 'The selected timetable has no teaching periods to export.',
+            default => null,
+        };
         $requestedView = (string) ($query['view'] ?? 'teacher');
         $view = in_array($requestedView, ['teacher', 'room', 'class'], true) ? $requestedView : 'teacher';
         $users = $store->usersForOrganisation($this->organisationId);
@@ -107,7 +112,7 @@ final class AdminTimetablePage
         $classes = $store->classesForOrganisation($this->organisationId);
         $resource = (int) ($query['resource'] ?? 0);
         if ($resource < 1) $resource = $view === 'teacher' ? (int) ($users[0]['id'] ?? 0) : ($view === 'room' ? (int) ($rooms[0]['id'] ?? 0) : (int) ($classes[0]['id'] ?? 0));
-        $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable builder</h1></div><a class="button" href="/admin/people">Manage people</a></section>';
+        $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable builder</h1></div><div class="form-actions">' . ($version === null ? '' : '<a class="button secondary" href="/admin/timetable/export.csv?version=' . $version->id . '">Export Blank CSV</a>') . '<a class="button" href="/admin/people">Manage people</a></div></section>';
         $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
         $body .= $this->resourceToolbar($versions, $version?->id, $view, $resource, $users, $rooms, $classes);
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
@@ -337,11 +342,16 @@ final class AdminTimetablePage
     /** @param list<TimetableVersion> $versions @param array<string, mixed> $query */
     private function page(array $versions, ?TimetableVersion $version, array $query, ?string $message): string
     {
+        $message ??= match ((string) ($query['csv_error'] ?? '')) {
+            'no_rooms' => 'Add at least one room before exporting a blank timetable CSV.',
+            'no_teaching_periods' => 'The selected timetable has no teaching periods to export.',
+            default => null,
+        };
         $users = $version === null ? [] : $this->store->usersForOrganisation($this->organisationId);
         $selectedTeacher = (int) ($query['teacher'] ?? $query['staff'] ?? ($users[0]['id'] ?? 0));
         $selectedTeacher = $this->validTeacher($selectedTeacher, $users) ? $selectedTeacher : (int) ($users[0]['id'] ?? 0);
         $selectedEdit = (int) ($query['edit'] ?? 0);
-        $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable editor</h1></div><a class="button" href="/admin/people">Manage people</a></section>';
+        $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable editor</h1></div><div class="form-actions">' . ($version === null ? '' : '<a class="button secondary" href="/admin/timetable/export.csv?version=' . $version->id . '">Export Blank CSV</a>') . '<a class="button" href="/admin/people">Manage people</a></div></section>';
         $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
         $body .= '<form class="toolbar" method="get"><label>Timetable version ' . $this->versionSelect($versions, $version?->id) . '</label><label>Teacher / staff member ' . $this->selectFromRows('teacher', $selectedTeacher, $users) . '</label><button>Show week</button></form>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';

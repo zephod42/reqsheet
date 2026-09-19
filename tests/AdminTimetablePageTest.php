@@ -99,6 +99,8 @@ final class AdminTimetablePageTest
         assertContains('Lunch', $grid, 'Lunch separator label was not rendered.');
         assertContains('Lab meeting', $grid, 'Custom separator label was not rendered.');
         assertContains('admin-resource-grid', $grid, 'Resource grid was not rendered.');
+        assertContains('/admin/timetable/export.csv?version=1', $grid, 'Selected timetable did not expose the blank CSV export action.');
+        assertContains('Export Blank CSV', $grid, 'Blank CSV export action used the wrong label.');
         assertContains('<h2>Teacher A</h2>', $grid, 'Selected teacher heading did not show the resource name.');
         assertNotContains('Versioned timetable by teacher/class/room', $grid, 'Redundant generic timetable heading remained.');
         assertContains('class="empty-period"', $grid, 'Empty teaching cells were not clickable.');
@@ -141,6 +143,9 @@ final class AdminTimetablePageTest
         assertContains('Lesson removed.', $deleted, 'Resource assignment deletion was not handled.');
         $page->handle('POST', [], ['action' => 'resource_delete_lesson', 'version' => 1, 'view' => 'class', 'resource' => 501, 'lesson_id' => $store->lessons[0]->id]);
         assertSameValue([], $store->lessons, 'Deleted resource assignment remained in the store.');
+
+        $missingRooms = $page->handle('GET', ['version' => 1, 'csv_error' => 'no_rooms'], []);
+        assertContains('Add at least one room before exporting', $missingRooms, 'Missing-room CSV export guidance was not rendered.');
     }
 }
 
@@ -150,9 +155,11 @@ final class ResourceConfigurationStore extends ConfigurationStore implements Res
     public array $rooms = [];
     /** @var list<array{id:int,code:string}> */
     public array $classes = [];
+    public int $lessonReads = 0;
 
-    public function roomsForOrganisation(int $organisationId): array { return $this->rooms; }
+    public function roomsForOrganisation(int $organisationId): array { return array_values(array_filter($this->rooms, static fn (array $room): bool => !isset($room['organisation_id']) || (int) $room['organisation_id'] === $organisationId)); }
     public function classesForOrganisation(int $organisationId): array { return $this->classes; }
+    public function lessonsForVersion(int $versionId): array { $this->lessonReads++; return parent::lessonsForVersion($versionId); }
     public function createRoom(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->rooms[] = ['id' => $id, 'code' => trim($code)]; return $id; }
     public function createClass(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->classes[] = ['id' => $id, 'code' => trim($code)]; return $id; }
     public function createTeacher(int $organisationId, string $code, string $displayName): int { $id = $this->nextResourceId(); $this->users[] = ['id' => $id, 'display_name' => $displayName !== '' ? $displayName : $code, 'staff_identifier' => $code, 'is_active' => true]; $this->teachers[$id] = $organisationId; return $id; }

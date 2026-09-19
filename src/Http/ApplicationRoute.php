@@ -14,6 +14,7 @@ final class ApplicationRoute
     public const CONTACT = 'contact';
     public const HEALTH = 'health';
     public const ADMIN_TIMETABLE = 'admin_timetable';
+    public const ADMIN_TIMETABLE_EXPORT = 'admin_timetable_export';
     public const TEACHER_WEEK = 'teacher_week';
     public const SETUP = 'setup';
     public const LOGIN = 'login';
@@ -31,6 +32,9 @@ final class ApplicationRoute
         }
         if ($path === '/admin/timetable') {
             return self::ADMIN_TIMETABLE;
+        }
+        if ($method === 'GET' && $path === '/admin/timetable/export.csv') {
+            return self::ADMIN_TIMETABLE_EXPORT;
         }
         if ($path === '/teacher' || $path === '/teacher/week') {
             return self::TEACHER_WEEK;

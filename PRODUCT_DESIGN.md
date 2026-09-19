@@ -160,6 +160,8 @@ Settings creates or safely edits timetable templates from the current structure;
 
 Reqsheet supports one canonical Reqsheet CSV format. It does not implement SIMS, Arbor, iSAMS, or other MIS-specific parsers.
 
+The canonical columns are exactly `Day,Period,Room,Class,Teacher`. Blank export produces one row for each selected-template teaching slot and current organisation room, populates only Day, Period and Room, and never reads or exports assignments, class codes, teacher codes, occurrences, requisitions, planning notes, risk assessments, or student data. Non-teaching separators are excluded. Import is initially limited to an empty selected timetable and must not activate it.
+
 The intended workflow is:
 
 1. Build the timetable structure in Reqsheet.

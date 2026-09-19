@@ -39,6 +39,12 @@ Technician and timetable presentation refinement completed 2026-09-19:
 - Teacher multi-period cards fill their row-spanned planner cells, and all resource-builder lesson modes return to the builder after successful creation.
 - Base-domain requests remain public splash pages even when a tenant session cookie is present; tenant hosts continue to route to tenant login.
 
+Canonical timetable CSV milestone 1 completed 2026-09-19:
+
+- An organisation administrator can export the selected template as the exact five-column `Day,Period,Room,Class,Teacher` CSV.
+- Export includes only ordered teaching slots and current organisation rooms; Class and Teacher remain blank, separators are omitted, and existing assignments or historical planning data are never queried.
+- The later import is documented as deterministic upload/validation, no-write preview, and a separately confirmed atomic insert into the existing recurring-lesson model. Empty-template revalidation and manual activation remain mandatory boundaries.
+
 Upcoming implementation sequence:
 
 1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, account/password workflows, technician workflows, and printing with representative schools.
@@ -47,7 +53,7 @@ Upcoming implementation sequence:
 4. Production deployment configuration: application support for `reqsheet.com` plus retained DuckDNS domains is implemented; DNS/web-server wildcard acceptance and production TLS coverage remain administrator deployment work.
 5. Teacher lesson duplication: accessible copy workflows for visible and future lessons, overwrite confirmation, and practical undo.
 6. Admin theme settings: exactly Primary and Secondary accent values, centrally applied without arbitrary CSS or coupling to class/grid/print colours.
-7. Canonical timetable CSV import/export: Reqsheet template export, deterministic validation/preview, and confirmed import.
+7. Canonical timetable CSV import: deterministic parsing and validation, no-write preview, and separately confirmed atomic import into an empty template. Blank export is complete.
 8. Authentication/authorization security hardening: replace pilot access and first-login handling with reviewed production mechanisms.
 9. Pilot-driven UI iteration and polish: improve wording, layout, and workflow while preserving the simple server-rendered architecture.
 
