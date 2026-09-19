@@ -14,6 +14,8 @@ interface TeacherPlanningStore
 
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion;
 
+    public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void;
+
     /** @return list<TimetableSlot> */
     public function slotsForVersion(int $versionId): array;
 

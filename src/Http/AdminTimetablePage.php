@@ -13,6 +13,7 @@ use Reqsheet\Timetable\TimetableValidationException;
 use Reqsheet\Timetable\TimetableVersion;
 use Reqsheet\Timetable\TimetableVersionService;
 use Reqsheet\Timetable\TimetableSlotService;
+use Reqsheet\Timetable\TimetableTemplateService;
 use Reqsheet\Timetable\ResourceTimetableStore;
 use Reqsheet\Timetable\TimetableResourceService;
 
@@ -83,8 +84,7 @@ final class AdminTimetablePage
                     }
                     $query = array_replace($query, ['version' => $versionId, 'view' => (string) ($input['view'] ?? 'teacher'), 'resource' => (int) ($input['resource'] ?? 0), 'edit' => 0]);
                 } elseif ($action === 'create_version') {
-                    $id = (new TimetableVersionService($store))->create($this->organisationId, $this->nullable($input['label'] ?? null), (string) ($input['effective_from'] ?? ''), $this->nullable($input['effective_to'] ?? null));
-                    $this->seedVersionStructure($store, $id);
+                    $id = (new TimetableTemplateService($store))->create($this->organisationId, null, $this->nullable($input['label'] ?? null), (string) ($input['effective_from'] ?? ''), $this->settings);
                     $query = array_replace($query, ['version' => $id]);
                     $message = 'Timetable version created: ' . $id;
                 }
@@ -93,7 +93,7 @@ final class AdminTimetablePage
             }
         }
         $versions = $store->versionsForOrganisation($this->organisationId);
-        $versionId = (int) ($query['version'] ?? $versions[0]->id ?? 0);
+        $versionId = array_key_exists('version', $query) ? (int) $query['version'] : ($this->activeVersion($versions)?->id ?? ($versions[0]->id ?? 0));
         $version = $store->findVersion($versionId);
         if ($version === null || $version->organisationId !== $this->organisationId) $version = $versions[0] ?? null;
         return $this->resourcePage($store, $versions, $version, $query, $message);
@@ -114,10 +114,10 @@ final class AdminTimetablePage
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
         if (!empty($query['create'])) $body .= $this->resourceCreationForm($version?->id, $view, $resource, (string) $query['create'], $query);
         elseif ($version !== null && $resource > 0) {
-            $body .= $this->resourceGrid($store, $version, $view, $resource);
+            $body .= $this->resourceGrid($store, $version, $view, $resource, $users);
             if (isset($query['edit']) || isset($query['day']) || isset($query['start_slot'])) $body .= $this->resourceLessonEditor($store, $version, $view, $resource, (int) ($query['edit'] ?? 0), $query, $users, $rooms, $classes);
         } elseif ($version !== null) $body .= '<p class="notice">Add a teacher, room, or class to begin.</p>';
-        return PageLayout::render('Admin timetable', $body . $this->versionForm(), $this->user);
+        return PageLayout::render('Admin timetable', $body, $this->user);
     }
 
     private function resourceToolbar(array $versions, ?int $version, string $view, int $resource, array $users, array $rooms, array $classes): string
@@ -137,7 +137,7 @@ final class AdminTimetablePage
         return '<dialog class="resource-dialog" open><form method="post"><a class="close" href="/admin/timetable?version=' . (int) $version . '&view=' . $this->e((string) ($query['return_view'] ?? $view)) . '&resource=' . (int) ($query['return_resource'] ?? $resource) . '&day=' . (int) ($query['return_day'] ?? 0) . '&start_slot=' . (int) ($query['return_start_slot'] ?? 0) . '">Cancel</a><p class="eyebrow">Add resource</p><h2>' . $this->e($type === 'teacher' ? 'Teacher' : ($type === 'class' ? 'Class code' : 'Room')) . '</h2><input type="hidden" name="action" value="create_resource"><input type="hidden" name="resource_type" value="' . $this->e($type) . '"><input type="hidden" name="version" value="' . (int) $version . '"><input type="hidden" name="return_view" value="' . $this->e((string) ($query['return_view'] ?? $view)) . '"><input type="hidden" name="return_resource" value="' . (int) ($query['return_resource'] ?? $resource) . '"><input type="hidden" name="return_day" value="' . (int) ($query['return_day'] ?? 0) . '"><input type="hidden" name="return_start_slot" value="' . (int) ($query['return_start_slot'] ?? 0) . '"><label>' . ($type === 'teacher' ? 'Initials/code' : ($type === 'class' ? 'Class code' : 'Room code')) . '<input name="code" required autofocus></label>' . ($type === 'teacher' ? '<label>Display name (optional)<input name="display_name"></label>' : '') . '<div class="form-actions"><button>Add</button></div></form></dialog><script>document.addEventListener("DOMContentLoaded",function(){var dialog=document.querySelector(".resource-dialog");if(!dialog)return;if(typeof dialog.showModal==="function"){dialog.close();dialog.showModal();}var field=dialog.querySelector("[autofocus]");if(field)field.focus();});</script>';
     }
 
-    private function resourceGrid(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource): string
+    private function resourceGrid(ResourceTimetableStore $store, TimetableVersion $version, string $view, int $resource, array $users): string
     {
         $days = $this->workingDays($store->slotsForVersion($version->id));
         $slots = $store->slotsForVersion($version->id);
@@ -164,7 +164,7 @@ final class AdminTimetablePage
                     $span = count(TimetableRules::occupiedSequences($daySlots, $slot, $lesson->durationPeriods));
                     $span = max(1, $span);
                     foreach ($daySlots as $candidate) if ($candidate->sequenceNumber !== $sequence && $candidate->sequenceNumber > $sequence && $candidate->sequenceNumber < $sequence + $span) $spanned[$day][$candidate->sequenceNumber] = true;
-                    $html .= '<td rowspan="' . $span . '"><a class="admin-lesson" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>Teacher ' . $lesson->teacherUserId . ' · ' . $lesson->durationPeriods . ' period' . ($lesson->durationPeriods === 1 ? '' : 's') . '</small></a></td>';
+                    $html .= '<td rowspan="' . $span . '"><a class="admin-lesson class-tone-' . $this->classTone($lesson->classCode) . '" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>Teacher ' . $this->e($this->teacherCode($lesson->teacherUserId, $users)) . ' · ' . $lesson->durationPeriods . ' period' . ($lesson->durationPeriods === 1 ? '' : 's') . '</small></a></td>';
                 } else $html .= '<td class="empty-cell"><a class="empty-period" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '" aria-label="Add lesson on ' . $this->e($this->dayName($day)) . ' ' . $this->e($this->periodLabel($slot)) . '"><span>+</span><small>Add lesson</small></a></td>';
             }
             $html .= '</tr>';
@@ -246,6 +246,7 @@ final class AdminTimetablePage
     private function separatorLabel(TimetableSlot $slot): string
     {
         $label = trim((string) ($slot->label ?? ''));
+        if ($slot->kind === 'lunch' && strtolower($label) === 'lunchtime') return 'Lunch';
         if ($label !== '') return $label;
         return match ($slot->kind) {
             'break' => 'Break',
@@ -253,6 +254,14 @@ final class AdminTimetablePage
             default => 'Other',
         };
     }
+
+    private function teacherCode(int $teacherId, array $users): string
+    {
+        foreach ($users as $user) if ((int) $user['id'] === $teacherId) return trim((string) ($user['staff_identifier'] ?? '')) ?: (string) $user['display_name'];
+        return 'Teacher';
+    }
+
+    private function classTone(string $class): int { return abs(crc32($class)) % 6; }
 
     private function seedVersionStructure(ResourceTimetableStore $store, int $versionId): void
     {
@@ -340,7 +349,7 @@ final class AdminTimetablePage
         } elseif ($version !== null) {
             $body .= '<p class="notice">Add a teacher in People before populating a timetable. A teacher may remain empty.</p>';
         }
-        return PageLayout::render('Admin timetable', $body . $this->versionForm(), $this->user);
+        return PageLayout::render('Admin timetable', $body, $this->user);
     }
 
     /** @param list<array{id:int,display_name:string,staff_identifier:?string,is_active:bool}> $users */
@@ -379,6 +388,18 @@ final class AdminTimetablePage
         $today = new \DateTimeImmutable('today');
         $state = $version->effectiveFrom > $today ? 'future' : ($version->effectiveTo !== null && $today >= $version->effectiveTo ? 'historical' : 'current');
         return 'Editing <strong>' . $this->e($version->label ?: 'Untitled timetable') . '</strong>, effective from ' . $version->effectiveFrom->format('Y-m-d') . ' (' . $state . ').';
+    }
+
+    /** @param list<TimetableVersion> $versions */
+    private function activeVersion(array $versions): ?TimetableVersion
+    {
+        $today = new \DateTimeImmutable('today');
+        $active = null;
+        foreach ($versions as $version) {
+            if ($version->effectiveFrom > $today || ($version->effectiveTo !== null && $today >= $version->effectiveTo)) continue;
+            if ($active === null || $version->effectiveFrom > $active->effectiveFrom || ($version->effectiveFrom == $active->effectiveFrom && $version->id > $active->id)) $active = $version;
+        }
+        return $active;
     }
 
     /** @param list<array{id:int,display_name:string,staff_identifier:?string,is_active:bool}> $users */
@@ -486,11 +507,6 @@ final class AdminTimetablePage
     }
 
     private function conjoinedPeriodsAllowed(): bool { return (bool) ($this->settings['allow_double_periods'] ?? true); }
-
-    private function versionForm(): string
-    {
-        return '<section class="editor-section secondary-section"><h2>Create timetable version</h2><form class="inline-form" method="post"><input type="hidden" name="action" value="create_version"><label>Name<input name="label"></label><label>Effective from<input type="date" name="effective_from" required></label><label>Effective to<input type="date" name="effective_to"></label><button>Create version</button></form></section>';
-    }
 
     private function dayName(int $day): string { return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][$day - 1] ?? 'Day ' . $day; }
     private function periodLabel(TimetableSlot $slot): string { return $slot->label !== '' ? $slot->label : 'P' . $slot->teachingPeriodNumber; }

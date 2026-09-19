@@ -27,12 +27,14 @@ final class SessionAuth
         $_SESSION['user'] = [
             'id' => (int) $account['id'],
             'organisation_id' => (int) $account['organisation_id'],
+            'display_name' => (string) ($account['display_name'] ?? ''),
+            'staff_identifier' => $account['staff_identifier'] ?? null,
             'operational_role' => (string) $account['operational_role'],
             'is_admin' => (bool) $account['is_admin'],
         ];
     }
 
-    /** @return array{id:int,organisation_id:int,operational_role:string,is_admin:bool}|null */
+    /** @return array{id:int,organisation_id:int,display_name:string,staff_identifier:?string,operational_role:string,is_admin:bool}|null */
     public static function current(): ?array
     {
         self::start();
@@ -40,6 +42,7 @@ final class SessionAuth
         if (!is_array($user) || !isset($user['id'], $user['organisation_id'], $user['operational_role'])) return null;
         return [
             'id' => (int) $user['id'], 'organisation_id' => (int) $user['organisation_id'],
+            'display_name' => (string) ($user['display_name'] ?? ''), 'staff_identifier' => isset($user['staff_identifier']) ? (string) $user['staff_identifier'] : null,
             'operational_role' => (string) $user['operational_role'], 'is_admin' => (bool) ($user['is_admin'] ?? false),
         ];
     }

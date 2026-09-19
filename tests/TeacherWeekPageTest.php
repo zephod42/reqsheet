@@ -23,11 +23,13 @@ final class TeacherWeekPageTest
         assertSameValue(7, (new TeacherPlanningService(new TeacherStore(), 1))->weekStart(new DateTimeImmutable('2026-09-13'))->format('N'), 'Week calculation was incorrect.');
 
         $store = new TeacherStore();
-        $page = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-09'));
+        $page = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-09'), ['display_name' => 'Niall Evans', 'staff_identifier' => 'NE']);
         $view = $page->handle('GET', ['date' => '2026-09-09'], []);
         assertContainsValue('Week beginning Monday 7 September 2026', $view, 'Week heading was not rendered.');
         assertContainsValue('Period One', $view, 'Configured teaching-period label was not rendered.');
         assertContainsValue('Break', $view, 'Configured separator was not rendered.');
+        assertContainsValue('Lunch', $view, 'Lunch separator was not rendered in the teacher view.');
+        assertContainsValue('Niall Evans (NE)', $view, 'Authenticated teacher identity was not rendered.');
         assertContainsValue('13PHY', $view, 'Lesson class was not rendered.');
         assertContainsValue('LAB-A', $view, 'Lesson room was not rendered.');
         assertContainsValue('Bring goggles', $view, 'Requisitions were not rendered.');
@@ -37,6 +39,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Next week', $view, 'Next-week navigation was not rendered.');
         assertContainsValue('This week', $view, 'This-week control was not rendered.');
         assertContainsValue('today-row', $view, 'Current day was not gently highlighted.');
+        assertSameValue(true, $store->ensured, 'Teacher week did not prepare effective recurring assignments for the selected week.');
 
         $editing = $page->handle('GET', ['date' => '2026-09-09', 'edit' => 500], []);
         assertContainsValue('Lesson outline', $editing, 'Planning editor did not expose lesson outline.');
@@ -74,7 +77,7 @@ function assertNotContainsValue(string $needle, string $haystack, string $messag
 
 final class TeacherStore implements TeacherPlanningStore
 {
-    public array $occurrences = [500 => [
+        public array $occurrences = [500 => [
         'id' => 500, 'lesson_date' => '2026-09-07', 'timetable_version_id' => 1, 'snapshot_teacher_user_id' => 10,
         'snapshot_class_code' => '13PHY', 'snapshot_room_code' => 'LAB-A', 'snapshot_start_slot_id' => 101,
         'snapshot_duration_periods' => 2, 'day_of_week' => 1, 'teaching_period_number' => 1, 'slot_label' => 'Period One',
@@ -83,7 +86,8 @@ final class TeacherStore implements TeacherPlanningStore
     ]];
     public TimetableVersion $version;
     /** @var list<TimetableSlot> */
-    public array $slots = [];
+        public array $slots = [];
+    public bool $ensured = false;
 
     public function __construct()
     {
@@ -93,12 +97,14 @@ final class TeacherStore implements TeacherPlanningStore
             new TimetableSlot(102, 1, 1, 2, 'teaching', 2, 'Period Two'),
             new TimetableSlot(103, 1, 1, 3, 'break', null, 'Break'),
             new TimetableSlot(104, 1, 1, 4, 'teaching', 3, 'Period Three'),
+            new TimetableSlot(105, 1, 1, 5, 'lunch', null, 'Lunch'),
             new TimetableSlot(201, 1, 2, 1, 'teaching', 1, 'Period One'),
         ];
     }
 
     public function teacherBelongsToOrganisation(int $teacherId, int $organisationId): bool { return $teacherId === 10 && $organisationId === 1; }
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion { return $organisationId === 1 && $date >= $this->version->effectiveFrom ? $this->version : null; }
+    public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
     public function slotsForVersion(int $versionId): array { return $this->slots; }
     public function occurrencesForTeacherDate(int $organisationId, int $teacherId, DateTimeImmutable $date): array { return array_values(array_filter($this->occurrences, static fn (array $o): bool => $o['lesson_date'] === $date->format('Y-m-d'))); }
     public function findOccurrenceForTeacher(int $organisationId, int $teacherId, int $occurrenceId): ?array { return $this->occurrences[$occurrenceId] ?? null; }

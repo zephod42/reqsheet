@@ -9,6 +9,8 @@ use PDO;
 use PDOStatement;
 use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\TimetableVersion;
+use Reqsheet\Timetable\PdoTimetableGenerationStore;
+use Reqsheet\Timetable\TimetableOccurrenceGenerator;
 
 final class PdoTeacherPlanningStore implements TeacherPlanningStore
 {
@@ -47,6 +49,17 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
             self::date((string) $row['effective_from']),
             $row['effective_to'] === null ? null : self::date((string) $row['effective_to']),
         );
+    }
+
+    public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void
+    {
+        $generator = new TimetableOccurrenceGenerator(new PdoTimetableGenerationStore($this->pdo));
+        $date = $start;
+        while ($date <= $end) {
+            $version = $this->effectiveVersion($organisationId, $date);
+            if ($version !== null) $generator->generate($organisationId, $version->id, $date->format('Y-m-d'), $date->format('Y-m-d'));
+            $date = $date->modify('+1 day');
+        }
     }
 
     public function slotsForVersion(int $versionId): array

@@ -13,6 +13,7 @@ use Reqsheet\Timetable\TimetableValidationException;
 use Reqsheet\Timetable\TimetableVersion;
 use Reqsheet\Timetable\TimetableVersionService;
 use Reqsheet\Timetable\RecurringLessonService;
+use Reqsheet\Timetable\TimetableTemplateService;
 
 final class TimetableConfigurationTest
 {
@@ -21,6 +22,7 @@ final class TimetableConfigurationTest
         self::versions();
         self::slots();
         self::lessons();
+        self::templates();
     }
 
     private static function versions(): void
@@ -79,6 +81,26 @@ final class TimetableConfigurationTest
         self::expectLessonValidation($service, 1, 10, 1, 101, 1, 'Y', 'LAB-A');
         self::expectLessonValidation($service, 1, 11, 1, 101, 1, 'Y', 'LAB-A');
         self::expectLessonValidation($service, 1, 11, 1, 101, 1, 'Y9', 'LAB-Z');
+    }
+
+    private static function templates(): void
+    {
+        $store = self::store();
+        $service = new TimetableTemplateService($store);
+        $version = $service->create(1, null, 'Autumn 2026', '2026-09-01', [
+            'working_days' => [1, 2, 3, 4, 5], 'periods_per_day' => 9, 'start_time' => '08:00',
+            'standard_period_minutes' => '50', 'custom_day_settings' => [],
+            'separators' => [['type' => 'Break', 'label' => 'Break', 'after_period' => 3, 'duration_minutes' => '10'], ['type' => 'Lunchtime', 'label' => 'Lunch', 'after_period' => 6, 'duration_minutes' => '30']],
+        ]);
+        assertSameValue(55, count($store->slotsForVersion($version)), 'Template creation did not seed all configured days, periods, and separators.');
+        assertSameValue(9, count(array_filter($store->slotsForVersion($version), static fn (TimetableSlot $slot): bool => $slot->isTeaching() && $slot->dayOfWeek === 1)), 'Template did not seed nine teaching periods.');
+        $lunch = array_values(array_filter($store->slotsForVersion($version), static fn (TimetableSlot $slot): bool => $slot->kind === 'lunch'))[0] ?? null;
+        assertSameValue('Lunch', $lunch?->label, 'Template did not preserve the Lunch label.');
+        $active = $service->activeTemplate(1, new DateTimeImmutable('2026-09-10'));
+        assertSameValue('Autumn 2026', $active['version']->label, 'Active template summary selected the wrong version.');
+        $successor = $service->create(1, $version, 'Spring 2027', '2027-01-01', ['working_days' => [1], 'periods_per_day' => 2, 'start_time' => '08:00', 'standard_period_minutes' => '60', 'custom_day_settings' => [], 'separators' => []]);
+        assertSameValue('2027-01-01', $store->versions[$version]->effectiveTo->format('Y-m-d'), 'Successor creation did not close the prior version.');
+        assertSameValue('2027-01-01', $store->versions[$successor]->effectiveFrom->format('Y-m-d'), 'Successor effective date was incorrect.');
     }
 
     private static function configurationSlots(ConfigurationStore $store): void
@@ -158,6 +180,8 @@ class ConfigurationStore implements TimetableConfigurationStore
     public function usersForOrganisation(int $organisationId): array { return $this->users; }
     public function roomCodesForVersion(int $versionId): array { return array_values(array_unique(array_map(static fn (RecurringLesson $lesson): string => $lesson->roomCode, $this->lessonsForVersion($versionId)))); }
     public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $from, ?DateTimeImmutable $to): int { $id = $this->nextId++; $this->versions[$id] = new TimetableVersion($id, $organisationId, $label, $from, $to); return $id; }
+    public function createSuccessorVersion(int $organisationId, int $sourceVersionId, ?string $label, DateTimeImmutable $from): int { $source = $this->versions[$sourceVersionId]; $this->versions[$sourceVersionId] = new TimetableVersion($source->id, $source->organisationId, $source->label, $source->effectiveFrom, $from); $id = $this->nextId++; $this->versions[$id] = new TimetableVersion($id, $organisationId, $label, $from, $source->effectiveTo); return $id; }
+    public function occurrenceCountForVersionFrom(int $versionId, DateTimeImmutable $date): int { return 0; }
     public function slotsForVersion(int $versionId): array { return array_values(array_filter($this->slots, static fn (TimetableSlot $s): bool => $s->timetableVersionId === $versionId)); }
     public function insertSlot(int $versionId, int $day, int $sequence, string $kind, ?int $period, string $label, string $start, string $end): int { $id = $this->nextId++; $this->slots[] = new TimetableSlot($id, $versionId, $day, $sequence, $kind, $period, $label, $start, $end); return $id; }
     public function findTeacherOrganisation(int $teacherUserId): ?int { return $this->teachers[$teacherUserId] ?? null; }

@@ -55,7 +55,7 @@ final class PdoAccountStore implements AccountStore
     public function findLogin(string $login): ?array
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, display_name, operational_role, is_admin,
+            'SELECT id, organisation_id, display_name, staff_identifier, operational_role, is_admin,
                     password_hash, account_state, is_active
              FROM users WHERE display_name = :login LIMIT 1',
         );
@@ -65,6 +65,7 @@ final class PdoAccountStore implements AccountStore
             'id' => (int) $row['id'],
             'organisation_id' => (int) $row['organisation_id'],
             'display_name' => (string) $row['display_name'],
+            'staff_identifier' => $row['staff_identifier'] === null ? null : (string) $row['staff_identifier'],
             'operational_role' => (string) $row['operational_role'],
             'is_admin' => (bool) $row['is_admin'],
             'password_hash' => $row['password_hash'] === null ? null : (string) $row['password_hash'],
@@ -76,7 +77,7 @@ final class PdoAccountStore implements AccountStore
     public function findUserById(int $userId): ?array
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, display_name, operational_role, is_admin,
+            'SELECT id, organisation_id, display_name, staff_identifier, operational_role, is_admin,
                     password_hash, account_state, is_active
              FROM users WHERE id = :id LIMIT 1',
         );
@@ -86,6 +87,7 @@ final class PdoAccountStore implements AccountStore
             'id' => (int) $row['id'],
             'organisation_id' => (int) $row['organisation_id'],
             'display_name' => (string) $row['display_name'],
+            'staff_identifier' => $row['staff_identifier'] === null ? null : (string) $row['staff_identifier'],
             'operational_role' => (string) $row['operational_role'],
             'is_admin' => (bool) $row['is_admin'],
             'password_hash' => $row['password_hash'] === null ? null : (string) $row['password_hash'],

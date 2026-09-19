@@ -69,9 +69,12 @@ final class TeacherWeekPage
         }
         $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1><a class="this-week" href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
-        $body .= '<p class="temporary">Temporary teacher review identity</p>';
+        $identity = trim((string) ($this->user['display_name'] ?? ''));
+        $initials = trim((string) ($this->user['staff_identifier'] ?? ''));
+        $identityLabel = $identity !== '' ? $identity . ($initials !== '' ? ' (' . $initials . ')' : '') : ($initials !== '' ? $initials : 'Teacher');
+        $body .= '<p class="teacher-identity">' . $this->e($identityLabel) . '</p>';
         $body .= '<div class="timetable-scroll"><table class="week-grid"><caption class="visually-hidden">Teacher timetable week</caption><thead><tr><th scope="col">Day</th>';
-        foreach ($columns as $slot) $body .= '<th class="' . ($slot->isTeaching() ? 'teaching-column' : 'separator-column') . '">' . $this->e($slot->isTeaching() ? $this->periodLabel($slot) : ($slot->label ?: ucfirst($slot->kind))) . '</th>';
+        foreach ($columns as $slot) $body .= '<th class="' . ($slot->isTeaching() ? 'teaching-column' : 'separator-column') . '">' . $this->e($slot->isTeaching() ? $this->periodLabel($slot) : $this->separatorLabel($slot)) . '</th>';
         $body .= '</tr></thead><tbody>';
         foreach ($week->days as $day) {
             $date = $day['date'];
@@ -84,7 +87,7 @@ final class TeacherWeekPage
             for ($index = 0; $index < count($sequences); $index++) {
                 $slot = $bySequence[$sequences[$index]] ?? null;
                 if ($slot === null) { $body .= '<td></td>'; continue; }
-                if (!$slot->isTeaching()) { $body .= '<td class="separator-cell" aria-label="' . $this->e($slot->label ?: $slot->kind) . '"></td>'; continue; }
+                if (!$slot->isTeaching()) { $body .= '<td class="separator-cell" aria-label="' . $this->e($this->separatorLabel($slot)) . '">' . $this->e($this->separatorLabel($slot)) . '</td>'; continue; }
                 $occurrence = $byStart[$slot->id] ?? null;
                 if ($occurrence === null) { $body .= '<td class="empty-cell"></td>'; continue; }
                 $duration = max(1, (int) $occurrence['snapshot_duration_periods']);
@@ -127,6 +130,13 @@ final class TeacherWeekPage
 
     private function weekDayLabel(DateTimeImmutable $date): string { return $date->format('l j F Y'); }
     private function periodLabel(TimetableSlot $slot): string { return $slot->label ?: 'P' . $slot->teachingPeriodNumber; }
+    private function separatorLabel(TimetableSlot $slot): string
+    {
+        $label = trim((string) ($slot->label ?? ''));
+        if ($slot->kind === 'lunch' && strtolower($label) === 'lunchtime') return 'Lunch';
+        if ($label !== '') return $label;
+        return match ($slot->kind) { 'break' => 'Break', 'lunch' => 'Lunch', default => 'Other' };
+    }
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
     private function error(string $message): string { return PageLayout::render('Teacher week', '<p class="notice error">' . $this->e($message) . '</p>', $this->user); }
     private function classTone(string $class): int { return abs(crc32($class)) % 6; }

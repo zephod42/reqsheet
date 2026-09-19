@@ -58,6 +58,24 @@ final class SettingsTest
         assertContainsValue('value="08:00"', $beforeSetup, 'Fresh settings did not default the start time to 08:00.');
         assertContainsValue('Allow conjoined periods', $beforeSetup, 'Settings did not use conjoined-period wording.');
 
+        $templateSettings = new SettingsStoreFake();
+        $templatePage = new SettingsPage(new SettingsService($templateSettings), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true], new ConfigurationStore());
+        $templateEmpty = $templatePage->handle('GET', []);
+        assertContainsValue('No active timetable template exists yet.', $templateEmpty, 'Settings did not show the empty active-template state.');
+        assertNotContainsValue('name="periods_per_day"', $templateEmpty, 'Read-only template summary exposed the large editor by default.');
+        $templateEditor = $templatePage->handle('POST', ['action' => 'create_template']);
+        assertContainsValue('Create new timetable template', $templateEditor, 'Create-template workflow did not open from Settings.');
+        $templateSaved = $templatePage->handle('POST', [
+            'action' => 'save_template', 'template_label' => 'Autumn settings template', 'effective_from' => '2026-09-01',
+            'school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
+            'periods_per_day' => 6, 'rooms' => ['LAB-A'], 'start_time' => '08:00', 'standard_period_minutes' => '60',
+            'separator_type' => ['Break', 'Lunchtime'], 'separator_label' => ['Break', 'Lunch'], 'separator_after' => [2, 4], 'separator_duration' => ['10', '30'], 'allow_conjoined_periods' => '1',
+        ]);
+        assertContainsValue('Current active timetable template', $templateSaved, 'Saved template did not return to the active-template summary.');
+        assertContainsValue('Autumn settings template', $templateSaved, 'Active template name was not summarized.');
+        $warning = $templatePage->handle('POST', ['action' => 'edit_template']);
+        assertContainsValue('Before editing the timetable template', $warning, 'Editing a template did not show the safety warning.');
+
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
         $signupAccounts = new \Reqsheet\Account\AccountService($signupStore);
         $signupAccounts->createFirstOrganisation('Existing School', 'Existing Admin', null, 'teacher', 'existing-pass', 'existing-pass');

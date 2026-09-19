@@ -289,7 +289,8 @@ if ($route === ApplicationRoute::SETTINGS) {
     try {
         $environment = ExternalEnvironment::load($environment);
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new SettingsPage(new SettingsService(new PdoOrganisationSettingsStore((new Database($config))->connection())), $currentUser['organisation_id'], $currentUser);
+        $database = new Database($config);
+        $page = new SettingsPage(new SettingsService(new PdoOrganisationSettingsStore($database->connection())), $currentUser['organisation_id'], $currentUser, new PdoTimetableConfigurationStore($database->connection()));
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
     } catch (\Throwable) {

@@ -117,7 +117,7 @@ small { font-size: .82rem; }
     overflow: hidden;
     border: 1px solid var(--lesson-accent, var(--rule));
     border-radius: var(--corner);
-    background: #fff;
+    background: color-mix(in srgb, var(--lesson-accent, #fff) 24%, #fff);
     box-shadow: 0 0 0 1px var(--lesson-accent, transparent), 0 2px 5px rgb(0 0 0 / 9%);
     color: inherit;
     text-decoration: none;
@@ -168,7 +168,11 @@ dialog .close { float: right; }
 .empty-period span { font: 1.5rem/1 var(--sans); }
 .empty-period small { font-family: var(--sans); }
 .empty-period:hover, .empty-period:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; background: var(--primary-pale); color: var(--ink); }
-.admin-lesson { display: flex; height: 5.6rem; flex-direction: column; gap: .2rem; border: 1px solid var(--rule); border-radius: var(--corner); padding: .45rem; color: inherit; background: #fff; text-decoration: none; }
+.admin-lesson { display: flex; min-height: 100%; height: 100%; box-sizing: border-box; flex-direction: column; gap: .2rem; border: 1px solid var(--rule); border-radius: var(--corner); padding: .45rem; color: inherit; background: color-mix(in srgb, var(--lesson-accent, #fff) 24%, #fff); box-shadow: 0 2px 5px rgb(0 0 0 / 9%); text-decoration: none; }
+.admin-lesson:hover, .admin-lesson:focus-visible { box-shadow: 0 0 0 2px var(--lesson-accent, var(--ink)), var(--interactive-shadow); }
+.admin-lesson strong { color: var(--class-code); font-size: 1rem; font-weight: 600; }
+.admin-lesson span { color: var(--room-code); font-size: .9rem; }
+.admin-lesson small { margin-top: auto; color: var(--muted); font-family: var(--sans); }
 .admin-lesson strong { color: var(--class-code); font-size: 1rem; font-weight: 600; }
 .admin-lesson span { color: var(--room-code); font-size: .9rem; }
 .admin-lesson small { margin-top: auto; color: var(--muted); font-family: var(--sans); }
@@ -220,7 +224,7 @@ dialog .close { float: right; }
     .site-nav, .page-header a, dialog, .temporary, .button, button { display: none !important; }
     .site-shell { display: block; }
     .site-main { width: 100%; padding: 0; }
-    .lesson-block, .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { background: #fff !important; color: #000 !important; box-shadow: none !important; text-shadow: none !important; }
-    .lesson-block { border-color: #000 !important; }
+    .lesson-block, .admin-lesson, .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { background: #fff !important; color: #000 !important; box-shadow: none !important; }
+    .lesson-block, .admin-lesson { border-color: #000 !important; }
     .lesson-header strong, .lesson-header > span { color: #000 !important; }
 }

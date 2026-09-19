@@ -28,6 +28,15 @@ interface TimetableConfigurationStore
         ?DateTimeImmutable $effectiveTo,
     ): int;
 
+    public function createSuccessorVersion(
+        int $organisationId,
+        int $sourceVersionId,
+        ?string $label,
+        DateTimeImmutable $effectiveFrom,
+    ): int;
+
+    public function occurrenceCountForVersionFrom(int $versionId, DateTimeImmutable $date): int;
+
     /** @return list<TimetableSlot> */
     public function slotsForVersion(int $versionId): array;
 

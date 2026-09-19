@@ -60,7 +60,7 @@ Any remaining reference below to free-text class/room codes describes stored his
 
 The configuration services are the intended application path for writing timetable versions, slots, and recurring lessons. `TimetableVersionService` applies the half-open effective-date rule and rejects overlapping versions without truncating existing data. `TimetableSlotService` validates ISO weekdays, positive sequence/period values, allowed kinds, valid non-overlapping times, and coherent sequence/chronological order. `RecurringLessonService` validates organisation ownership, start-slot relationships, contiguous teaching-only spans, non-blank free-text class/room codes, and teacher/room conflicts. The admin editor uses these services and allows recurring-lesson edits/removals only before materialised occurrences exist. These services use `TimetableValidationException` for expected invalid input; PDO/database failures remain operational exceptions.
 
-There is no timetable-version or slot update workflow yet. Recurring lessons can be edited or removed through the admin editor only before materialised historical occurrences exist. Any future broader update design must preserve the immutable boundary after occurrences have been generated and must never rewrite historical snapshots.
+Timetable template management is in Settings: the active template is summarized read-only, editing requires a warning, and saving creates a successor effective-dated version without copying assignments. Protected historical versions and occurrences are not mutated. Recurring lessons can be edited or removed through the admin editor only before materialised historical occurrences exist.
 
 ## Bounded occurrence generation
 
@@ -122,7 +122,7 @@ The public HTTPS routing has been verified by an administrator: `GET /`, `GET /l
 
 The skeletal admin timetable editor requires a logged-in account with Admin permission and uses the session organisation; it no longer relies on an environment-selected user or organisation. It supports staff, room, and day inspection plus validated recurring-lesson creation/editing/removal. Lessons with historical occurrences are immutable.
 
-The skeletal teacher week view requires a logged-in Teacher account. Open `/teacher` (or `/teacher/week`) through the local server or protected vhost to review the current configured week. The view reads materialised dated occurrences; run bounded occurrence generation first if the week has no occurrences. `REQSHEET_FIRST_DAY_OF_WEEK` may be supplied as an ISO weekday number for temporary development review and defaults to `1` (Monday); it remains scaffolding until organisation timetable settings own it.
+The skeletal teacher week view requires a logged-in Teacher account. Open `/teacher` (or `/teacher/week`) through the local server or protected vhost to review the current configured week. On load, the view uses the effective timetable version and materialises missing dated occurrences for that selected week through the existing occurrence generator; planning/requisition data remains stored against those dated snapshots. `REQSHEET_FIRST_DAY_OF_WEEK` may be supplied as an ISO weekday number for temporary development review and defaults to `1` (Monday); it remains scaffolding until organisation timetable settings own it.
 
 ## Pilot first-run setup and login
 

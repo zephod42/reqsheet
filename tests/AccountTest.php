@@ -59,6 +59,7 @@ final class AccountTest
         session_save_path(sys_get_temp_dir());
         SessionAuth::login($account);
         assertSameValue($account['id'], SessionAuth::current()['id'], 'Authenticated session did not retain the user.');
+        assertSameValue('NE', SessionAuth::current()['staff_identifier'], 'Authenticated session did not retain teacher initials.');
         SessionAuth::logout();
         assertSameValue(null, SessionAuth::current(), 'Logout did not clear authentication.');
     }

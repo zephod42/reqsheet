@@ -29,6 +29,7 @@ final class TeacherPlanningService
             throw new TimetableValidationException(['Teacher does not belong to the requested organisation.']);
         }
         $start = $this->weekStart($date);
+        $this->store->ensureOccurrencesForWeek($organisationId, $start, $start->add(new DateInterval('P6D')));
         $days = [];
         for ($offset = 0; $offset < 7; $offset++) {
             $day = $start->add(new DateInterval('P' . $offset . 'D'));

@@ -175,6 +175,36 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
         return (int) $this->pdo->lastInsertId();
     }
 
+    public function createSuccessorVersion(int $organisationId, int $sourceVersionId, ?string $label, DateTimeImmutable $effectiveFrom): int
+    {
+        if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin successor template creation.');
+        try {
+            $source = $this->findVersion($sourceVersionId);
+            if ($source === null || $source->organisationId !== $organisationId) throw new TimetableValidationException(['The source timetable template is not available for this organisation.']);
+            $close = $this->prepare('UPDATE timetable_versions SET effective_to = :effective_to WHERE id = :id AND organisation_id = :organisation_id');
+            $close->execute(['effective_to' => $effectiveFrom->format('Y-m-d'), 'id' => $sourceVersionId, 'organisation_id' => $organisationId]);
+            $insert = $this->prepare('INSERT INTO timetable_versions (organisation_id, label, effective_from, effective_to) VALUES (:organisation_id, :label, :effective_from, :effective_to)');
+            $insert->execute([
+                'organisation_id' => $organisationId, 'label' => $label,
+                'effective_from' => $effectiveFrom->format('Y-m-d'),
+                'effective_to' => $source->effectiveTo?->format('Y-m-d'),
+            ]);
+            $id = (int) $this->pdo->lastInsertId();
+            if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete successor template creation.');
+            return $id;
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
+    }
+
+    public function occurrenceCountForVersionFrom(int $versionId, DateTimeImmutable $date): int
+    {
+        $statement = $this->prepare('SELECT COUNT(*) FROM lesson_occurrences WHERE timetable_version_id = :version_id AND lesson_date >= :lesson_date');
+        $statement->execute(['version_id' => $versionId, 'lesson_date' => $date->format('Y-m-d')]);
+        return (int) $statement->fetchColumn();
+    }
+
     public function slotsForVersion(int $versionId): array
     {
         $statement = $this->prepare(

@@ -74,10 +74,17 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
                 'separators' => json_encode($settings['separators'], JSON_THROW_ON_ERROR),
                 'double_periods' => $settings['allow_double_periods'] ? 1 : 0,
             ]);
-            $delete = $this->prepare('DELETE FROM organisation_rooms WHERE organisation_id = :id');
-            $delete->execute(['id' => $organisationId]);
-            $room = $this->prepare('INSERT INTO organisation_rooms (organisation_id, room_code) VALUES (:id, :code)');
-            foreach ($rooms as $code) $room->execute(['id' => $organisationId, 'code' => $code]);
+            $existingRoomCodes = $this->prepare('SELECT room_code FROM organisation_rooms WHERE organisation_id = :id ORDER BY room_code');
+            $existingRoomCodes->execute(['id' => $organisationId]);
+            $existing = array_map(static fn (mixed $code): string => strtolower((string) $code), $existingRoomCodes->fetchAll(PDO::FETCH_COLUMN));
+            $requested = array_map(static fn (mixed $code): string => strtolower((string) $code), $rooms);
+            sort($existing); sort($requested);
+            if ($existing !== $requested) {
+                $delete = $this->prepare('DELETE FROM organisation_rooms WHERE organisation_id = :id');
+                $delete->execute(['id' => $organisationId]);
+                $room = $this->prepare('INSERT INTO organisation_rooms (organisation_id, room_code) VALUES (:id, :code)');
+                foreach ($rooms as $code) $room->execute(['id' => $organisationId, 'code' => $code]);
+            }
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete settings save.');
         } catch (\Throwable $exception) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();

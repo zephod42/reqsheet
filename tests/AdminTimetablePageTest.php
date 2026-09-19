@@ -123,6 +123,10 @@ final class AdminTimetablePageTest
         $updated = $page->handle('POST', [], ['action' => 'resource_save_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 10, 'lesson_id' => $lessonId, 'teacher_user_id' => 10, 'day_of_week' => 2, 'start_slot_id' => 201, 'duration_periods' => 3, 'class_id' => 501, 'room_id' => 402]);
         assertContains('Lesson updated.', $updated, 'Resource assignment update was not handled.');
         assertSameValue(3, $store->lessons[0]->durationPeriods, 'Conjoined span was not preserved in resource editing.');
+        $spanned = $page->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10], []);
+        assertContains('rowspan="3"', $spanned, 'Conjoined lesson did not occupy its complete visual span.');
+        assertContains('Teacher TA', $spanned, 'Lesson card leaked a teacher database ID instead of initials.');
+        assertContains('class-tone-', $spanned, 'Admin lesson card did not receive a deterministic class colour.');
         $clash = $page->handle('POST', [], ['action' => 'resource_save_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 11, 'teacher_user_id' => 11, 'day_of_week' => 2, 'start_slot_id' => 201, 'duration_periods' => 1, 'class_id' => 501, 'room_id' => 401]);
         assertContains('conflict', strtolower($clash), 'Resource clash validation was not surfaced in the editor.');
         $deleted = $page->handle('POST', [], ['action' => 'resource_delete_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 10, 'lesson_id' => $lessonId]);
