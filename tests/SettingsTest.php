@@ -92,7 +92,14 @@ final class SettingsTest
         assertSameValue(null, \Reqsheet\Http\SessionAuth::current(), 'Public signup left a generic-host session active during tenant handoff.');
         self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', 'TAD', 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');
         \Reqsheet\Http\SessionAuth::logout();
-        assertContainsValue('action="/login"', (new HomePage())->render(), 'Home login form did not post to /login.');
+        $home = (new HomePage())->render();
+        assertContainsValue('Fast. Clean. Simple.', $home, 'Public homepage tagline was not rendered.');
+        assertContainsValue('href="/signup"', $home, 'Public homepage signup action was not rendered.');
+        assertContainsValue('Already have an account?', $home, 'Public homepage account guidance was not rendered.');
+        assertNotContainsValue('action="/login"', $home, 'Public homepage still renders the login form.');
+        $authenticatedHome = (new HomePage())->render(['id' => 2, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => false, 'roles' => ['teacher']]);
+        assertContainsValue('View My Timetable', $authenticatedHome, 'Authenticated homepage lost the application navigation.');
+        assertNotContainsValue('href="/signup"', $authenticatedHome, 'Authenticated homepage exposed public signup navigation.');
 
         $blocked = (new SetupBlockingPage())->render(['is_admin' => false]);
         assertContainsValue("Something's missing...", $blocked, 'Setup blocking heading was not rendered.');

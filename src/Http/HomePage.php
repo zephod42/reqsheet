@@ -6,8 +6,11 @@ namespace Reqsheet\Http;
 
 final class HomePage
 {
-    public function render(): string
+    /** @param array<string, mixed>|null $user */
+    public function render(?array $user = null): string
     {
-        return PageLayout::render('Home', '<section class="content-narrow"><h1>Reqsheet.</h1><h2>Log in</h2>' . LoginPage::fields() . '</section>');
+        $signup = $user === null ? '<a class="button" href="/signup">Sign up</a>' : '';
+        $guidance = $user === null ? '<p class="public-landing-guidance">Already have an account? Talk to your admin to get your unique school login.</p>' : '';
+        return PageLayout::render('Home', '<section class="public-landing"><h1>Reqsheet.</h1><p class="public-landing-tagline">Fast. Clean. Simple.</p>' . $signup . $guidance . '</section>', $user);
     }
 }

@@ -137,7 +137,7 @@ if ($route === ApplicationRoute::LOGIN) {
 
 if ($route === ApplicationRoute::ROOT) {
     header('Content-Type: text/html; charset=UTF-8');
-    echo (new HomePage())->render();
+    echo (new HomePage())->render($currentUser);
     exit;
 }
 
