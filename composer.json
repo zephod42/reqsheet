@@ -23,6 +23,7 @@
         "test": "php tests/run.php",
         "test:integration": "php tests/integration.php",
         "timetable:generate": "php bin/generate-occurrences.php",
+        "reset:test-data": "php bin/reset-test-data.php",
         "test:phpunit": "phpunit --configuration phpunit.xml.dist"
     },
     "config": {

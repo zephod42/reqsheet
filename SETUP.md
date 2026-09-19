@@ -44,7 +44,16 @@ SetEnv REQSHEET_ENV_FILE /etc/reqsheet/reqsheet-runtime.env
 
 The application does not search for `.env` files and does not load repository environment files. A configured file that is missing, malformed, relative, or inside the repository causes database-backed requests to fail safely with the existing generic unhealthy response; file contents are never returned.
 
-The repository currently contains migrations `0001` through `0007`. The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. Restricted Codex work may author and test migration files, but applying them to a protected database is an administrator operation using the protected migration identity. Repository inspection alone cannot prove which migrations are applied to a live database; that is an intentional security boundary, not an implementation gap. The domain migrations create organisations, users, organisation settings and rooms, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. They do not seed data or generate occurrences.
+The repository currently contains migrations `0001` through `0008`. The command applies SQL files from `database/migrations/` in numeric version order and records applied versions in `schema_migrations`. It is safe to rerun after a successful migration; already-recorded versions are skipped. Migration versions and names must be unique. Restricted Codex work may author and test migration files, but applying them to a protected database is an administrator operation using the protected migration identity. Repository inspection alone cannot prove which migrations are applied to a live database; that is an intentional security boundary, not an implementation gap. The domain migrations create organisations, users, organisation settings and rooms, timetable versions and slots, recurring lessons, dated lesson occurrences, and requisitions. They do not seed data or generate occurrences.
+
+The administrator-only `bin/reset-test-data.php` command is the supported disposable-test-data reset. It uses the protected `MIGRATION_DB_*` configuration, accepts only the documented `reqsheet_dev` or `reqsheet_test` database names, discovers tenant-owned tables through foreign keys, preserves `schema_migrations`, and deletes child records before organisations. It is never run automatically. Review the dry run first:
+
+```sh
+php bin/reset-test-data.php --dry-run
+php bin/reset-test-data.php --confirm=DELETE-ALL-REQSHEET-TEST-DATA
+```
+
+The destructive command requires the exact confirmation token and runs inside a transaction. It must be used only for the explicitly disposable Reqsheet test database; it does not create a backup, drop tables, disable foreign-key checks, or reset schema.
 
 MySQL DDL can implicitly commit and is not fully transactional. A failed migration is not recorded as applied, but a migration that fails after some DDL may leave partial schema changes. Review and repair the database before rerunning such a migration; migrations should be small, forward-only, and safe to retry where practical.
 

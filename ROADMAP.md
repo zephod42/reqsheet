@@ -54,3 +54,7 @@ Bounded login refinement completed 2026-09-19:
 - Tenant login shows only the trusted registered school name and short code; the generic host remains school-neutral.
 - Staff initials are now exactly three A–Z letters, normalised to uppercase and unique per organisation. They are the organisation-scoped login identifier and remain separate from internal IDs and teacher numbers.
 - Billing, subscriptions, payment processing, email verification, and password recovery remain deferred.
+
+Test-data reset handoff completed 2026-09-19:
+
+- `bin/reset-test-data.php` provides an explicit dry-run and confirmed CLI reset for the disposable Reqsheet test databases. It preserves schema and migration history; fresh school creation remains an administrator verification step after execution.

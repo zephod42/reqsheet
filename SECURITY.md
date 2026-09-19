@@ -50,4 +50,6 @@ Administrator People operations use session CSRF tokens and server-side organisa
 
 Staff initials are validated server-side as exactly three A–Z letters, normalised to uppercase, and looked up only within the authenticated organisation. Existing organisation-scoped uniqueness constraints and service checks prevent duplicate login identifiers. Tenant login identity is rendered only from the trusted organisation returned by tenant resolution; generic, unknown, and cross-tenant hosts do not receive another organisation's identity or accounts.
 
+The disposable test-data reset is CLI-only and uses the protected migration database identity. It refuses database names outside the explicit Reqsheet test allowlist, requires migration `0008`, derives tenant-owned deletion order from live foreign-key metadata, preserves `schema_migrations`, and requires an exact operator confirmation token. It does not expose an HTTP reset route or disable foreign-key enforcement.
+
 The pilot deliberately defers password reset/recovery, email verification, MFA, brute-force/rate limiting, advanced session management, admin recovery, organisation ownership transfer, and broader abuse controls. The awaiting-first-login flow and temporary setup protection require review before wider public deployment.

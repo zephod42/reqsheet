@@ -17,6 +17,7 @@ require __DIR__ . '/TimetableGenerationTest.php';
 require __DIR__ . '/MyAccountTest.php';
 require __DIR__ . '/AdminPeoplePageTest.php';
 require __DIR__ . '/LoginPageTest.php';
+require __DIR__ . '/TenantDataResetterTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -195,5 +196,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\MyAccountTest::run();
 \Reqsheet\Tests\AdminPeoplePageTest::run();
 \Reqsheet\Tests\LoginPageTest::run();
+\Reqsheet\Tests\TenantDataResetterTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");
