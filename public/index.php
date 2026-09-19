@@ -15,6 +15,7 @@ use Reqsheet\Auth\PdoOnboardingHandoffStore;
 use Reqsheet\Http\AdminAccess;
 use Reqsheet\Http\AdminTimetableCsvExport;
 use Reqsheet\Http\AdminTimetableCsvImport;
+use Reqsheet\Http\AdminTimetableCsvConfirm;
 use Reqsheet\Http\AdminTimetableResourceCsvExport;
 use Reqsheet\Http\AdminTimetablePage;
 use Reqsheet\Http\ApplicationRoute;
@@ -44,6 +45,8 @@ use Reqsheet\Timetable\BlankTimetableCsvExporter;
 use Reqsheet\Timetable\TimetableCsvImportDraftStore;
 use Reqsheet\Timetable\TimetableCsvImportPreviewService;
 use Reqsheet\Timetable\TimetableCsvParser;
+use Reqsheet\Timetable\TimetableCsvImportService;
+use Reqsheet\Timetable\TimetableCsvImportTechnicalException;
 use Reqsheet\Timetable\TimetableResourceCsvExporter;
 use Reqsheet\Timetable\TimetableCsvExportException;
 use Reqsheet\Settings\PdoOrganisationSettingsStore;
@@ -378,7 +381,7 @@ if ($route === ApplicationRoute::SETTINGS) {
     exit;
 }
 
-if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES], true)) {
+if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES], true)) {
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -596,6 +599,53 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE_IMPORT) {
         echo $response->html;
     } catch (\Throwable $exception) {
         $logRequestFailure('timetable-csv-import-preview', $exception);
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if ($route === ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM) {
+    $user = SessionAuth::current();
+    if (!SessionAuth::isAdmin($user)) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    $action = null;
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $store = new PdoTimetableConfigurationStore((new Database($config))->connection());
+        $action = new AdminTimetableCsvConfirm(
+            new TimetableCsvImportService(
+                $store,
+                new BlankTimetableCsvExporter($store),
+                new TimetableCsvParser(),
+                new TimetableCsvImportPreviewService($store),
+            ),
+            new TimetableCsvImportDraftStore(),
+            (int) $user['organisation_id'],
+            $user,
+        );
+        $response = $action->handle($_POST);
+        http_response_code($response->status);
+        if ($response->location !== null) header('Location: ' . $response->location, true, $response->status);
+        if ($response->html !== '') {
+            header('Content-Type: text/html; charset=UTF-8');
+            echo $response->html;
+        }
+    } catch (TimetableCsvImportTechnicalException $exception) {
+        $logRequestFailure('timetable-csv-import-confirm', $exception);
+        http_response_code(500);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $action instanceof AdminTimetableCsvConfirm
+            ? $action->error(['The import could not be completed. No lessons were saved. Please try again.'])
+            : "Timetable import failed. No lessons were saved.\n";
+    } catch (\Throwable $exception) {
+        $logRequestFailure('timetable-csv-import-confirm-setup', $exception);
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo "Service unavailable\n";

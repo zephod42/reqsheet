@@ -105,6 +105,7 @@ final class AdminTimetablePage
             'no_teaching_periods' => 'The selected timetable has no teaching periods to export.',
             default => null,
         };
+        if (($query['csv_imported'] ?? null) === '1') $message = 'Timetable imported successfully.';
         $requestedView = (string) ($query['view'] ?? 'teacher');
         $view = in_array($requestedView, ['teacher', 'room', 'class'], true) ? $requestedView : 'teacher';
         $users = $store->usersForOrganisation($this->organisationId);

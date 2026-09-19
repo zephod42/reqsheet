@@ -47,7 +47,7 @@ final class AdminTimetableCsvImport
     {
         $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable / CSV import</p><h1>Import preview</h1></div><a class="button secondary" href="/admin/timetable?version=' . $preview->versionId . '">Back to timetable</a></section>';
         $body .= '<section class="editor-section" data-import-draft="' . $this->e($draftId) . '"><div class="section-heading"><div><p class="eyebrow">Selected timetable</p><h2>' . $this->e($preview->versionName) . '</h2></div></div>';
-        $body .= '<p class="notice"><strong>Nothing has been saved.</strong> This validated preview expires after 15 minutes. Final import confirmation will be added in the next milestone.</p>';
+        $body .= '<p class="notice"><strong>Nothing has been saved.</strong> This validated preview expires after 15 minutes. Importing does not activate the timetable or change the currently active timetable.</p>';
         $body .= '<dl class="summary-list"><div><dt>Proposed lessons</dt><dd>' . count($preview->assignments) . '</dd></div><div><dt>Occupied periods</dt><dd>' . $preview->occupiedPeriods . '</dd></div><div><dt>Free room/period slots</dt><dd>' . $preview->freeSlots . '</dd></div></dl>';
         if ($preview->assignments === []) {
             $body .= '<p class="message">The CSV is structurally valid and contains no lesson assignments.</p>';
@@ -59,6 +59,9 @@ final class AdminTimetableCsvImport
             }
             $body .= '</tbody></table></div>';
         }
+        $csrf = $this->e(CsrfToken::value());
+        $draft = $this->e($draftId);
+        $body .= '<div class="form-actions"><form method="post" action="/admin/timetable/import/confirm"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="draft_id" value="' . $draft . '"><input type="hidden" name="action" value="import"><button type="submit">Import Timetable</button></form><form method="post" action="/admin/timetable/import/confirm"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="draft_id" value="' . $draft . '"><input type="hidden" name="action" value="cancel"><button type="submit" class="secondary">Cancel</button></form></div>';
         return PageLayout::render('Timetable CSV import preview', $body . '</section>', $this->user);
     }
 

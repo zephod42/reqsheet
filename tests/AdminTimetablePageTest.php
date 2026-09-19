@@ -152,7 +152,7 @@ final class AdminTimetablePageTest
     }
 }
 
-final class ResourceConfigurationStore extends ConfigurationStore implements ResourceTimetableStore
+class ResourceConfigurationStore extends ConfigurationStore implements ResourceTimetableStore
 {
     /** @var list<array{id:int,code:string}> */
     public array $rooms = [];

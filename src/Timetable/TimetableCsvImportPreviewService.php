@@ -108,6 +108,9 @@ final class TimetableCsvImportPreviewService
         $identity = hash('sha256', (string) json_encode([
             'organisation_id' => $organisationId,
             'version_id' => $versionId,
+            'label' => $version->label,
+            'effective_from' => $version->effectiveFrom->format('Y-m-d'),
+            'effective_to' => $version->effectiveTo?->format('Y-m-d'),
             'first_day' => $version->firstDayOfWeek,
             'slots' => array_map(static fn (TimetableSlot $slot): array => [$slot->id, $slot->dayOfWeek, $slot->sequenceNumber, $slot->kind, $slot->teachingPeriodNumber, $slot->label], $slots),
             'rooms' => array_map(static fn (array $room): array => [(int) $room['id'], (string) $room['code']], $rooms),

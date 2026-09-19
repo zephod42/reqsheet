@@ -135,7 +135,9 @@ final class TimetableCsvImportTest
         assertContainsValue('&lt;script&gt;alert(1)&lt;/script&gt;', $response->html, 'Escaped uploaded value was absent.');
         assertContainsValue('Nothing has been saved.', $response->html, 'Preview omitted its read-only status.');
         assertSameValue([], $store->lessons, 'HTTP preview wrote timetable data.');
-        assertSameValue(403, $action->handle(['version' => 1, 'csrf_token' => 'invalid'], [])->status, 'CSV upload accepted invalid CSRF.');
+        $invalidUpload = $action->handle(['version' => 1, 'csrf_token' => 'invalid'], []);
+        assertSameValue(403, $invalidUpload->status, 'CSV upload accepted invalid CSRF.');
+        assertSameValue(false, str_contains($invalidUpload->html, 'Import Timetable'), 'Invalid upload exposed a working import confirmation action.');
         $nonAdmin = new AdminTimetableCsvImport(new TimetableCsvParser(), new TimetableCsvImportPreviewService($store), $drafts, 1, ['id' => 81, 'roles' => ['teacher']], true);
         assertSameValue(403, $nonAdmin->handle([], [])->status, 'CSV upload accepted an unauthorised user.');
     }

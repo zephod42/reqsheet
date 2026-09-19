@@ -57,4 +57,12 @@ final class TimetableCsvImportDraftStore
         SessionAuth::start();
         unset($_SESSION[self::SESSION_KEY]);
     }
+
+    public function discardOwned(string $draftId, int $organisationId, int $userId, ?int $now = null): bool
+    {
+        $draft = $this->load($draftId, $organisationId, $userId, $now);
+        if ($draft === null) return false;
+        unset($_SESSION[self::SESSION_KEY]);
+        return true;
+    }
 }

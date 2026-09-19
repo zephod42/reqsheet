@@ -16,6 +16,7 @@ final class ApplicationRoute
     public const ADMIN_TIMETABLE = 'admin_timetable';
     public const ADMIN_TIMETABLE_EXPORT = 'admin_timetable_export';
     public const ADMIN_TIMETABLE_IMPORT = 'admin_timetable_import';
+    public const ADMIN_TIMETABLE_IMPORT_CONFIRM = 'admin_timetable_import_confirm';
     public const ADMIN_TIMETABLE_RESOURCES = 'admin_timetable_resources';
     public const TEACHER_WEEK = 'teacher_week';
     public const SETUP = 'setup';
@@ -40,6 +41,9 @@ final class ApplicationRoute
         }
         if ($method === 'POST' && $path === '/admin/timetable/import') {
             return self::ADMIN_TIMETABLE_IMPORT;
+        }
+        if ($method === 'POST' && $path === '/admin/timetable/import/confirm') {
+            return self::ADMIN_TIMETABLE_IMPORT_CONFIRM;
         }
         if ($method === 'GET' && $path === '/admin/timetable/resources.csv') {
             return self::ADMIN_TIMETABLE_RESOURCES;

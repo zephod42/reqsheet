@@ -8,7 +8,7 @@ use DateTimeImmutable;
 use PDO;
 use PDOStatement;
 
-final class PdoTimetableConfigurationStore implements ResourceTimetableStore, EditableTimetableConfigurationStore
+final class PdoTimetableConfigurationStore implements ResourceTimetableStore, EditableTimetableConfigurationStore, TimetableCsvImportStore
 {
     public function __construct(private readonly PDO $pdo)
     {
@@ -199,6 +199,94 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
         );
         $statement->execute(['id' => $lessonId, 'teacher' => $teacherUserId, 'day' => $dayOfWeek, 'start_slot' => $startSlotId, 'duration' => $durationPeriods, 'class_id' => $classId, 'room_id' => $roomId]);
         if ($statement->rowCount() < 1) throw new \RuntimeException('Timetable resources are not available.');
+    }
+
+    public function beginCsvImport(int $organisationId, int $versionId): bool
+    {
+        if ($this->pdo->inTransaction() || !$this->pdo->beginTransaction()) {
+            throw new \RuntimeException('Unable to begin timetable CSV import transaction.');
+        }
+        try {
+            $version = $this->prepare('SELECT organisation_id FROM timetable_versions WHERE id = :version_id FOR UPDATE');
+            $version->execute(['version_id' => $versionId]);
+            $owner = $version->fetchColumn();
+            if ($owner === false || (int) $owner !== $organisationId) {
+                throw new TimetableCsvImportException(['The selected timetable is not available for this organisation.']);
+            }
+
+            $lessons = $this->prepare('SELECT id FROM recurring_lessons WHERE timetable_version_id = :version_id LIMIT 1 FOR UPDATE');
+            $lessons->execute(['version_id' => $versionId]);
+            if ($lessons->fetchColumn() !== false) {
+                throw new TimetableCsvImportException(['The selected timetable is no longer empty. Create or select an empty timetable before importing.']);
+            }
+
+            foreach ([
+                ['SELECT id FROM timetable_slots WHERE timetable_version_id = :scope FOR UPDATE', $versionId],
+                ['SELECT id FROM organisation_rooms WHERE organisation_id = :scope FOR UPDATE', $organisationId],
+                ['SELECT id FROM organisation_classes WHERE organisation_id = :scope FOR UPDATE', $organisationId],
+                ["SELECT id FROM users WHERE organisation_id = :scope AND (is_teacher = TRUE OR operational_role = 'teacher') FOR UPDATE", $organisationId],
+            ] as [$sql, $scope]) {
+                $lock = $this->prepare($sql);
+                $lock->execute(['scope' => $scope]);
+                $lock->fetchAll();
+            }
+            $settings = $this->prepare('SELECT allow_double_periods FROM organisation_settings WHERE organisation_id = :organisation_id FOR UPDATE');
+            $settings->execute(['organisation_id' => $organisationId]);
+            $value = $settings->fetchColumn();
+            return $value !== false && (bool) $value;
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
+    }
+
+    public function insertCsvImportLesson(
+        int $organisationId,
+        int $versionId,
+        int $teacherUserId,
+        int $dayOfWeek,
+        int $startSlotId,
+        int $durationPeriods,
+        int $classId,
+        int $roomId,
+    ): int {
+        if (!$this->pdo->inTransaction()) throw new \RuntimeException('Timetable CSV import transaction is not active.');
+        $statement = $this->prepare(
+            "INSERT INTO recurring_lessons
+                (timetable_version_id, teacher_user_id, day_of_week, start_slot_id, duration_periods, class_code, room_code, class_id, room_id)
+             SELECT tv.id, u.id, :day, s.id, :duration, c.class_code, r.room_code, c.id, r.id
+             FROM timetable_versions tv
+             JOIN users u ON u.id = :teacher_id AND u.organisation_id = tv.organisation_id
+                AND u.is_active = TRUE AND (u.is_teacher = TRUE OR u.operational_role = 'teacher')
+             JOIN organisation_classes c ON c.id = :class_id AND c.organisation_id = tv.organisation_id
+             JOIN organisation_rooms r ON r.id = :room_id AND r.organisation_id = tv.organisation_id
+             JOIN timetable_slots s ON s.id = :slot_id AND s.timetable_version_id = tv.id
+                AND s.day_of_week = :slot_day AND s.kind = 'teaching'
+             WHERE tv.id = :version_id AND tv.organisation_id = :organisation_id",
+        );
+        $statement->execute([
+            'day' => $dayOfWeek,
+            'duration' => $durationPeriods,
+            'teacher_id' => $teacherUserId,
+            'class_id' => $classId,
+            'room_id' => $roomId,
+            'slot_id' => $startSlotId,
+            'slot_day' => $dayOfWeek,
+            'version_id' => $versionId,
+            'organisation_id' => $organisationId,
+        ]);
+        if ($statement->rowCount() !== 1) throw new \RuntimeException('A validated timetable resource became unavailable.');
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function commitCsvImport(): void
+    {
+        if (!$this->pdo->inTransaction() || !$this->pdo->commit()) throw new \RuntimeException('Unable to commit timetable CSV import.');
+    }
+
+    public function rollbackCsvImport(): void
+    {
+        if ($this->pdo->inTransaction()) $this->pdo->rollBack();
     }
 
     public function insertVersion(int $organisationId, ?string $label, DateTimeImmutable $effectiveFrom, ?DateTimeImmutable $effectiveTo, int $firstDayOfWeek = 1): int

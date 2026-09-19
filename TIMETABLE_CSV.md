@@ -50,21 +50,29 @@ Successful validation produces an escaped, read-only preview showing the selecte
 
 The preview's canonical proposed assignments are stored in the current administrator session for 15 minutes with a random draft ID, organisation ID, user ID, version ID, structure digest, and expiry. Only one current draft is retained, so a later valid preview supersedes it. Uploaded file bytes are not stored. The draft is tenant/user-bound and is deliberately non-authoritative.
 
-## Final confirmation architecture
+## Milestone 3: confirmed atomic import
 
-Milestones 1 and 2 now provide the first three stages of the import pipeline. The final milestone must add only the fourth stage:
+The validated preview now provides explicit **Import Timetable** and **Cancel** actions. Both are CSRF-protected posts containing only the random draft identifier; organisation, user, timetable version, proposal, and counts are read from the server-side session draft. The preview states that import does not activate the timetable.
 
-1. Add an explicit CSRF-protected confirmation form associated with the current session draft.
-2. Inside one database transaction, lock and recheck the organisation-owned version and recurring lessons, proving the timetable is still empty.
-3. Reload teachers, classes, rooms, slots, and Settings; verify the structure digest and rebuild/revalidate all proposal assignments rather than trusting the preview.
-4. Insert every recurring lesson and commit, or roll back all inserts on any error. Do not create occurrences or requisitions and do not activate the version.
+Confirmation requires the same authenticated administrator, organisation, and unexpired session draft that created the preview. Cancel consumes the draft without changing the database. A successful import also consumes it and redirects to the selected builder with `Timetable imported successfully.` Expired, cancelled, completed, foreign-user, and foreign-tenant drafts cannot be reused.
 
-The final transaction needs a narrow bulk-import method in the timetable persistence layer because the current individual lesson methods do not own one transaction across an entire import. That method should use the existing tables and validation objects; it does not require a schema migration. Preview data must never be accepted as proof that resources still exist or that the timetable remains empty.
+Confirmation uses one InnoDB transaction on one PDO connection:
+
+1. Lock the selected `timetable_versions` row with `FOR UPDATE` and verify organisation ownership.
+2. Lock/check the version's `recurring_lessons` range and reject a timetable that is no longer empty.
+3. Lock the current slots, rooms, classes, eligible teachers, and conjoined-period setting used for revalidation.
+4. Regenerate the blank structure, compare its digest with the preview, reconstruct the proposed occupied rows from the server draft, and rerun the complete Milestone 2 resolver/grouping/conflict validator.
+5. Compare the newly resolved canonical proposal and counts with the draft, then insert every `recurring_lessons` row through an organisation-constrained insert.
+6. Commit after all inserts succeed; any validation or storage failure rolls back the whole transaction.
+
+The version-row lock serialises imports targeting the same timetable. A second importer waits and then sees the committed assignments, so it fails the empty-timetable check rather than duplicating lessons. Manual activation remains separate. Import neither creates dated occurrences nor updates/deletes occurrences or requisitions, and it does not change the active timetable ID.
+
+Ordinary state changes after preview—such as a populated target, changed structure/rooms, removed or changed teacher/class resources, disabled multi-period support, or new conflicts—produce an actionable validation response and no HTTP 503. Unexpected transaction failures are rolled back, logged through the request-ID exception logger, and shown without SQL details.
 
 Preview text is HTML-escaped, and spreadsheet formula-like values remain inert strings in Reqsheet. Uploaded content is never executed or interpreted as HTML.
 
-## Remaining final-import work
+## Operational notes and remaining risks
 
 - Confirm the 2 MiB and 20,000-row limits against the largest pilot timetable before broad deployment.
-- Define the narrow transactional bulk-insert persistence method and its concurrency test.
 - Server-side session drafts are intentionally temporary. A durable/shared preview store would need a migration only if Reqsheet later moves to multiple web nodes or requires previews to survive session loss; that is not required now.
+- Import intentionally creates recurring assignments only. Existing occurrence-generation procedures remain responsible for producing future dated occurrences when appropriate.

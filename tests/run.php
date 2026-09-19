@@ -11,6 +11,7 @@ require __DIR__ . '/TimetableConfigurationTest.php';
 require __DIR__ . '/AdminTimetablePageTest.php';
 require __DIR__ . '/BlankTimetableCsvExporterTest.php';
 require __DIR__ . '/TimetableCsvImportTest.php';
+require __DIR__ . '/TimetableCsvConfirmTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
 require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
 require __DIR__ . '/AccountTest.php';
@@ -201,6 +202,7 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\AdminTimetablePageTest::run();
 \Reqsheet\Tests\BlankTimetableCsvExporterTest::run();
 \Reqsheet\Tests\TimetableCsvImportTest::run();
+\Reqsheet\Tests\TimetableCsvConfirmTest::run();
 \Reqsheet\Tests\AccountTest::run();
 \Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();

@@ -19,6 +19,8 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::NOT_FOUND, ApplicationRoute::match('POST', '/admin/timetable/export.csv'), 'Blank timetable CSV export accepted a non-GET request.');
         assertSameValue(ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::match('POST', '/admin/timetable/import'), 'Timetable CSV import route was not recognised.');
         assertSameValue(ApplicationRoute::NOT_FOUND, ApplicationRoute::match('GET', '/admin/timetable/import'), 'Timetable CSV import accepted a non-POST request.');
+        assertSameValue(ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM, ApplicationRoute::match('POST', '/admin/timetable/import/confirm'), 'Timetable CSV confirmation route was not recognised.');
+        assertSameValue(ApplicationRoute::NOT_FOUND, ApplicationRoute::match('GET', '/admin/timetable/import/confirm'), 'Timetable CSV confirmation accepted a non-POST request.');
         assertSameValue(ApplicationRoute::ADMIN_TIMETABLE_RESOURCES, ApplicationRoute::match('GET', '/admin/timetable/resources.csv'), 'Timetable resource CSV route was not recognised.');
         assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher'), 'Teacher route was not recognised.');
         assertSameValue(ApplicationRoute::TEACHER_WEEK, ApplicationRoute::match('GET', '/teacher/week'), 'Teacher week route was not recognised.');
