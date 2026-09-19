@@ -44,10 +44,12 @@ final class SettingsPage
             elseif ($action === 'create_template') $editor = 'create';
             elseif ($action === 'save_template') {
                 try {
-                    $this->settings->save($this->organisationId, $input);
+                    $source = (int) ($input['source_version_id'] ?? 0);
+                    // Creation uses the authenticated organisation's existing
+                    // settings and the template service's safe defaults.
+                    if ($source > 0) $this->settings->save($this->organisationId, $input);
                     $data = $this->settings->load($this->organisationId);
                     $label = trim((string) ($input['template_label'] ?? ''));
-                    $source = (int) ($input['source_version_id'] ?? 0);
                     $id = (new TimetableTemplateService($this->timetable))->create($this->organisationId, $source > 0 ? $source : null, $label === '' ? null : $label, (string) ($input['effective_from'] ?? ''), $data);
                     $message = 'Timetable template saved as version ' . $id . '.';
                 } catch (SettingsValidationException | \Reqsheet\Timetable\TimetableValidationException $exception) {
@@ -80,7 +82,7 @@ final class SettingsPage
         } else {
             $body .= $this->templateSummary($active, $data);
             $body .= '<div class="form-actions"><form method="post"><input type="hidden" name="action" value="create_template"><button>Create new timetable template</button></form>';
-            if ($active !== null) $body .= '<form method="post"><input type="hidden" name="action" value="edit_template"><button class="secondary">Edit template</button></form>';
+            if ($active !== null) $body .= '<form method="post"><input type="hidden" name="action" value="edit_template"><button class="secondary">Edit timetable</button></form>';
             $body .= '</div>';
         }
         return $body . $this->accountSection() . '</section>';
@@ -115,6 +117,9 @@ final class SettingsPage
     {
         $effective = $mode === 'edit' && $source !== null ? $source->effectiveFrom->modify('+1 day')->format('Y-m-d') : date('Y-m-d');
         $label = $mode === 'edit' && $source !== null ? (string) ($source->label ?? '') : '';
+        if ($mode === 'create') {
+            return '<section class="settings-section"><h2>Create new timetable template</h2><form method="post"><input type="hidden" name="action" value="save_template"><label>Template name<input name="template_label"></label><label>Effective from<input type="date" name="effective_from" value="' . $effective . '" required></label><p class="muted">You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.</p><div class="form-actions"><button>Create timetable template</button></div></form><form method="post"><input type="hidden" name="action" value="cancel_template"><button class="secondary">Cancel</button></form></section>';
+        }
         $sourceInput = $source === null ? '' : '<input type="hidden" name="source_version_id" value="' . $source->id . '"><p class="muted">Saving creates a successor template and preserves the existing version.</p>';
         $form = $this->form($data, null);
         $replacement = '<form method="post"><input type="hidden" name="action" value="save_template">' . $sourceInput . '<label>Template name<input name="template_label" value="' . $this->e($label) . '"></label><label>Effective from<input type="date" name="effective_from" value="' . $effective . '" required></label>';

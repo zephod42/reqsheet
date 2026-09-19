@@ -58,3 +58,7 @@ Bounded login refinement completed 2026-09-19:
 Test-data reset handoff completed 2026-09-19:
 
 - `bin/reset-test-data.php` provides an explicit dry-run and confirmed CLI reset for the disposable Reqsheet test databases. It preserves schema and migration history; fresh school creation remains an administrator verification step after execution.
+
+Timetable template creation refinement completed 2026-09-19:
+
+- New templates are created with minimal version metadata and authenticated organisation context. Existing settings and timetable editor controls remain available after creation; no school-name or detailed timing/configuration fields are required in the initial template form.

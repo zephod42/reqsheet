@@ -80,16 +80,23 @@ final class SettingsTest
         assertNotContainsValue('name="periods_per_day"', $templateEmpty, 'Read-only template summary exposed the large editor by default.');
         $templateEditor = $templatePage->handle('POST', ['action' => 'create_template']);
         assertContainsValue('Create new timetable template', $templateEditor, 'Create-template workflow did not open from Settings.');
+        assertContainsValue('You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.', $templateEditor, 'Template creation did not explain later configuration.');
+        assertNotContainsValue('name="school_name"', $templateEditor, 'Template creation still asks for a school name.');
+        assertNotContainsValue('name="start_time"', $templateEditor, 'Template creation still exposes timing controls.');
+        assertNotContainsValue('name="standard_period_minutes"', $templateEditor, 'Template creation still exposes period duration.');
+        assertNotContainsValue('name="separator_type[]"', $templateEditor, 'Template creation still exposes separators.');
+        assertNotContainsValue('name="allow_conjoined_periods"', $templateEditor, 'Template creation still exposes conjoined-period settings.');
         $templateSaved = $templatePage->handle('POST', [
             'action' => 'save_template', 'template_label' => 'Autumn settings template', 'effective_from' => '2026-09-01',
-            'school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
-            'periods_per_day' => 6, 'rooms' => ['LAB-A'], 'start_time' => '08:00', 'standard_period_minutes' => '60',
-            'separator_type' => ['Break', 'Lunchtime'], 'separator_label' => ['Break', 'Lunch'], 'separator_after' => [2, 4], 'separator_duration' => ['10', '30'], 'allow_conjoined_periods' => '1',
         ]);
         assertContainsValue('Current active timetable template', $templateSaved, 'Saved template did not return to the active-template summary.');
         assertContainsValue('Autumn settings template', $templateSaved, 'Active template name was not summarized.');
         $warning = $templatePage->handle('POST', ['action' => 'edit_template']);
         assertContainsValue('Before editing the timetable template', $warning, 'Editing a template did not show the safety warning.');
+        $fullEditor = $templatePage->handle('POST', ['action' => 'continue_edit_template', 'source_version_id' => 1]);
+        assertContainsValue('Edit timetable template', $fullEditor, 'Template editing did not open after creation.');
+        assertContainsValue('name="school_name"', $fullEditor, 'Full timetable editing lost organisation settings.');
+        assertContainsValue('name="standard_period_minutes"', $fullEditor, 'Full timetable editing lost timing controls.');
 
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
         $signupAccounts = new \Reqsheet\Account\AccountService($signupStore);
