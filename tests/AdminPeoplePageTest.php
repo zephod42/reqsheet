@@ -31,12 +31,13 @@ final class AdminPeoplePageTest
         $view = $page->handle('GET', []);
         assertContainsValue('First Teacher', $view, 'People page did not list organisation people.');
         assertNotContainsValue('Other Teacher', $view, 'People page leaked another organisation.');
+        assertNotContainsValue('Teacher no.', $view, 'People table exposed the internal teacher number column.');
         assertContainsValue('Add Person', $view, 'People page did not move creation behind an Add Person control.');
         assertContainsValue('name="roles[]" value="administrator"', $view, 'People dialog did not expose the administrator role checkbox.');
 
         $createdView = $page->handle('POST', ['csrf_token' => $token, 'action' => 'add', 'display_name' => 'Combined Person', 'staff_identifier' => 'CP', 'email' => 'cp@example.test', 'roles' => ['teacher', 'technician', 'administrator']]);
         assertContainsValue('Person created.', $createdView, 'Add Person workflow did not create a person.');
-        assertContainsValue('Teacher number: 3.', $createdView, 'Add Person did not report the organisation-local teacher number.');
+        assertNotContainsValue('Teacher number:', $createdView, 'People UI exposed the internal teacher number.');
         assertSameValue(['teacher', 'technician', 'administrator'], $store->accounts['Combined Person']['roles'], 'Multiple roles were not stored cumulatively.');
         assertSameValue(true, SessionAuth::hasRole(['roles' => ['teacher', 'administrator']], 'teacher'), 'Teacher role was not cumulative.');
         assertSameValue(true, SessionAuth::isAdmin(['roles' => ['teacher', 'administrator'], 'is_admin' => true]), 'Administrator role was not cumulative.');

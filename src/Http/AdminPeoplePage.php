@@ -32,9 +32,7 @@ final class AdminPeoplePage
                         $message = 'Person updated.';
                     } else {
                         $id = $this->accounts->createPerson($this->organisationId, (string) ($input['display_name'] ?? ''), isset($input['staff_identifier']) ? (string) $input['staff_identifier'] : null, $email, $roles);
-                        $created = $this->accounts->findUserById($id);
                         $message = 'Person created. They can set a password on first login.';
-                        if (($created['teacher_number'] ?? null) !== null) $message .= ' Teacher number: ' . (int) $created['teacher_number'] . '.';
                     }
                 } catch (AccountValidationException $exception) {
                     $message = implode(' ', $exception->errors());
@@ -54,11 +52,11 @@ final class AdminPeoplePage
         foreach ($people as $person) {
             $id = (int) $person['id'];
             $roles = $this->roles($person);
-            $rows .= '<tr><th scope="row">' . $this->e((string) $person['display_name']) . '</th><td>' . (!empty($person['staff_identifier']) ? $this->e((string) $person['staff_identifier']) : '<span class="muted">—</span>') . '</td><td>' . (!empty($person['teacher_number']) ? (int) $person['teacher_number'] : '<span class="muted">—</span>') . '</td><td>' . (!empty($person['email']) ? $this->e((string) $person['email']) : '<span class="muted">Not entered</span>') . '</td><td>' . $this->e($this->roleLabels($roles)) . '</td><td><button type="button" class="secondary" data-open-dialog="person-' . $id . '">Edit</button></td></tr>';
+            $rows .= '<tr><th scope="row">' . $this->e((string) $person['display_name']) . '</th><td>' . (!empty($person['staff_identifier']) ? $this->e((string) $person['staff_identifier']) : '<span class="muted">—</span>') . '</td><td>' . (!empty($person['email']) ? $this->e((string) $person['email']) : '<span class="muted">Not entered</span>') . '</td><td>' . $this->e($this->roleLabels($roles)) . '</td><td><button type="button" class="secondary" data-open-dialog="person-' . $id . '">Edit</button></td></tr>';
             $dialogs .= $this->personDialog($person, $roles);
         }
-        if ($rows === '') $rows = '<tr><td colspan="6">No people have been added yet.</td></tr>';
-        $body = '<section class="content-wide"><div class="page-header"><div><p class="eyebrow">Admin</p><h1>People</h1></div><a class="button secondary" href="/admin/timetable">Timetable</a></div>' . $notice . '<p>People belong only to this organisation. Roles are cumulative and can be changed by an administrator.</p><div class="people-table-wrap"><table class="people-table"><caption class="visually-hidden">People in this organisation</caption><thead><tr><th scope="col">Full name</th><th scope="col">Initials</th><th scope="col">Teacher no.</th><th scope="col">Email</th><th scope="col">Roles / permissions</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>' . $rows . '</tbody></table></div><p><button type="button" data-open-dialog="person-add">Add Person</button></p>' . $dialogs . $this->personDialog(null, []) . '</section><script>' . $this->script() . '</script>';
+        if ($rows === '') $rows = '<tr><td colspan="5">No people have been added yet.</td></tr>';
+        $body = '<section class="content-wide"><div class="page-header"><div><p class="eyebrow">Admin</p><h1>People</h1></div><a class="button secondary" href="/admin/timetable">Timetable</a></div>' . $notice . '<p>People belong only to this organisation. Roles are cumulative and can be changed by an administrator.</p><div class="people-table-wrap"><table class="people-table"><caption class="visually-hidden">People in this organisation</caption><thead><tr><th scope="col">Full name</th><th scope="col">Initials</th><th scope="col">Email</th><th scope="col">Roles / permissions</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>' . $rows . '</tbody></table></div><p><button type="button" data-open-dialog="person-add">Add Person</button></p>' . $dialogs . $this->personDialog(null, []) . '</section><script>' . $this->script() . '</script>';
         return $body;
     }
 
