@@ -43,6 +43,11 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $route = ApplicationRoute::match($method, $path);
 
+// Front-controller responses can contain tenant or session data. Static assets
+// are served separately and retain normal cacheability.
+header('Cache-Control: no-store, private');
+header('Pragma: no-cache');
+
 $rawEnvironment = getenv();
 $rawEnvironment = is_array($rawEnvironment) ? $rawEnvironment : [];
 try {
@@ -92,7 +97,12 @@ if ($currentUser !== null) {
             $currentUser = null;
         }
     } catch (\Throwable) {
-        // Existing public routing behaviour remains available when no runtime database is configured.
+        // Do not turn a schema/database outage into an authentication redirect.
+        SessionAuth::logout();
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Reqsheet is temporarily unavailable while its database schema is being updated.\n";
+        exit;
     }
 }
 if ($tenantOrganisationId !== null && $currentUser !== null && (int) $currentUser['organisation_id'] !== (int) $tenantOrganisationId) {

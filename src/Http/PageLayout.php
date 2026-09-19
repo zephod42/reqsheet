@@ -17,6 +17,8 @@ final class PageLayout
 
     public static function render(string $title, string $body, ?array $user = null): string
     {
+        $assetPath = dirname(__DIR__, 2) . '/public/assets/app.css';
+        $assetVersion = is_file($assetPath) ? (string) filemtime($assetPath) : '1';
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $active = static fn (string $path): string => ($path === '/teacher' ? str_starts_with($currentPath, '/teacher') : $currentPath === $path) ? ' class="active" aria-current="page"' : '';
         $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet.</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
@@ -33,7 +35,7 @@ final class PageLayout
         }
         $nav .= '</ul></nav>';
         $tenant = self::$tenantOrganisation === null ? '' : '<p class="tenant-name">' . self::e(self::$tenantOrganisation['name']) . '</p>';
-        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title><link rel="stylesheet" href="/assets/app.css"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . $tenant . $body . '</main></div></body></html>';
+        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title><link rel="stylesheet" href="/assets/app.css?v=' . rawurlencode($assetVersion) . '"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . $tenant . $body . '</main></div></body></html>';
     }
 
     private static function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }

@@ -64,6 +64,12 @@ People and navigation milestone completed 2026-09-19:
 - People is an organisation-scoped list with accessible Add/Edit dialogs, optional email, cumulative independent roles, and CSRF-protected validation.
 - Migration `0008_add_people_roles_and_teacher_numbers.sql` adds optional email, independent operational-role flags, and immutable organisation-local teacher numbers. Existing users are backfilled by organisation and existing database IDs/relationships are preserved.
 
+Session robustness refinement completed 2026-09-19:
+
+- Session payloads are versioned and account state/revocation is revalidated at request time; stale, revoked, cross-tenant, and incompatible sessions are cleared without role redirects.
+- Dynamic tenant/session responses use private no-store headers, while the shared stylesheet uses a file-version query parameter so normal static caching does not retain deployed CSS.
+- Schema/database failures remain controlled service errors and are not disguised as authentication failures. Migration 0011 must be applied before serving the current account/session code on an older database.
+
 The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services provide the validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Product behaviour and the remaining UI/admin scope are canonical in `PRODUCT_DESIGN.md`; authentication/authorization and exception handling remain future work.
 
 Bounded login refinement completed 2026-09-19:

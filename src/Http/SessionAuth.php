@@ -6,6 +6,8 @@ namespace Reqsheet\Http;
 
 final class SessionAuth
 {
+    private const SESSION_VERSION = 2;
+
     public static function start(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) return;
@@ -24,6 +26,7 @@ final class SessionAuth
     {
         self::start();
         session_regenerate_id(true);
+        $_SESSION['session_version'] = self::SESSION_VERSION;
         $_SESSION['user'] = [
             'id' => (int) $account['id'],
             'organisation_id' => (int) $account['organisation_id'],
@@ -47,7 +50,15 @@ final class SessionAuth
     {
         self::start();
         $user = $_SESSION['user'] ?? null;
-        if (!is_array($user) || !isset($user['id'], $user['organisation_id'])) return null;
+        if ($user === null) return null;
+        if ((int) ($_SESSION['session_version'] ?? 0) !== self::SESSION_VERSION) {
+            self::logout();
+            return null;
+        }
+        if (!is_array($user) || !isset($user['id'], $user['organisation_id'])) {
+            self::logout();
+            return null;
+        }
         return [
             'id' => (int) $user['id'], 'organisation_id' => (int) $user['organisation_id'],
             'display_name' => (string) ($user['display_name'] ?? ''), 'staff_identifier' => isset($user['staff_identifier']) ? (string) $user['staff_identifier'] : null,

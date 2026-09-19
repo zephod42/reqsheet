@@ -71,6 +71,10 @@ final class AccountTest
         SessionAuth::login($account);
         assertSameValue($account['id'], SessionAuth::current()['id'], 'Authenticated session did not retain the user.');
         assertSameValue('NEV', SessionAuth::current()['staff_identifier'], 'Authenticated session did not retain teacher initials.');
+        $_SESSION['session_version'] = 1;
+        assertSameValue(null, SessionAuth::current(), 'An incompatible session payload was not cleared.');
+        SessionAuth::login($account);
+        assertSameValue($account['id'], SessionAuth::current()['id'], 'A user could not log in after an incompatible session was cleared.');
         SessionAuth::logout();
         assertSameValue(null, SessionAuth::current(), 'Logout did not clear authentication.');
     }
