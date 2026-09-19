@@ -110,7 +110,7 @@ final class AccountService
     public function authenticate(string $login, string $password, ?int $organisationId = null): array
     {
         if ($organisationId === null) throw new AccountValidationException(['Open your school’s Reqsheet address to log in.']);
-        try { $login = StaffIdentifier::normalise($login); } catch (AccountValidationException) { throw new AccountValidationException(['Invalid login details.']); }
+        try { $login = StaffIdentifier::normalise(strtoupper($login)); } catch (AccountValidationException) { throw new AccountValidationException(['Invalid login details.']); }
         $account = $this->store->findLogin($login, $organisationId);
         if ($account === null || !($account['is_active'] ?? false) || ($organisationId !== null && (int) ($account['organisation_id'] ?? 0) !== $organisationId)) throw new AccountValidationException(['Invalid login details.']);
         if (($account['account_state'] ?? '') === 'awaiting_first_login' && ($account['password_hash'] ?? null) === null) {
@@ -136,7 +136,7 @@ final class AccountService
     public function needsFirstLogin(string $login, ?int $organisationId = null): bool
     {
         if ($organisationId === null) return false;
-        try { $login = StaffIdentifier::normalise($login); } catch (AccountValidationException) { return false; }
+        try { $login = StaffIdentifier::normalise(strtoupper($login)); } catch (AccountValidationException) { return false; }
         $account = $this->store->findLogin($login, $organisationId);
         return $account !== null && ($account['is_active'] ?? false)
             && ($organisationId === null || (int) ($account['organisation_id'] ?? 0) === $organisationId)
@@ -147,7 +147,7 @@ final class AccountService
     public function claimFirstLogin(string $login, string $password, string $confirmation, ?int $organisationId = null): array
     {
         if ($organisationId === null) throw new AccountValidationException(['Open your school’s Reqsheet address to log in.']);
-        try { $login = StaffIdentifier::normalise($login); } catch (AccountValidationException) { throw new AccountValidationException(['Invalid login details.']); }
+        try { $login = StaffIdentifier::normalise(strtoupper($login)); } catch (AccountValidationException) { throw new AccountValidationException(['Invalid login details.']); }
         $account = $this->store->findLogin($login, $organisationId);
         if ($account === null || !($account['is_active'] ?? false) || (int) ($account['organisation_id'] ?? 0) !== $organisationId || ($account['account_state'] ?? '') !== 'awaiting_first_login' || ($account['password_hash'] ?? null) !== null) {
             throw new AccountValidationException(['This account has already been claimed or is unavailable.']);
