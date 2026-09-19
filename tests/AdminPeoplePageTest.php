@@ -37,6 +37,7 @@ final class AdminPeoplePageTest
 
         $createdView = $page->handle('POST', ['csrf_token' => $token, 'action' => 'add', 'display_name' => 'Combined Person', 'staff_identifier' => 'CPX', 'email' => 'cp@example.test', 'roles' => ['teacher', 'technician', 'administrator']]);
         assertContainsValue('Person created.', $createdView, 'Add Person workflow did not create a person.');
+        assertContainsValue('Please use three capital letters.', $createdView, 'Staff-code validation guidance was not rendered.');
         assertNotContainsValue('Teacher number:', $createdView, 'People UI exposed the internal teacher number.');
         assertSameValue(['teacher', 'technician', 'administrator'], $store->accounts['Combined Person']['roles'], 'Multiple roles were not stored cumulatively.');
         assertSameValue(true, SessionAuth::hasRole(['roles' => ['teacher', 'administrator']], 'teacher'), 'Teacher role was not cumulative.');

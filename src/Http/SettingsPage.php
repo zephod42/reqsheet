@@ -62,8 +62,9 @@ final class SettingsPage
                     $data = $this->settings->load($this->organisationId);
                     $label = trim((string) ($input['template_label'] ?? ''));
                     if ($source === 0) $data = array_replace($data, ['working_days' => $input['working_days'] ?? [], 'first_day_of_week' => $input['first_day_of_week'] ?? 0, 'periods_per_day' => $input['periods_per_day'] ?? 0]);
-                    $id = (new TimetableTemplateService($this->timetable))->create($this->organisationId, $source > 0 ? $source : null, $label, null, $data);
-                    $message = 'Timetable template saved as version ' . $id . '.';
+                    $service = new TimetableTemplateService($this->timetable);
+                    if ($source > 0) { $service->update($this->organisationId, $source, $label, $data); $message = 'Timetable template updated.'; }
+                    else { $id = $service->create($this->organisationId, null, $label, null, $data); $message = 'Timetable template saved as version ' . $id . '.'; }
                 } catch (SettingsValidationException | \Reqsheet\Timetable\TimetableValidationException $exception) {
                     $message = implode(' ', $exception->errors());
                     $editor = ((int) ($input['source_version_id'] ?? 0)) > 0 ? 'edit' : 'create';
@@ -149,7 +150,7 @@ final class SettingsPage
             foreach ($dayNames as $number => $name) $dayInputs .= '<label class="check-label"><input type="checkbox" name="working_days[]" value="' . $number . '"' . (in_array($number, $days, true) ? ' checked' : '') . '> ' . $name . '</label>';
             return '<section class="settings-section"><h2>Create new timetable template</h2><form method="post"><input type="hidden" name="action" value="save_template"><label>Timetable name<input name="template_label" maxlength="255" required></label><fieldset><legend>Days of the week</legend><div class="day-options">' . $dayInputs . '</div><p class="muted">Select at least one day.</p></fieldset><label>First day of the week<select name="first_day_of_week" required>' . $this->dayOptions($dayNames, $selectedFirstDay) . '</select></label><label>Periods per day<input type="number" name="periods_per_day" min="1" max="20" value="' . (int) ($data['periods_per_day'] ?? 6) . '" required></label><div class="form-actions"><button>Create timetable template</button></div></form><form method="post"><input type="hidden" name="action" value="cancel_template"><button class="secondary">Cancel</button></form></section>';
         }
-        $sourceInput = $source === null ? '' : '<input type="hidden" name="source_version_id" value="' . $source->id . '"><p class="muted">Saving creates a successor template and preserves the existing version.</p>';
+        $sourceInput = $source === null ? '' : '<input type="hidden" name="source_version_id" value="' . $source->id . '"><p class="muted">Saving updates this timetable and preserves dated lesson history.</p>';
         if ($source !== null) {
             $sourceSlots = $this->timetable?->slotsForVersion($source->id) ?? [];
             $sourceDays = array_values(array_unique(array_map(static fn ($slot): int => $slot->dayOfWeek, $sourceSlots)));

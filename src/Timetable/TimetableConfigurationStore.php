@@ -87,3 +87,9 @@ interface TimetableConfigurationStore
 
     public function deleteLesson(int $lessonId): void;
 }
+
+interface EditableTimetableConfigurationStore extends TimetableConfigurationStore
+{
+    /** @param list<array{day:int,sequence:int,kind:string,period:?int,label:string,starts_at:string,ends_at:string}> $slots */
+    public function updateVersion(int $organisationId, int $versionId, string $label, int $firstDayOfWeek, array $slots): void;
+}

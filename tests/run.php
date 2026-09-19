@@ -100,8 +100,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -152,6 +152,11 @@ $peopleMigration = file_get_contents($migrationDirectory . '/0008_add_people_rol
 if ($peopleMigration === false) throw new RuntimeException('People migration could not be read.');
 foreach (['email', 'is_teacher', 'is_technician', 'teacher_number', 'users_organisation_teacher_number', 'ROW_NUMBER'] as $expectedPeopleFragment) {
     if (!str_contains($peopleMigration, $expectedPeopleFragment)) throw new RuntimeException('Expected people schema fragment is missing: ' . $expectedPeopleFragment);
+}
+$technicianMigration = file_get_contents($migrationDirectory . '/0010_create_technician_room_preferences.sql');
+if ($technicianMigration === false) throw new RuntimeException('Technician preference migration could not be read.');
+foreach (['technician_room_preferences', 'organisation_id', 'user_id', 'room_id'] as $expectedTechnicianFragment) {
+    if (!str_contains($technicianMigration, $expectedTechnicianFragment)) throw new RuntimeException('Expected technician schema fragment is missing: ' . $expectedTechnicianFragment);
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),

@@ -8,7 +8,7 @@ use DateTimeImmutable;
 use PDO;
 use PDOStatement;
 
-final class PdoTimetableConfigurationStore implements ResourceTimetableStore
+final class PdoTimetableConfigurationStore implements ResourceTimetableStore, EditableTimetableConfigurationStore
 {
     public function __construct(private readonly PDO $pdo)
     {
@@ -215,6 +215,39 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore
             'first_day_of_week' => $firstDayOfWeek,
         ]);
         return (int) $this->pdo->lastInsertId();
+    }
+
+    public function updateVersion(int $organisationId, int $versionId, string $label, int $firstDayOfWeek, array $slots): void
+    {
+        if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin timetable edit.');
+        try {
+            $check = $this->prepare('SELECT id FROM timetable_versions WHERE id = :id AND organisation_id = :organisation_id FOR UPDATE');
+            $check->execute(['id' => $versionId, 'organisation_id' => $organisationId]);
+            if ($check->fetchColumn() === false) throw new TimetableValidationException(['The timetable template is not available for this organisation.']);
+            $update = $this->prepare('UPDATE timetable_versions SET label = :label, first_day_of_week = :first_day WHERE id = :id AND organisation_id = :organisation_id');
+            $update->execute(['label' => $label, 'first_day' => $firstDayOfWeek, 'id' => $versionId, 'organisation_id' => $organisationId]);
+            $existing = [];
+            $select = $this->prepare('SELECT id, day_of_week, sequence_number FROM timetable_slots WHERE timetable_version_id = :version_id ORDER BY day_of_week, sequence_number FOR UPDATE');
+            $select->execute(['version_id' => $versionId]);
+            foreach ($select->fetchAll() as $row) $existing[(int) $row['day_of_week'] . ':' . (int) $row['sequence_number']] = (int) $row['id'];
+            $keep = [];
+            foreach ($slots as $slot) {
+                $key = (int) $slot['day'] . ':' . (int) $slot['sequence']; $keep[$key] = true;
+                if (isset($existing[$key])) {
+                    $statement = $this->prepare('UPDATE timetable_slots SET kind = :kind, teaching_period_number = :period, label = :label, starts_at = :starts_at, ends_at = :ends_at WHERE id = :id');
+                    $statement->execute(['kind' => $slot['kind'], 'period' => $slot['period'], 'label' => $slot['label'], 'starts_at' => $slot['starts_at'], 'ends_at' => $slot['ends_at'], 'id' => $existing[$key]]);
+                } else $this->insertSlot($versionId, (int) $slot['day'], (int) $slot['sequence'], (string) $slot['kind'], $slot['period'] === null ? null : (int) $slot['period'], (string) $slot['label'], (string) $slot['starts_at'], (string) $slot['ends_at']);
+            }
+            foreach ($existing as $key => $slotId) {
+                if (isset($keep[$key])) continue;
+                $used = $this->prepare('SELECT 1 FROM recurring_lessons WHERE start_slot_id = :slot_id UNION ALL SELECT 1 FROM lesson_occurrences WHERE snapshot_start_slot_id = :slot_id LIMIT 1');
+                $used->execute(['slot_id' => $slotId]);
+                if ($used->fetchColumn() !== false) throw new TimetableValidationException(['This timetable period is part of existing lessons or dated history and cannot be removed.']);
+                $delete = $this->prepare('DELETE FROM timetable_slots WHERE id = :id AND timetable_version_id = :version_id');
+                $delete->execute(['id' => $slotId, 'version_id' => $versionId]);
+            }
+            if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete timetable edit.');
+        } catch (\Throwable $exception) { if ($this->pdo->inTransaction()) $this->pdo->rollBack(); throw $exception; }
     }
 
     public function createSuccessorVersion(int $organisationId, int $sourceVersionId, ?string $label, DateTimeImmutable $effectiveFrom): int

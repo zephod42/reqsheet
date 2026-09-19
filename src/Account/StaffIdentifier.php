@@ -10,7 +10,7 @@ final class StaffIdentifier
     {
         $value = strtoupper(trim($value));
         if (preg_match('/\A[A-Z]{3}\z/D', $value) !== 1) {
-            throw new AccountValidationException(['Initials must be exactly three letters (A-Z).']);
+            throw new AccountValidationException(['Please use three capital letters.']);
         }
         return $value;
     }

@@ -25,8 +25,8 @@ Agreed design decisions recorded on 2026-09-18:
 Upcoming implementation sequence:
 
 1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, account/password workflows, technician workflows, and printing with representative schools.
-2. Technician day-view skeleton and room preferences: current day, room columns, period rows, My rooms/All rooms/custom rooms, and teacher/room week inspection.
-3. Technician print/PDF workflow: future-week selection, one A4 page per day, selected-room layouts, and practical page fitting.
+2. Technician day-view and room preferences completed 2026-09-19: current/future day navigation, room columns and separator rows, persisted requisitions, My rooms/All rooms/custom rooms, personal defaults, and secondary teacher/room inspection views.
+3. Technician browser-print workflow completed 2026-09-19: selected-room daily preparation sheet, A4 landscape print CSS, one selected day per print page, neutral black-and-white output, and native browser printing.
 4. Production deployment configuration when a domain is selected: configure DNS/web-server wildcard acceptance and production TLS coverage. The tenant architecture is already implemented and remains independent of the eventual domain.
 5. Teacher lesson duplication: accessible copy workflows for visible and future lessons, overwrite confirmation, and practical undo.
 6. Admin theme settings: exactly Primary and Secondary accent values, centrally applied without arbitrary CSS or coupling to class/grid/print colours.

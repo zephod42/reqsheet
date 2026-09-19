@@ -92,17 +92,20 @@ final class AdminTimetablePageTest
         $page = new AdminTimetablePage($store, 1, ['working_days' => [1, 2], 'first_day_of_week' => 1, 'allow_double_periods' => true]);
         $roomAdded = $page->handle('POST', ['version' => 1, 'view' => 'room', 'resource' => 401], ['action' => 'create_resource', 'resource_type' => 'room', 'code' => 'L3', 'return_view' => 'room', 'return_resource' => 401]);
         assertContains('Room added.', $roomAdded, 'Timetable builder no longer creates rooms.');
+        assertNotContains('id="assignment-editor"', $roomAdded, 'Adding a room unexpectedly opened Add Lesson.');
         assertSameValue('L3', $store->rooms[2]['code'], 'Timetable builder did not preserve the created room.');
         $grid = $page->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10], []);
         assertContains('Break', $grid, 'Break separator label was not rendered.');
         assertContains('Lunch', $grid, 'Lunch separator label was not rendered.');
         assertContains('Lab meeting', $grid, 'Custom separator label was not rendered.');
         assertContains('admin-resource-grid', $grid, 'Resource grid was not rendered.');
+        assertContains('<h2>Teacher A</h2>', $grid, 'Selected teacher heading did not show the resource name.');
+        assertNotContains('Versioned timetable by teacher/class/room', $grid, 'Redundant generic timetable heading remained.');
         assertContains('class="empty-period"', $grid, 'Empty teaching cells were not clickable.');
 
         $teacherEditor = $page->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10, 'day' => 1, 'start_slot' => 101], []);
         assertContains('id="assignment-editor"', $teacherEditor, 'Teacher cell editor did not open.');
-        assertContains('Teacher TA', $teacherEditor, 'Teacher projection context was not rendered.');
+        assertContains('Teacher Teacher A', $teacherEditor, 'Teacher projection context was not rendered.');
         assertNotContains('<select id="teacher_user_id"', $teacherEditor, 'Teacher projection redundantly exposed a teacher selector.');
         assertContains('<select id="room_id"', $teacherEditor, 'Teacher projection omitted the room selector.');
         assertContains('<select id="class_id"', $teacherEditor, 'Teacher projection omitted the class selector.');

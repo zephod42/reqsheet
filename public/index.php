@@ -28,12 +28,13 @@ use Reqsheet\Http\SetupBlockingPage;
 use Reqsheet\Http\SetupAccess;
 use Reqsheet\Http\SetupPage;
 use Reqsheet\Http\SignupPage;
-use Reqsheet\Http\TechnicianPlaceholderPage;
+use Reqsheet\Http\TechnicianPage;
 use Reqsheet\Http\TenantHostContext;
 use Reqsheet\Http\TenantHostException;
 use Reqsheet\Http\TenantHostResolver;
 use Reqsheet\Teacher\PdoTeacherPlanningStore;
 use Reqsheet\Teacher\TeacherPlanningService;
+use Reqsheet\Technician\PdoTechnicianPlanningStore;
 use Reqsheet\Timetable\PdoTimetableConfigurationStore;
 use Reqsheet\Settings\PdoOrganisationSettingsStore;
 use Reqsheet\Settings\SettingsService;
@@ -394,8 +395,19 @@ if ($route === ApplicationRoute::TECHNICIAN) {
         header('Location: /login', true, 302);
         exit;
     }
-    header('Content-Type: text/html; charset=UTF-8');
-    echo (new TechnicianPlaceholderPage())->render($user);
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    try {
+        $environment = ExternalEnvironment::load($environment);
+        $config = DatabaseConfig::fromEnvironment($environment);
+        $page = new TechnicianPage(new PdoTechnicianPlanningStore((new Database($config))->connection()), (int) $user['organisation_id'], (int) $user['id'], $user);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $page->handle($method, $_GET, $_POST);
+    } catch (\Throwable) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
     exit;
 }
 

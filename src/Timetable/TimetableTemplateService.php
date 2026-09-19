@@ -43,6 +43,25 @@ final class TimetableTemplateService
         return $versionId;
     }
 
+    /** @param array<string, mixed> $settings */
+    public function update(int $organisationId, int $versionId, ?string $label, array $settings): void
+    {
+        if (!$this->store instanceof EditableTimetableConfigurationStore) throw new TimetableValidationException(['This timetable store does not support editing an existing template.']);
+        $version = $this->store->findVersion($versionId);
+        if ($version === null || $version->organisationId !== $organisationId) throw new TimetableValidationException(['The timetable template is not available for this organisation.']);
+        $name = trim((string) $label);
+        if ($name === '') throw new TimetableValidationException(['Timetable name is required.']);
+        if (mb_strlen($name) > 255) throw new TimetableValidationException(['Timetable name must be 255 characters or fewer.']);
+        foreach ($this->store->versionsForOrganisation($organisationId) as $existing) if ($existing->id !== $versionId && strcasecmp((string) $existing->label, $name) === 0) throw new TimetableValidationException(['A timetable with this name already exists for this organisation.']);
+        $days = array_values(array_unique(array_filter(array_map('intval', (array) ($settings['working_days'] ?? [])), static fn (int $day): bool => $day >= 1 && $day <= 7)));
+        sort($days);
+        $firstDay = (int) ($settings['first_day_of_week'] ?? 0); $periods = (int) ($settings['periods_per_day'] ?? 0);
+        if ($days === []) throw new TimetableValidationException(['Select at least one working day.']);
+        if (!in_array($firstDay, $days, true)) throw new TimetableValidationException(['The first day of the week must be one of the selected working days.']);
+        if ($periods < 1 || $periods > 20) throw new TimetableValidationException(['Periods per day must be a positive whole number between 1 and 20.']);
+        $this->store->updateVersion($organisationId, $versionId, $name, $firstDay, $this->seedRows(array_replace($settings, ['working_days' => $days, 'periods_per_day' => $periods])));
+    }
+
     /** @return array<string, mixed>|null */
     public function activeTemplate(int $organisationId): ?array
     {
@@ -61,6 +80,12 @@ final class TimetableTemplateService
     /** @param array<string, mixed> $settings */
     private function seed(int $versionId, array $settings): void
     {
+        foreach ($this->seedRows($settings) as $slot) $this->store->insertSlot($versionId, $slot['day'], $slot['sequence'], $slot['kind'], $slot['period'], $slot['label'], $slot['starts_at'], $slot['ends_at']);
+    }
+
+    /** @return list<array{day:int,sequence:int,kind:string,period:?int,label:string,starts_at:string,ends_at:string}> */
+    private function seedRows(array $settings): array
+    {
         $days = array_values(array_filter(array_map('intval', (array) ($settings['working_days'] ?? [1, 2, 3, 4, 5])), static fn (int $day): bool => $day >= 1 && $day <= 7));
         $periods = max(1, min(20, (int) ($settings['periods_per_day'] ?? 6)));
         $defaultStart = (string) ($settings['start_time'] ?? '08:00');
@@ -72,7 +97,7 @@ final class TimetableTemplateService
             $after = (int) ($separator['after_period'] ?? 0);
             if ($after >= 1 && $after < $periods) $separators[$after] = $separator;
         }
-        $service = new TimetableSlotService($this->store);
+        $rows = [];
         foreach ($days as $day) {
             $daySettings = is_array($customDays[(string) $day] ?? null) ? $customDays[(string) $day] : [];
             $start = (string) ($daySettings['start_time'] ?? '') ?: $defaultStart;
@@ -81,7 +106,7 @@ final class TimetableTemplateService
             $sequence = 1;
             for ($period = 1; $period <= $periods; $period++) {
                 $end = $clock->modify('+' . $length . ' minutes');
-                $service->create($versionId, $day, $sequence++, 'teaching', $period, 'P' . $period, $clock->format('H:i'), $end->format('H:i'));
+                $rows[] = ['day' => $day, 'sequence' => $sequence++, 'kind' => 'teaching', 'period' => $period, 'label' => 'P' . $period, 'starts_at' => $clock->format('H:i'), 'ends_at' => $end->format('H:i')];
                 $clock = $end;
                 if (!isset($separators[$period])) continue;
                 $separator = $separators[$period];
@@ -90,9 +115,10 @@ final class TimetableTemplateService
                 $label = trim((string) ($separator['label'] ?? '')) ?: ($type === 'Lunchtime' ? 'Lunch' : $type);
                 $minutes = max(1, (int) ($separator['duration_minutes'] ?? 15));
                 $separatorEnd = $clock->modify('+' . $minutes . ' minutes');
-                $service->create($versionId, $day, $sequence++, $kind, null, $label, $clock->format('H:i'), $separatorEnd->format('H:i'));
+                    $rows[] = ['day' => $day, 'sequence' => $sequence++, 'kind' => $kind, 'period' => null, 'label' => $label, 'starts_at' => $clock->format('H:i'), 'ends_at' => $separatorEnd->format('H:i')];
                 $clock = $separatorEnd;
             }
         }
+        return $rows;
     }
 }

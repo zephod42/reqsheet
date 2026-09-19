@@ -218,6 +218,24 @@ dialog .close { float: right; }
 .assignment-dialog form, .resource-dialog form { max-width: none; margin: 0; }
 .assignment-dialog .lesson-context { margin-top: .9rem; }
 .technician-placeholder { padding-top: var(--space-5); }
+.technician-controls { display: flex; align-items: center; gap: .7rem; margin: var(--space-4) 0; }
+.technician-date { min-width: 16rem; text-align: center; font-family: var(--technical); }
+.technician-room-controls { display: flex; flex-wrap: wrap; gap: 1rem; border: 1px solid var(--rule); padding: .8rem; margin-bottom: var(--space-4); }
+.technician-room-controls form { display: flex; align-items: end; flex-wrap: wrap; gap: .6rem; }
+.technician-room-controls label { margin: 0; }
+.technician-room-controls .check-label { align-items: center; }
+.technician-sheet { font-family: var(--technical); }
+.print-date { margin: 0 0 .7rem; font-size: 1rem; }
+.technician-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.technician-grid th, .technician-grid td { border: 1px solid var(--rule); padding: .35rem; vertical-align: top; }
+.technician-grid th:first-child { width: 7rem; text-align: left; }
+.technician-grid td { height: 4.2rem; }
+.technician-separator th, .technician-separator td { height: 1.5rem; background: #eee; color: var(--muted); }
+.technician-cell { height: 100%; overflow: hidden; }
+.technician-cell summary { display: block; overflow: hidden; cursor: pointer; text-overflow: ellipsis; white-space: nowrap; }
+.technician-detail { position: relative; z-index: 2; margin-top: .4rem; padding: .55rem; border: 1px solid var(--rule); background: #fff; font-family: var(--sans); font-size: .82rem; }
+.technician-detail p { margin: .45rem 0; }
+.technician-secondary { margin-top: var(--space-4); }
 
 @media (max-width: 48rem) {
     .site-shell { display: block; }
@@ -245,4 +263,11 @@ dialog .close { float: right; }
     .lesson-block, .admin-lesson, .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { background: #fff !important; color: #000 !important; box-shadow: none !important; }
     .lesson-block, .admin-lesson { border-color: #000 !important; }
     .lesson-header strong, .lesson-header > span { color: #000 !important; }
+    @page { size: A4 landscape; margin: 8mm; }
+    .technician-controls, .technician-room-controls, .technician-secondary, .technician-sheet .technician-detail, .technician-cell summary::marker { display: none !important; }
+    .technician-sheet { display: block; }
+    .technician-grid { font-size: 9pt; }
+    .technician-grid th, .technician-grid td { padding: 2mm; }
+    .technician-cell { display: block; }
+    .technician-cell summary { display: block; white-space: normal; }
 }

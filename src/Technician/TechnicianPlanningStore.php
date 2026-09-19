@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Reqsheet\Technician;
+
+use DateTimeImmutable;
+
+interface TechnicianPlanningStore
+{
+    public function technicianBelongsToOrganisation(int $userId, int $organisationId): bool;
+    /** @return list<array{id:int,code:string}> */
+    public function roomsForOrganisation(int $organisationId): array;
+    /** @return list<array{id:int,name:string}> */
+    public function teachersForOrganisation(int $organisationId): array;
+    /** @return list<int> */
+    public function defaultRoomIds(int $organisationId, int $userId): array;
+    /** @param list<int> $roomIds */
+    public function saveDefaultRoomIds(int $organisationId, int $userId, array $roomIds): void;
+    /** @return array{version:?array,slots:list<array<string,mixed>>,occurrences:list<array<string,mixed>>} */
+    public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array;
+    /** @return list<array<string,mixed>> */
+    public function weekForTeacher(int $organisationId, int $teacherId, DateTimeImmutable $start): array;
+    /** @return list<array<string,mixed>> */
+    public function weekForRoom(int $organisationId, int $roomId, DateTimeImmutable $start): array;
+}

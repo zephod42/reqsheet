@@ -114,7 +114,7 @@ final class AdminTimetablePage
         if (!empty($query['create'])) $body .= $this->resourceCreationForm($version?->id, $view, $resource, (string) $query['create'], $query);
         elseif ($version !== null && $resource > 0) {
             $body .= $this->resourceGrid($store, $version, $view, $resource, $users);
-            if (isset($query['edit']) || isset($query['day']) || isset($query['start_slot'])) $body .= $this->resourceLessonEditor($store, $version, $view, $resource, (int) ($query['edit'] ?? 0), $query, $users, $rooms, $classes);
+            if ((int) ($query['edit'] ?? 0) > 0 || ((int) ($query['day'] ?? 0) > 0 && (int) ($query['start_slot'] ?? 0) > 0)) $body .= $this->resourceLessonEditor($store, $version, $view, $resource, (int) ($query['edit'] ?? 0), $query, $users, $rooms, $classes);
         } elseif ($version !== null) $body .= '<p class="notice">Add a teacher, room, or class to begin.</p>';
         return PageLayout::render('Admin timetable', $body, $this->user);
     }
@@ -144,7 +144,8 @@ final class AdminTimetablePage
         foreach ($slots as $slot) $rows[$slot->sequenceNumber] = $slot->sequenceNumber;
         ksort($rows);
         $lessons = $store->lessonsForVersion($version->id);
-        $html = '<section class="editor-section admin-resource-grid"><div class="section-heading"><div><p class="eyebrow">' . $this->e(ucfirst($view)) . ' timetable</p><h2>Selected ' . $this->e($view) . '</h2></div><p class="muted">Click an empty period to assign a lesson.</p></div><div class="timetable-scroll"><table><caption class="sr-only">Versioned timetable by ' . $this->e($view) . '</caption><thead><tr><th>Period</th>';
+        $label = $this->resourceName($view, $resource, $users, $store->roomsForOrganisation($this->organisationId), $store->classesForOrganisation($this->organisationId));
+        $html = '<section class="editor-section admin-resource-grid"><div class="section-heading"><div><p class="eyebrow">' . $this->e(ucfirst($view)) . ' timetable</p><h2>' . $this->e($label) . '</h2></div><p class="muted">Click an empty period to assign a lesson.</p></div><div class="timetable-scroll"><table><caption class="visually-hidden">Timetable grid</caption><thead><tr><th>Period</th>';
         foreach ($days as $day) $html .= '<th>' . $this->e($this->dayName($day)) . '</th>';
         $html .= '</tr></thead><tbody>';
         $spanned = [];
@@ -231,8 +232,8 @@ final class AdminTimetablePage
     private function resourceName(string $view, int $resource, array $users, array $rooms, array $classes): string
     {
         $rows = $view === 'teacher' ? $users : ($view === 'room' ? $rooms : $classes);
-        foreach ($rows as $row) if ((int) $row['id'] === $resource) return (string) ($row['code'] ?? ($row['staff_identifier'] ?: $row['display_name']));
-        return 'selected ' . $view;
+        foreach ($rows as $row) if ((int) $row['id'] === $resource) return $view === 'teacher' ? (string) $row['display_name'] : (string) ($row['code'] ?? '');
+        return '';
     }
 
     /** @param list<TimetableSlot> $slots */
