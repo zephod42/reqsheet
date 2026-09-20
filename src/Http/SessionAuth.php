@@ -36,6 +36,7 @@ final class SessionAuth
             'is_admin' => (bool) ($account['is_admin'] ?? false),
             'roles' => array_values(array_unique(array_map('strval', (array) ($account['roles'] ?? [])))),
             'auth_version' => (int) ($account['auth_version'] ?? 1),
+            'account_state' => (string) ($account['account_state'] ?? 'claimed'),
         ];
     }
 
@@ -66,6 +67,7 @@ final class SessionAuth
             'is_admin' => (bool) ($user['is_admin'] ?? false),
             'roles' => array_values(array_unique(array_map('strval', (array) ($user['roles'] ?? [])))),
             'auth_version' => (int) ($user['auth_version'] ?? 1),
+            'account_state' => (string) ($user['account_state'] ?? 'claimed'),
         ];
     }
 
@@ -83,6 +85,7 @@ final class SessionAuth
     /** @param array<string, mixed>|null $user */
     public static function landingPath(?array $user): string
     {
+        if (($user['account_state'] ?? 'claimed') === 'recovery_pending') return '/recovery-key';
         $roles = (array) ($user['roles'] ?? []);
         if ($roles === [] && ($user['operational_role'] ?? null) !== null) $roles[] = (string) $user['operational_role'];
         if (in_array('technician', $roles, true) && !in_array('teacher', $roles, true)) return '/technician';

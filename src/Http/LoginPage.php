@@ -15,7 +15,8 @@ final class LoginPage
         if ($this->organisation !== null) {
             $identity = '<p class="login-school">' . $this->e((string) ($this->organisation['name'] ?? '')) . ' <span>(' . $this->e((string) ($this->organisation['tenant_slug'] ?? '')) . ')</span></p><p>Please log in below:</p>';
         }
-        return $this->layout($identity . '<h1>Log in</h1>' . $notice . self::fields($login));
+        $recovery = $this->organisation === null ? '' : '<p class="login-recovery"><a class="button secondary" href="/account-recovery">Account Recovery</a></p>';
+        return $this->layout($identity . '<h1>Log in</h1>' . $notice . self::fields($login) . $recovery);
     }
 
     public function firstLogin(string $login, ?string $message = null): string

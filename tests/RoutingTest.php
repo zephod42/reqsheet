@@ -27,6 +27,8 @@ final class RoutingTest
         assertSameValue(ApplicationRoute::TEACHER_DAY, ApplicationRoute::match('GET', '/teacher/day'), 'Teacher day route was not recognised.');
         assertSameValue(ApplicationRoute::SETUP, ApplicationRoute::match('GET', '/setup'), 'Setup route was not recognised.');
         assertSameValue(ApplicationRoute::LOGIN, ApplicationRoute::match('GET', '/login'), 'Login route was not recognised.');
+        assertSameValue(ApplicationRoute::ACCOUNT_RECOVERY, ApplicationRoute::match('GET', '/account-recovery'), 'Account recovery route was not recognised.');
+        assertSameValue(ApplicationRoute::RECOVERY_KEY, ApplicationRoute::match('GET', '/recovery-key'), 'Recovery-key management route was not recognised.');
         assertSameValue(ApplicationRoute::LOGOUT, ApplicationRoute::match('GET', '/logout'), 'Logout route was not recognised.');
         assertSameValue(ApplicationRoute::TECHNICIAN, ApplicationRoute::match('GET', '/technician'), 'Technician route was not recognised.');
         assertSameValue(ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::match('GET', '/admin/people'), 'Admin people route was not recognised.');

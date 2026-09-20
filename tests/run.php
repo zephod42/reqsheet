@@ -24,6 +24,7 @@ require __DIR__ . '/AdminPeoplePageTest.php';
 require __DIR__ . '/LoginPageTest.php';
 require __DIR__ . '/TenantDataResetterTest.php';
 require __DIR__ . '/TechnicianPageTest.php';
+require __DIR__ . '/RecoveryTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -106,8 +107,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -164,6 +165,11 @@ if ($technicianMigration === false) throw new RuntimeException('Technician prefe
 foreach (['technician_room_preferences', 'organisation_id', 'user_id', 'room_id'] as $expectedTechnicianFragment) {
     if (!str_contains($technicianMigration, $expectedTechnicianFragment)) throw new RuntimeException('Expected technician schema fragment is missing: ' . $expectedTechnicianFragment);
 }
+$recoveryMigration = file_get_contents($migrationDirectory . '/0012_add_recovery_and_remove_email.sql');
+if ($recoveryMigration === false) throw new RuntimeException('Recovery migration could not be read.');
+foreach (['DROP COLUMN email', 'DROP COLUMN contact_email', 'recovery_key_digest', 'recovery_key_generation', 'account_recovery_flows', 'account_recovery_rate_limits', 'subscription_state', 'subscription_until'] as $expectedRecoveryFragment) {
+    if (!str_contains($recoveryMigration, $expectedRecoveryFragment)) throw new RuntimeException('Expected recovery schema fragment is missing: ' . $expectedRecoveryFragment);
+}
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
     new MigrationFile('0002', 'earlier', 'earlier.sql', ''),
@@ -212,5 +218,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\LoginPageTest::run();
 \Reqsheet\Tests\TenantDataResetterTest::run();
 \Reqsheet\Tests\TechnicianPageTest::run();
+\Reqsheet\Tests\RecoveryTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

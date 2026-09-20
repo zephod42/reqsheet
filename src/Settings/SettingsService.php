@@ -92,14 +92,6 @@ final class SettingsService
         ], $rooms);
     }
 
-    public function contactEmail(int $organisationId): ?string { return $this->store->contactEmail($organisationId); }
-    public function saveContactEmail(int $organisationId, ?string $email): void
-    {
-        $email = trim((string) ($email ?? ''));
-        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) throw new SettingsValidationException(['Contact email is invalid.']);
-        $this->store->saveContactEmail($organisationId, $email === '' ? null : $email);
-    }
-
     private function validTime(string $value): bool
     {
         $time = DateTimeImmutable::createFromFormat('!H:i', $value);

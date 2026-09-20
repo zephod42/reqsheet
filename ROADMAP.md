@@ -26,7 +26,7 @@ Staff account and pilot workflow refinement completed 2026-09-19:
 
 - Known tenant roots route to school login while recognised base roots retain the public landing page.
 - People creates email-free staff accounts with explicit awaiting-first-login state; staff choose a password after initials-plus-blank-password entry, and administrators can reset ordinary staff accounts with tenant-scoped CSRF protection and session revocation.
-- Organisation signup collects an organisation contact email, editable under Settings; it is not an individual staff requirement.
+- Organisation signup and staff account management collect no email addresses.
 - Technician day/week labels and selected-week browser printing use configured working days, while room display defaults to all rooms and no longer exposes personal room saving.
 
 The pilot first-login workflow retains an account-claiming risk: anyone who knows a newly created staff member’s initials may claim the account before the intended person. It is not identity verification and remains unsuitable as a final public authentication design.
@@ -92,14 +92,14 @@ Teacher day view and timetable-settings refinement completed 2026-09-19:
 People and navigation milestone completed 2026-09-19:
 
 - Authenticated navigation now has a black general/application separator and labels the teacher destination “View My Timetable”.
-- People is an organisation-scoped list with accessible Add/Edit dialogs, optional email, cumulative independent roles, and CSRF-protected validation.
-- Migration `0008_add_people_roles_and_teacher_numbers.sql` adds optional email, independent operational-role flags, and immutable organisation-local teacher numbers. Existing users are backfilled by organisation and existing database IDs/relationships are preserved.
+- People is an organisation-scoped list with accessible Add/Edit dialogs, cumulative independent roles, and CSRF-protected validation.
+- Migration `0008_add_people_roles_and_teacher_numbers.sql` originally added optional email alongside independent operational-role flags and immutable organisation-local teacher numbers; migration `0012` removes that email column while preserving existing users, roles, identifiers, and teacher numbers.
 
 Session robustness refinement completed 2026-09-19:
 
 - Session payloads are versioned and account state/revocation is revalidated at request time; stale, revoked, cross-tenant, and incompatible sessions are cleared without role redirects.
 - Dynamic tenant/session responses use private no-store headers, while the shared stylesheet uses a file-version query parameter so normal static caching does not retain deployed CSS.
-- Schema/database failures remain controlled service errors and are not disguised as authentication failures. Migration 0011 must be applied before serving the current account/session code on an older database.
+- Schema/database failures remain controlled service errors and are not disguised as authentication failures. Migration 0012 must be applied before serving the current account/recovery code on an older database.
 
 The database foundation and initial application-domain schema are complete and verified against local MySQL. Timetable configuration services provide the validated path for effective-dated versions, slots, and recurring lessons. The bounded occurrence-generation service validates timetable spans/conflicts and creates dated occurrences for explicit inclusive date ranges. Product behaviour and the remaining UI/admin scope are canonical in `PRODUCT_DESIGN.md`; authentication/authorization and exception handling remain future work.
 
@@ -107,7 +107,16 @@ Bounded login refinement completed 2026-09-19:
 
 - Tenant login shows only the trusted registered school name and short code; the generic host remains school-neutral.
 - Staff initials are now exactly three A–Z letters, normalised to uppercase and unique per organisation. They are the organisation-scoped login identifier and remain separate from internal IDs and teacher numbers.
-- Billing, subscriptions, payment processing, email verification, and password recovery remain deferred.
+- Billing, payment processing, MFA, and persistent-login policy remain deferred. Organisation-key administrator recovery is implemented.
+
+Account recovery and data-minimisation milestone completed 2026-09-20:
+
+- Reqsheet account and organisation records are email-free. Migration `0012` removes active stored staff email and organisation contact-email values without deleting accounts or tenant data; historical backups age out only under normal retention policy.
+- New schools receive a one-time 256-bit Organisation Recovery Key after authenticated tenant handoff. Existing schools establish one through an administrator-only, password-confirmed flow. Only a domain-separated SHA-256 digest is persistent.
+- Tenant login exposes Account Recovery for existing administrators only. Verification creates a short-lived single-use flow; password completion revokes that administrator's sessions and atomically rotates the organisation key. Unrestricted access remains blocked until the replacement key is acknowledged, and interrupted presentations can be safely replaced.
+- Administrators can replace a lost or compromised recovery key from Settings using CSRF protection, explicit confirmation, and current-password reauthentication. There is no operator bypass or universal key.
+- New school short codes use 3–12 lowercase letters/digits, with `www` reserved case-insensitively; historical slugs remain routable unchanged.
+- My Account preserves all current roles and displays organisation-wide trial/paid countdown metadata when explicitly configured, otherwise `Not configured`. No trial, paid state, billing address, or renewal is invented.
 
 Test-data reset handoff completed 2026-09-19:
 

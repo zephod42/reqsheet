@@ -12,11 +12,20 @@ final class TenantTest
 {
     public static function run(): void
     {
-        assertSameValue('kings-williams-college', TenantSlug::suggest("King's William's College"), 'School name slug suggestion was not normalized.');
-        assertSameValue('kwc', TenantSlug::normalise('KWC'), 'Tenant slug was not normalized to lowercase.');
-        foreach (['bad slug', '-school', 'school-', 'www', 'WWW', 'Www', 'localhost', str_repeat('a', 64)] as $invalid) {
+        assertSameValue('kingswilliam', TenantSlug::suggest("King's William's College"), 'School name short-code suggestion was not normalized and bounded.');
+        assertThrows(static fn () => TenantSlug::normalise('KWC'), 'Uppercase school short code was silently normalized.');
+        assertSameValue('kwc', TenantSlug::normalise('kwc'), 'Valid lowercase school short code was rejected.');
+        assertSameValue('sch4', TenantSlug::normalise('sch4'), 'Lowercase alphanumeric school short code was rejected.');
+        foreach (['ab', 'bad slug', 'bad-code', '-school', 'school-', 'www', 'WWW', 'Www', 'localhost', str_repeat('a', 13)] as $invalid) {
             assertThrows(static fn () => TenantSlug::normalise($invalid), 'Invalid or reserved tenant slug was accepted: ' . $invalid);
         }
+        try {
+            TenantSlug::normalise('bad-code');
+            throw new \RuntimeException('Punctuated school short code did not fail.');
+        } catch (\Reqsheet\Account\AccountValidationException $exception) {
+            assertSameValue('Use 3–12 lowercase letters or numbers.', $exception->errors()[0], 'School short-code guidance was not actionable.');
+        }
+        assertSameValue(true, TenantSlug::isRoutable('legacy-school'), 'Historical hyphenated school short code was not retained for routing compatibility.');
         try {
             TenantSlug::normalise('WwW');
             throw new \RuntimeException('Reserved www tenant slug did not fail.');

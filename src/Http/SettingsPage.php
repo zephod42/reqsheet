@@ -24,14 +24,13 @@ final class SettingsPage
         $message = null;
         if ($method === 'POST') {
             try {
-                if (($input['action'] ?? '') === 'save_contact_email') { if (!CsrfToken::valid($input['csrf_token'] ?? null)) throw new SettingsValidationException(['The form expired. Please try again.']); $this->settings->saveContactEmail($this->organisationId, (string) ($input['contact_email'] ?? '')); $message = 'Contact email saved.'; }
-                else { $this->settings->save($this->organisationId, $input); $message = 'Settings saved.'; }
+                $this->settings->save($this->organisationId, $input); $message = 'Settings saved.';
             } catch (SettingsValidationException $exception) {
                 $message = implode(' ', $exception->errors());
             }
         }
         $data = $this->settings->load($this->organisationId);
-        return PageLayout::render('Settings', $this->form($data, $message) . $this->contactSection() . $this->accountSection(), $this->user);
+        return PageLayout::render('Settings', $this->form($data, $message) . $this->accountSection(), $this->user);
     }
 
     /** @param array<string, mixed> $input */
@@ -100,7 +99,7 @@ final class SettingsPage
             $body .= $this->templateList($timetable->versionsForOrganisation($this->organisationId), $active['version']->id ?? null);
             $body .= '<div class="form-actions"><form method="post"><input type="hidden" name="action" value="create_template"><button>Create new timetable template</button></form></div>';
         }
-        return $body . $this->contactSection() . $this->accountSection() . '</section>';
+        return $body . $this->accountSection() . '</section>';
     }
 
     private function templateList(array $versions, ?int $activeId): string
@@ -212,11 +211,6 @@ final class SettingsPage
 
     private function accountSection(): string
     {
-        return '<section class="settings-section account-management"><h2>Reqsheet account</h2><p>This school’s membership and account with the Reqsheet service.</p><p class="notice">Membership and payment management will be available here.</p></section>';
-    }
-
-    private function contactSection(): string
-    {
-        return '<section class="settings-section"><h2>Contact email</h2><p>This organisation-level address is used for school contact, not as a requirement for individual staff accounts.</p><form method="post"><input type="hidden" name="action" value="save_contact_email"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><label>Contact email<input type="email" name="contact_email" value="' . $this->e((string) ($this->settings->contactEmail($this->organisationId) ?? '')) . '"></label><button>Save contact email</button></form></section>';
+        return '<section class="settings-section account-management"><h2>Reqsheet account</h2><p>This school’s membership and account with the Reqsheet service.</p><p><a class="button secondary" href="/recovery-key">Manage Organisation Recovery Key</a></p><p class="notice">Membership and payment management will be available here.</p></section>';
     }
 }

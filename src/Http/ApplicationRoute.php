@@ -28,6 +28,8 @@ final class ApplicationRoute
     public const NOT_FOUND = 'not_found';
     public const ONBOARDING = 'onboarding';
     public const MY_ACCOUNT = 'my_account';
+    public const ACCOUNT_RECOVERY = 'account_recovery';
+    public const RECOVERY_KEY = 'recovery_key';
 
     public static function match(string $method, string $path): string
     {
@@ -57,6 +59,8 @@ final class ApplicationRoute
         }
         if ($path === '/setup') return self::SETUP;
         if ($path === '/login') return self::LOGIN;
+        if ($path === '/account-recovery') return self::ACCOUNT_RECOVERY;
+        if ($path === '/recovery-key') return self::RECOVERY_KEY;
         if ($path === '/logout') return self::LOGOUT;
         if ($path === '/technician') return self::TECHNICIAN;
         if ($path === '/admin/people') return self::ADMIN_PEOPLE;

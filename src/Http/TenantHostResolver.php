@@ -81,7 +81,7 @@ final class TenantHostResolver
         $slug = substr($requestHost, 0, -strlen($suffix));
         // The conventional www alias belongs to the public base host, not to a school.
         if ($slug === 'www') return null;
-        if ($slug === '' || str_contains($slug, '.') || !TenantSlug::isValid($slug)) throw new TenantHostException('Host is not a valid tenant host.');
+        if ($slug === '' || str_contains($slug, '.') || !TenantSlug::isRoutable($slug)) throw new TenantHostException('Host is not a valid tenant host.');
         return $slug;
     }
 

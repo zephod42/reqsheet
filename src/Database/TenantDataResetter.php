@@ -58,9 +58,9 @@ final class TenantDataResetter
             throw new RuntimeException('Refusing reset: required Reqsheet schema tables are missing.');
         }
         $migration = $this->pdo->prepare('SELECT COUNT(*) FROM schema_migrations WHERE version = :version');
-        $migration->execute(['version' => '0008']);
+        $migration->execute(['version' => '0012']);
         if ((int) $migration->fetchColumn() !== 1) {
-            throw new RuntimeException('Refusing reset: migration 0008 is not recorded as applied.');
+            throw new RuntimeException('Refusing reset: migration 0012 is not recorded as applied.');
         }
 
         $parents = [];

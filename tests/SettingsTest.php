@@ -45,6 +45,7 @@ final class SettingsTest
         assertSameValue(true, $store->saved['allow_double_periods'], 'Conjoined-period setting was not saved.');
         $ninePeriodView = (new SettingsPage(new SettingsService($store), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]))->handle('GET', []);
         assertContainsValue('After period 8', $ninePeriodView, 'Nine-period settings did not expose the period 8/9 separator boundary.');
+        assertNotContainsValue('Contact email', $ninePeriodView, 'Organisation Settings still collected a contact email.');
 
         $transitionStore = new SettingsTransitionStoreFake();
         $settingsPage = new SettingsPage(new SettingsService($transitionStore), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
@@ -63,15 +64,15 @@ final class SettingsTest
         assertContainsValue('Standard period length', $beforeSetup, 'Optional timetable settings were not available after setup.');
 
         $initialSetupAccounts = new \Reqsheet\Account\AccountService(new \Reqsheet\Tests\AccountStoreFake());
-        $initialSetup = new SetupPage($initialSetupAccounts, 'reqsheet.test');
+        $initialSetup = new SetupPage($initialSetupAccounts, 'reqsheet.test', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $initialSetupView = $initialSetup->handle('GET', []);
         assertNotContainsValue('name="rooms[]"', $initialSetupView, 'Initial setup still offered room creation.');
         assertContainsValue('You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.', $initialSetupView, 'Initial setup did not explain later settings.');
         $initialSetupComplete = $initialSetup->handle('POST', [
             'organisation_name' => 'Minimal School', 'display_name' => 'Minimal Admin', 'staff_identifier' => 'MAD',
-            'operational_role' => 'teacher', 'password' => 'minimal-pass', 'password_confirmation' => 'minimal-pass', 'tenant_slug' => 'minimal-school',
+            'operational_role' => 'teacher', 'password' => 'minimal-pass', 'password_confirmation' => 'minimal-pass', 'tenant_slug' => 'minimalschl',
         ]);
-        assertContainsValue('Setup complete', $initialSetupComplete, 'Initial setup could not complete without rooms or optional settings.');
+        assertContainsValue('https://minimalschl.reqsheet.test/onboarding?token=', $initialSetupComplete, 'Initial setup did not continue to tenant-bound recovery-key onboarding.');
 
         $templateSettings = new SettingsStoreFake();
         $templatePage = new SettingsPage(new SettingsService($templateSettings), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true], new ConfigurationStore());
@@ -116,29 +117,29 @@ final class SettingsTest
         $signupView = $signup->handle('GET', []);
         assertContainsValue('School name', $signupView, 'Signup did not ask for a school name.');
         assertContainsValue('School short code', $signupView, 'Signup did not use school-facing short-code language.');
-        assertContainsValue("Choose a short code for your school. This will form part of your school's unique Reqsheet address.", $signupView, 'Signup short-code guidance was not rendered.');
+        assertContainsValue('Use 3–12 lowercase letters or numbers.', $signupView, 'Signup short-code guidance was not rendered.');
         assertContainsValue('sch4', $signupView, 'Signup did not show a short-code example.');
         assertContainsValue('sch4.reqsheet.test', $signupView, 'Signup did not show the configured public domain in its example.');
         assertNotContainsValue('Tenant slug', $signupView, 'Signup exposed internal tenant-slug terminology.');
         assertNotContainsValue('tenant identity', strtolower($signupView), 'Signup exposed internal tenant terminology.');
-        assertContainsValue('Organisation contact email', $signupView, 'Signup did not collect organisation contact email.');
-        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'contact_email' => 'pilot@example.test', 'tenant_slug' => 'pilot-school', 'display_name' => 'Pilot Admin', 'staff_identifier' => 'PAD', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
-        assertContainsValue('https://pilot-school.reqsheet.test/onboarding?token=', $created, 'Successful signup did not hand off to the tenant host.');
+        assertNotContainsValue('email', strtolower($signupView), 'Signup still collected an email address.');
+        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilotschool', 'display_name' => 'Pilot Admin', 'staff_identifier' => 'PAD', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
+        assertContainsValue('https://pilotschool.reqsheet.test/onboarding?token=', $created, 'Successful signup did not hand off to the tenant host.');
         $newDomainSignup = new SignupPage($signupAccounts, 'reqsheet.com', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $newDomainPreview = $newDomainSignup->handle('GET', []);
         assertContainsValue('sch4.reqsheet.com', $newDomainPreview, 'Signup did not use the canonical new public domain.');
-        $newDomainCreated = $newDomainSignup->handle('POST', ['school_name' => 'New Domain School', 'contact_email' => 'new@example.test', 'tenant_slug' => 'new-domain-school', 'display_name' => 'New Domain Admin', 'staff_identifier' => 'NDA', 'operational_role' => 'teacher', 'password' => 'new-domain-pass', 'password_confirmation' => 'new-domain-pass']);
-        assertContainsValue('https://new-domain-school.reqsheet.com/onboarding?token=', $newDomainCreated, 'Signup from the new domain did not generate a canonical tenant handoff.');
+        $newDomainCreated = $newDomainSignup->handle('POST', ['school_name' => 'New Domain School', 'tenant_slug' => 'newdomain', 'display_name' => 'New Domain Admin', 'staff_identifier' => 'NDA', 'operational_role' => 'teacher', 'password' => 'new-domain-pass', 'password_confirmation' => 'new-domain-pass']);
+        assertContainsValue('https://newdomain.reqsheet.com/onboarding?token=', $newDomainCreated, 'Signup from the new domain did not generate a canonical tenant handoff.');
         assertSameValue(true, (bool) $signupStore->accounts['Pilot Admin']['is_admin'], 'Signup did not create an admin account.');
         assertSameValue(2, $signupStore->accounts['Pilot Admin']['organisation_id'], 'Public signup did not create a second organisation.');
-        assertSameValue('pilot-school', $signupStore->accounts['Pilot Admin']['tenant_slug'], 'Public signup did not store the tenant slug.');
+        assertSameValue('pilotschool', $signupStore->accounts['Pilot Admin']['tenant_slug'], 'Public signup did not store the tenant slug.');
         assertSameValue(1, $signupStore->accounts['Existing Admin']['organisation_id'], 'Public signup leaked or changed the existing tenant.');
         assertSameValue(null, \Reqsheet\Http\SessionAuth::current(), 'Public signup left a generic-host session active during tenant handoff.');
         self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', 'TAD', 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');
         foreach (['www', 'WWW', 'Www'] as $reservedSlug) {
-            self::expectAccountValidation(static fn () => $signupAccounts->createOrganisationAdmin('Reserved School', 'Reserved Admin', 'RSA', 'teacher', 'reserved-pass', 'reserved-pass', $reservedSlug, 'reserved@example.test'), 'Reserved www school short code was accepted: ' . $reservedSlug);
+            self::expectAccountValidation(static fn () => $signupAccounts->createOrganisationAdmin('Reserved School', 'Reserved Admin', 'RSA', 'teacher', 'reserved-pass', 'reserved-pass', $reservedSlug), 'Reserved www school short code was accepted: ' . $reservedSlug);
         }
-        $reservedSignupView = $signup->handle('POST', ['school_name' => 'Reserved School', 'contact_email' => 'reserved@example.test', 'tenant_slug' => 'WWW', 'display_name' => 'Reserved Admin', 'staff_identifier' => 'RSV', 'operational_role' => 'teacher', 'password' => 'reserved-pass', 'password_confirmation' => 'reserved-pass']);
+        $reservedSignupView = $signup->handle('POST', ['school_name' => 'Reserved School', 'tenant_slug' => 'WWW', 'display_name' => 'Reserved Admin', 'staff_identifier' => 'RSV', 'operational_role' => 'teacher', 'password' => 'reserved-pass', 'password_confirmation' => 'reserved-pass']);
         assertContainsValue('This school short code is reserved. Please choose another.', $reservedSignupView, 'Signup did not display the reserved www error.');
         \Reqsheet\Http\SessionAuth::logout();
         $home = (new HomePage())->render();
@@ -199,8 +200,6 @@ final class SettingsStoreFake implements OrganisationSettingsStore
         $this->saved = $settings;
         if ($rooms !== null) $this->rooms = $rooms;
     }
-    public function contactEmail(int $organisationId): ?string { return $this->saved['contact_email'] ?? null; }
-    public function saveContactEmail(int $organisationId, ?string $email): void { $this->saved['contact_email'] = $email; }
 }
 
 final class SettingsTransitionStoreFake implements OrganisationSettingsStore
@@ -230,6 +229,4 @@ final class SettingsTransitionStoreFake implements OrganisationSettingsStore
         if ($rooms !== null) $this->rooms = $rooms;
         $this->complete = true;
     }
-    public function contactEmail(int $organisationId): ?string { return $this->settings['contact_email'] ?? null; }
-    public function saveContactEmail(int $organisationId, ?string $email): void { $this->settings['contact_email'] = $email; }
 }

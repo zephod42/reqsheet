@@ -55,7 +55,7 @@ final class PdoAccountStore implements AccountStore
     public function findLogin(string $login, ?int $organisationId = null): ?array
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, display_name, staff_identifier, email, operational_role, is_admin,
+            'SELECT id, organisation_id, display_name, staff_identifier, operational_role, is_admin,
                     is_teacher, is_technician, teacher_number, password_hash, account_state, auth_version, is_active
              FROM users WHERE staff_identifier = :login
                AND (:organisation_id_filter IS NULL OR organisation_id = :organisation_id_match)
@@ -69,7 +69,7 @@ final class PdoAccountStore implements AccountStore
     public function findUserById(int $userId): ?array
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, display_name, staff_identifier, email, operational_role, is_admin,
+            'SELECT id, organisation_id, display_name, staff_identifier, operational_role, is_admin,
                     is_teacher, is_technician, teacher_number, password_hash, account_state, auth_version, is_active
              FROM users WHERE id = :id LIMIT 1',
         );
@@ -81,7 +81,7 @@ final class PdoAccountStore implements AccountStore
     public function findPeopleForOrganisation(int $organisationId): array
     {
         $statement = $this->prepare(
-            'SELECT id, organisation_id, display_name, staff_identifier, email, operational_role, is_admin,
+            'SELECT id, organisation_id, display_name, staff_identifier, operational_role, is_admin,
                     is_teacher, is_technician, teacher_number, password_hash, account_state, auth_version, is_active
              FROM users WHERE organisation_id = :organisation_id ORDER BY display_name, id',
         );
@@ -96,33 +96,34 @@ final class PdoAccountStore implements AccountStore
         return (int) $statement->fetchColumn();
     }
 
-    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, ?string $email, array $roles): int
+    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, array $roles): int
     {
-        return $this->withOrganisationLock($organisationId, function () use ($organisationId, $displayName, $staffIdentifier, $email, $roles): int {
+        return $this->withOrganisationLock($organisationId, function () use ($organisationId, $displayName, $staffIdentifier, $roles): int {
             $teacherNumber = in_array('teacher', $roles, true) ? $this->nextTeacherNumber($organisationId) : null;
             $statement = $this->prepare(
                 'INSERT INTO users
-                    (organisation_id, display_name, staff_identifier, email, operational_role, is_admin, is_teacher, is_technician, teacher_number, account_state)
-                 VALUES (:organisation_id, :display_name, :staff_identifier, :email, :operational_role, :is_admin, :is_teacher, :is_technician, :teacher_number, \'awaiting_first_login\')',
+                    (organisation_id, display_name, staff_identifier, operational_role, is_admin, is_teacher, is_technician, teacher_number, account_state)
+                 VALUES (:organisation_id, :display_name, :staff_identifier, :operational_role, :is_admin, :is_teacher, :is_technician, :teacher_number, \'awaiting_first_login\')',
             );
-            $statement->execute($this->personParameters($organisationId, $displayName, $staffIdentifier, $email, $roles, $teacherNumber));
+            $statement->execute($this->personParameters($organisationId, $displayName, $staffIdentifier, $roles, $teacherNumber));
             return (int) $this->pdo->lastInsertId();
         });
     }
 
-    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, ?string $email, array $roles): void
+    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, array $roles): void
     {
-        $this->withOrganisationLock($organisationId, function () use ($organisationId, $userId, $displayName, $staffIdentifier, $email, $roles): void {
+        $this->withOrganisationLock($organisationId, function () use ($organisationId, $userId, $displayName, $staffIdentifier, $roles): void {
             $current = $this->findUserById($userId);
             if ($current === null || (int) $current['organisation_id'] !== $organisationId) throw new AccountValidationException(['That person is not part of this organisation.']);
             $teacherNumber = (int) ($current['teacher_number'] ?? 0) ?: (in_array('teacher', $roles, true) ? $this->nextTeacherNumber($organisationId) : null);
             $statement = $this->prepare(
-                'UPDATE users SET display_name = :display_name, staff_identifier = :staff_identifier, email = :email,
+                'UPDATE users SET display_name = :display_name, staff_identifier = :staff_identifier,
                     operational_role = :operational_role, is_admin = :is_admin, is_teacher = :is_teacher,
-                    is_technician = :is_technician, teacher_number = :teacher_number
+                    is_technician = :is_technician, teacher_number = :teacher_number,
+                    auth_version = auth_version + 1
                  WHERE id = :id AND organisation_id = :organisation_id',
             );
-            $parameters = $this->personParameters($organisationId, $displayName, $staffIdentifier, $email, $roles, $teacherNumber);
+            $parameters = $this->personParameters($organisationId, $displayName, $staffIdentifier, $roles, $teacherNumber);
             $parameters['id'] = $userId;
             $statement->execute($parameters);
         });
@@ -142,11 +143,11 @@ final class PdoAccountStore implements AccountStore
         }
     }
 
-    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = '', ?string $contactEmail = null): int
+    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin organisation signup.');
         try {
-            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash, $tenantSlug, $contactEmail);
+            $organisationId = $this->insertOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash, $tenantSlug);
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete organisation signup.');
             return $organisationId;
         } catch (\Throwable $exception) {
@@ -159,7 +160,7 @@ final class PdoAccountStore implements AccountStore
     {
         $roles = [$role];
         if ($isAdmin) $roles[] = 'administrator';
-        return $this->createPerson($organisationId, $displayName, $staffIdentifier, null, $roles);
+        return $this->createPerson($organisationId, $displayName, $staffIdentifier, $roles);
     }
 
     public function claimFirstLogin(int $userId, string $passwordHash): void
@@ -208,7 +209,6 @@ final class PdoAccountStore implements AccountStore
             'id' => (int) $row['id'], 'organisation_id' => (int) $row['organisation_id'],
             'display_name' => (string) $row['display_name'],
             'staff_identifier' => $row['staff_identifier'] === null ? null : (string) $row['staff_identifier'],
-            'email' => $row['email'] === null ? null : (string) $row['email'],
             'operational_role' => $row['operational_role'] === null ? null : (string) $row['operational_role'],
             'roles' => $roles, 'is_admin' => in_array('administrator', $roles, true),
             'is_teacher' => in_array('teacher', $roles, true), 'is_technician' => in_array('technician', $roles, true),
@@ -220,11 +220,11 @@ final class PdoAccountStore implements AccountStore
     }
 
     /** @param list<string> $roles @return array<string, mixed> */
-    private function personParameters(int $organisationId, string $displayName, ?string $staffIdentifier, ?string $email, array $roles, ?int $teacherNumber): array
+    private function personParameters(int $organisationId, string $displayName, ?string $staffIdentifier, array $roles, ?int $teacherNumber): array
     {
         return [
             'organisation_id' => $organisationId, 'display_name' => $displayName, 'staff_identifier' => $staffIdentifier,
-            'email' => $email, 'operational_role' => in_array('teacher', $roles, true) ? 'teacher' : (in_array('technician', $roles, true) ? 'technician' : null),
+            'operational_role' => in_array('teacher', $roles, true) ? 'teacher' : (in_array('technician', $roles, true) ? 'technician' : null),
             'is_admin' => in_array('administrator', $roles, true) ? 1 : 0,
             'is_teacher' => in_array('teacher', $roles, true) ? 1 : 0,
             'is_technician' => in_array('technician', $roles, true) ? 1 : 0,
@@ -255,10 +255,10 @@ final class PdoAccountStore implements AccountStore
         }
     }
 
-    private function insertOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug, ?string $contactEmail = null): int
+    private function insertOrganisationAdmin(string $organisationName, string $displayName, ?string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug): int
     {
-        $organisation = $this->prepare('INSERT INTO organisations (name, tenant_slug, contact_email) VALUES (:name, :tenant_slug, :contact_email)');
-        $organisation->execute(['name' => $organisationName, 'tenant_slug' => $tenantSlug, 'contact_email' => $contactEmail]);
+        $organisation = $this->prepare('INSERT INTO organisations (name, tenant_slug) VALUES (:name, :tenant_slug)');
+        $organisation->execute(['name' => $organisationName, 'tenant_slug' => $tenantSlug]);
         $organisationId = (int) $this->pdo->lastInsertId();
         $user = $this->prepare(
             'INSERT INTO users
@@ -277,5 +277,17 @@ final class PdoAccountStore implements AccountStore
             'password_hash' => $passwordHash,
         ]);
         return $organisationId;
+    }
+
+    public function organisationAccountStatus(int $organisationId): array
+    {
+        $statement = $this->prepare('SELECT subscription_state, subscription_until FROM organisations WHERE id = :id');
+        $statement->execute(['id' => $organisationId]);
+        $row = $statement->fetch();
+        if ($row === false) throw new AccountValidationException(['Organisation is invalid.']);
+        return [
+            'state' => $row['subscription_state'] === null ? null : (string) $row['subscription_state'],
+            'until' => $row['subscription_until'] === null ? null : (string) $row['subscription_until'],
+        ];
     }
 }

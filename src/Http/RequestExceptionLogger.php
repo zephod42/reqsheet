@@ -22,7 +22,7 @@ final class RequestExceptionLogger
     {
         $message = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $exception->getMessage()) ?? 'Unavailable exception message';
         $message = preg_replace(
-            '/\b(password|passwd|secret|token|cookie|authorization|credential)(\s*[=:]\s*)([^,;\s]+)/i',
+            '/\b(password|passwd|secret|token|recovery[_ -]?key|cookie|authorization|credential)(\s*[=:]\s*)([^,;\s]+)/i',
             '$1$2[redacted]',
             $message,
         ) ?? 'Unavailable exception message';

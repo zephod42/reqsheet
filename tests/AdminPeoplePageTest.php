@@ -18,8 +18,8 @@ final class AdminPeoplePageTest
         $accounts = new AccountService($store);
         $organisationOne = $accounts->createOrganisationAdmin('One', 'One Admin', 'OAD', 'teacher', 'one-pass', 'one-pass', 'one');
         $organisationTwo = $accounts->createOrganisationAdmin('Two', 'Two Admin', 'TAD', 'teacher', 'two-pass', 'two-pass', 'two');
-        $firstTeacher = $accounts->createPerson($organisationOne, 'First Teacher', 'FTH', 'first@example.test', ['teacher']);
-        $secondTeacher = $accounts->createPerson($organisationTwo, 'Other Teacher', 'OTH', null, ['teacher']);
+        $firstTeacher = $accounts->createPerson($organisationOne, 'First Teacher', 'FTH', ['teacher']);
+        $secondTeacher = $accounts->createPerson($organisationTwo, 'Other Teacher', 'OTH', ['teacher']);
         assertSameValue(2, $store->accounts['First Teacher']['teacher_number'], 'Teacher number was not scoped and allocated within the organisation.');
         assertSameValue(2, $store->accounts['Other Teacher']['teacher_number'], 'Teacher number did not preserve the organisation’s existing teacher sequence.');
         assertSameValue($organisationOne, $store->accounts['First Teacher']['organisation_id'], 'Created person was assigned to the wrong organisation.');
@@ -33,24 +33,29 @@ final class AdminPeoplePageTest
         assertNotContainsValue('Other Teacher', $view, 'People page leaked another organisation.');
         assertNotContainsValue('Teacher no.', $view, 'People table exposed the internal teacher number column.');
         assertContainsValue('Add Person', $view, 'People page did not move creation behind an Add Person control.');
+        assertNotContainsValue('Email', $view, 'People still displayed or collected staff email addresses.');
         assertContainsValue('name="roles[]" value="administrator"', $view, 'People dialog did not expose the administrator role checkbox.');
 
-        $createdView = $page->handle('POST', ['csrf_token' => $token, 'action' => 'add', 'display_name' => 'Combined Person', 'staff_identifier' => 'CPX', 'email' => 'cp@example.test', 'roles' => ['teacher', 'technician', 'administrator']]);
+        $createdView = $page->handle('POST', ['csrf_token' => $token, 'action' => 'add', 'display_name' => 'Combined Person', 'staff_identifier' => 'CPX', 'roles' => ['teacher', 'technician']]);
         assertContainsValue('Person created.', $createdView, 'Add Person workflow did not create a person.');
         assertContainsValue('Please use three capital letters.', $createdView, 'Staff-code validation guidance was not rendered.');
         assertContainsValue('pattern="[A-Z]{3}"', $createdView, 'Staff-code HTML validation did not require capitals.');
         assertNotContainsValue('Teacher number:', $createdView, 'People UI exposed the internal teacher number.');
-        assertSameValue(['teacher', 'technician', 'administrator'], $store->accounts['Combined Person']['roles'], 'Multiple roles were not stored cumulatively.');
+        assertSameValue(['teacher', 'technician'], $store->accounts['Combined Person']['roles'], 'Multiple operational roles were not stored cumulatively.');
+        $accounts->claimFirstLogin('CPX', 'combined-pass', 'combined-pass', $organisationOne);
+        $promotedView = $page->handle('POST', ['csrf_token' => $token, 'action' => 'edit', 'person_id' => $store->accounts['Combined Person']['id'], 'display_name' => 'Combined Person', 'staff_identifier' => 'CPX', 'roles' => ['teacher', 'technician', 'administrator']]);
+        assertContainsValue('Person updated.', $promotedView, 'A claimed staff account could not receive Administrator access.');
+        assertSameValue(['teacher', 'technician', 'administrator'], $store->accounts['Combined Person']['roles'], 'Administrator role was not stored cumulatively after password setup.');
         assertSameValue(true, SessionAuth::hasRole(['roles' => ['teacher', 'administrator']], 'teacher'), 'Teacher role was not cumulative.');
         assertSameValue(true, SessionAuth::isAdmin(['roles' => ['teacher', 'administrator'], 'is_admin' => true]), 'Administrator role was not cumulative.');
 
-        $editedView = $page->handle('POST', ['csrf_token' => $token, 'action' => 'edit', 'person_id' => $firstTeacher, 'display_name' => 'First Technician', 'staff_identifier' => 'FXX', 'email' => '', 'roles' => ['technician']]);
+        $editedView = $page->handle('POST', ['csrf_token' => $token, 'action' => 'edit', 'person_id' => $firstTeacher, 'display_name' => 'First Technician', 'staff_identifier' => 'FXX', 'roles' => ['technician']]);
         assertContainsValue('Person updated.', $editedView, 'Edit Person workflow did not update the person.');
         assertSameValue(['technician'], $store->accounts['First Technician']['roles'], 'Edit Person did not replace the selected role set.');
-        $accounts->updatePerson($organisationOne, $store->accounts['Combined Person']['id'], 'Combined Person', 'CPX', 'cp@example.test', ['teacher']);
+        $accounts->updatePerson($organisationOne, $store->accounts['Combined Person']['id'], 'Combined Person', 'CPX', ['teacher']);
 
-        self::expectValidation(static fn () => $accounts->updatePerson($organisationOne, $store->accounts['Two Admin']['id'], 'Cross Tenant', 'CTX', null, ['teacher']), 'Cross-tenant person edit was accepted.');
-        self::expectValidation(static fn () => $accounts->updatePerson($organisationOne, $store->accounts['One Admin']['id'], 'One Admin', 'OAD', null, ['teacher']), 'The last administrator was removable.');
+        self::expectValidation(static fn () => $accounts->updatePerson($organisationOne, $store->accounts['Two Admin']['id'], 'Cross Tenant', 'CTX', ['teacher']), 'Cross-tenant person edit was accepted.');
+        self::expectValidation(static fn () => $accounts->updatePerson($organisationOne, $store->accounts['One Admin']['id'], 'One Admin', 'OAD', ['teacher']), 'The last administrator was removable.');
         SessionAuth::logout();
     }
 

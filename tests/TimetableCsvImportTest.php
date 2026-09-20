@@ -165,14 +165,14 @@ final class TimetableCsvImportTest
 
     private static function resourceReferenceCsv(): void
     {
-        $store = self::store(); $store->users[0]['email'] = 'private@example.test';
+        $store = self::store();
         $export = (new AdminTimetableResourceCsvExport(new TimetableResourceCsvExporter($store), 1, ['roles' => ['administrator'], 'is_admin' => true]))->create();
         $rows = self::csvRows($export->content);
         assertSameValue(['Resource Type', 'Code', 'Name'], $rows[0], 'Resource reference headers changed.');
         foreach ([['Teacher', 'AAA', 'Teacher A'], ['Class', 'C1', 'C1'], ['Room', 'R1', 'R1']] as $value) {
             assertSameValue(true, in_array($value, $rows, true), 'Resource reference omitted ' . implode('/', $value));
         }
-        foreach (['private@example.test', 'XXX', 'OTHER'] as $value) assertSameValue(false, str_contains($export->content, $value), 'Resource reference exposed private or cross-tenant data.');
+        foreach (['XXX', 'OTHER'] as $value) assertSameValue(false, str_contains($export->content, $value), 'Resource reference exposed cross-tenant data.');
         try {
             (new AdminTimetableResourceCsvExport(new TimetableResourceCsvExporter($store), 1, ['roles' => ['teacher']]))->create();
         } catch (TimetableCsvExportException $exception) {

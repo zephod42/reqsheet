@@ -21,6 +21,8 @@ final class LoginPageTest
         assertContainsValue('(sch4)', $school, 'School login did not show the tenant short code.');
         assertContainsValue('maxlength="3"', $school, 'Login initials field has no three-character limit.');
         assertContainsValue('class="staff-identifier"', $school, 'Login initials field is not compactly styled.');
+        assertContainsValue('href="/account-recovery">Account Recovery', $school, 'School login did not expose tenant account recovery.');
+        assertNotContainsValue('Account Recovery', $generic, 'Generic login exposed organisation account recovery.');
         assertContainsValue('/assets/app.css?v=', $school, 'Rendered pages do not version the stylesheet asset.');
     }
 }

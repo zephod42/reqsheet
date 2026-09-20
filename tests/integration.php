@@ -20,6 +20,11 @@ use Reqsheet\Timetable\TimetableCsvImportPreviewService;
 use Reqsheet\Timetable\TimetableCsvImportService;
 use Reqsheet\Timetable\TimetableCsvParser;
 use Reqsheet\Http\TeacherWeekPage;
+use Reqsheet\Account\AccountService;
+use Reqsheet\Account\PdoAccountStore;
+use Reqsheet\Recovery\PdoRecoveryStore;
+use Reqsheet\Recovery\RecoveryException;
+use Reqsheet\Recovery\RecoveryService;
 use Reqsheet\Teacher\PdoTeacherPlanningStore;
 use Reqsheet\Teacher\TeacherPlanningService;
 
@@ -27,6 +32,8 @@ const TEST_TABLES = [
     'requisitions',
     'technician_room_preferences',
     'onboarding_handoffs',
+    'account_recovery_flows',
+    'account_recovery_rate_limits',
     'lesson_occurrences',
     'recurring_lessons',
     'timetable_slots',
@@ -141,7 +148,7 @@ try {
     cleanTestDatabase($pdo);
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 11, 'Expected all migrations to apply to the clean test database.');
+        integrationAssert($migrationCount === 12, 'Expected all migrations to apply to the clean test database.');
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         foreach (TEST_TABLES as $table) {
@@ -173,6 +180,14 @@ try {
             "INSERT INTO users (organisation_id, display_name, staff_identifier, operational_role) VALUES (:organisation_id, :display_name, :staff_identifier, 'teacher')",
             ['organisation_id' => $organisationId, 'display_name' => 'Integration Teacher B', 'staff_identifier' => 'INB'],
         );
+        $administratorB = $insert(
+            "INSERT INTO users (organisation_id, display_name, staff_identifier, is_admin, password_hash, account_state) VALUES (:organisation_id, :display_name, :staff_identifier, TRUE, :password_hash, 'claimed')",
+            ['organisation_id' => $organisationId, 'display_name' => 'Integration Administrator B', 'staff_identifier' => 'INZ', 'password_hash' => password_hash('admin-b-password', PASSWORD_DEFAULT)],
+        );
+        $userColumns = array_map('strval', $pdo->query('SHOW COLUMNS FROM users')->fetchAll(PDO::FETCH_COLUMN));
+        $organisationColumns = array_map('strval', $pdo->query('SHOW COLUMNS FROM organisations')->fetchAll(PDO::FETCH_COLUMN));
+        integrationAssert(!in_array('email', $userColumns, true), 'Staff email storage remained in the active users table.');
+        integrationAssert(!in_array('contact_email', $organisationColumns, true), 'Organisation contact-email storage remained in the active organisations table.');
         $pdo->prepare('INSERT INTO organisation_settings (organisation_id, allow_double_periods) VALUES (:organisation_id, TRUE)')->execute(['organisation_id' => $organisationId]);
         $emptyTeacherPage = new TeacherWeekPage(
             new TeacherPlanningService(new PdoTeacherPlanningStore($pdo)),
@@ -373,6 +388,29 @@ try {
         }
         integrationAssert($secondCanStart, 'A later import could not start after the first committed.');
         integrationAssert(count($configurationStore->lessonsForVersion($concurrentVersion)) === 1, 'Concurrent import handling duplicated lessons.');
+
+        $accountService = new AccountService(new PdoAccountStore($pdo));
+        $recovery = new RecoveryService(new PdoRecoveryStore($pdo), $accountService);
+        $initialKey = $recovery->issueForAdministrator($organisationId, $teacherA, true);
+        $storedKey = $pdo->query('SELECT recovery_key_digest FROM organisations WHERE id = ' . $organisationId)->fetchColumn();
+        integrationAssert(is_string($storedKey) && strlen($storedKey) === 32 && !str_contains($storedKey, $initialKey['key']), 'Recovery key was not stored as only a fixed-length digest.');
+        $recovery->acknowledge($organisationId, $teacherA, $initialKey['generation']);
+        $attemptOne = $recovery->begin($organisationId, 'INA', $initialKey['key'], 'integration-client-one');
+        $attemptTwo = $recovery->begin($organisationId, 'INA', $initialKey['key'], 'integration-client-two');
+        $rotated = $recovery->complete($organisationId, $attemptOne['token'], 'recovered-password', 'recovered-password');
+        integrationAssert($rotated['generation'] === $initialKey['generation'] + 1, 'Recovery did not atomically rotate the organisation key.');
+        $staleRejected = false;
+        try {
+            $recovery->complete($organisationId, $attemptTwo['token'], 'stale-password', 'stale-password');
+        } catch (RecoveryException) {
+            $staleRejected = true;
+        }
+        integrationAssert($staleRejected, 'Concurrent recovery based on the old key remained usable after rotation.');
+        $recovery->acknowledge($organisationId, $teacherA, $rotated['generation']);
+        $recoveredAccount = $accountService->authenticate('INA', 'recovered-password', $organisationId);
+        integrationAssert((int) $recoveredAccount['id'] === $teacherA && $recoveredAccount['account_state'] === 'claimed', 'Recovered administrator password/account state was not completed.');
+        integrationAssert((int) $accountService->authenticate('INZ', 'admin-b-password', $organisationId)['id'] === $administratorB, 'Recovery changed another administrator password.');
+        integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 3, 'Recovery created or deleted a staff account.');
     } finally {
         cleanTestDatabase($pdo);
     }

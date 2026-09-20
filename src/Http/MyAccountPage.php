@@ -9,7 +9,7 @@ use Reqsheet\Account\AccountValidationException;
 
 final class MyAccountPage
 {
-    public function __construct(private readonly AccountService $accounts, private readonly array $user)
+    public function __construct(private readonly AccountService $accounts, private readonly array $user, private readonly ?\DateTimeImmutable $today = null)
     {
     }
 
@@ -31,7 +31,8 @@ final class MyAccountPage
                         (string) ($input['new_password'] ?? ''),
                         (string) ($input['new_password_confirmation'] ?? ''),
                     );
-                    SessionAuth::regenerate();
+                    $fresh = $this->accounts->findUserById((int) $this->user['id']);
+                    if ($fresh !== null) SessionAuth::login($fresh);
                     $message = 'Password changed successfully.';
                 } catch (AccountValidationException $exception) {
                     $message = implode(' ', $exception->errors());
@@ -61,9 +62,23 @@ final class MyAccountPage
             'administrator' => 'Administrator',
             default => ucfirst(str_replace('_', ' ', $role)),
         }, $roles);
-        $identity = '<dl class="account-identity"><dt>Full/display name</dt><dd>' . $this->e($name) . '</dd><dt>Initials/teacher code</dt><dd>' . ($code === '' ? '<span class="muted">Not entered</span>' : $this->e($code)) . '</dd><dt>Roles</dt><dd>' . ($roleLabels === [] ? '<span class="muted">No roles assigned.</span>' : $this->e(implode(', ', $roleLabels))) . '</dd></dl>';
+        $status = $this->statusLabel($this->accounts->organisationAccountStatus((int) $account['organisation_id']));
+        $identity = '<dl class="account-identity"><dt>Full/display name</dt><dd>' . $this->e($name) . '</dd><dt>Initials/teacher code</dt><dd>' . ($code === '' ? '<span class="muted">Not entered</span>' : $this->e($code)) . '</dd><dt>Roles</dt><dd>' . ($roleLabels === [] ? '<span class="muted">No roles assigned.</span>' : $this->e(implode(', ', $roleLabels))) . '</dd><dt>School Account Status:</dt><dd>' . $this->e($status) . '</dd></dl>';
         $form = '<section class="settings-section"><h2>Change password</h2><p>You can change your own password. Name, code and roles are managed by an administrator.</p><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><label>Current password<input type="password" name="current_password" required autocomplete="current-password"></label><label>New password<input type="password" name="new_password" minlength="8" required autocomplete="new-password"></label><label>Confirm new password<input type="password" name="new_password_confirmation" minlength="8" required autocomplete="new-password"></label><button>Change password</button></form></section>';
         return '<section class="content-narrow"><h1>My Account</h1>' . $notice . '<section class="settings-section"><h2>Your identity</h2>' . $identity . '</section>' . $form . '</section>';
+    }
+
+    /** @param array{state:?string,until:?string} $status */
+    private function statusLabel(array $status): string
+    {
+        if ($status['state'] === null || $status['until'] === null) return 'Not configured';
+        $until = \DateTimeImmutable::createFromFormat('!Y-m-d', $status['until'], new \DateTimeZone('UTC'));
+        if ($until === false) return 'Not configured';
+        $today = ($this->today ?? new \DateTimeImmutable('today', new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone('UTC'))->setTime(0, 0);
+        $days = (int) $today->diff($until)->format('%r%a');
+        if ($status['state'] === 'free_trial') return 'Free Trial — ' . max(0, $days) . ' days remaining';
+        if ($status['state'] === 'paid') return 'Paid Member — ' . max(0, $days) . ' days until renewal';
+        return 'Not configured';
     }
 
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }

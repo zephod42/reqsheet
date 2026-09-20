@@ -45,16 +45,14 @@ final class AccountService
         string $password,
         string $confirmation,
         ?string $tenantSlug = null,
-        ?string $contactEmail = null,
     ): int {
         $this->validateIdentity($organisationName, $displayName, $role);
         $staffIdentifier = StaffIdentifier::normalise($staffIdentifier);
         $this->validatePassword($password, $confirmation);
-        $contactEmail = $this->validateContactEmail($contactEmail);
         $tenantSlug = $this->validatedTenantSlug($organisationName, $tenantSlug);
         return $this->store->createOrganisationAdmin(
             trim($organisationName), trim($displayName), $staffIdentifier, $role,
-            password_hash($password, PASSWORD_DEFAULT), $tenantSlug, $contactEmail,
+            password_hash($password, PASSWORD_DEFAULT), $tenantSlug,
         );
     }
 
@@ -62,7 +60,7 @@ final class AccountService
     {
         $roles = [$role];
         if ($isAdmin) $roles[] = 'administrator';
-        return $this->createPerson($organisationId, $displayName, $staffIdentifier, null, $roles);
+        return $this->createPerson($organisationId, $displayName, $staffIdentifier, $roles);
     }
 
     /** @return list<array<string, mixed>> */
@@ -73,39 +71,45 @@ final class AccountService
     }
 
     /** @param list<string> $roles */
-    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, ?string $email, array $roles): int
+    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, array $roles): int
     {
-        $this->validatePerson($organisationId, $displayName, $email, $roles);
+        $this->validatePerson($organisationId, $displayName, $roles);
+        if (in_array('administrator', $roles, true)) {
+            throw new AccountValidationException(['Create the person without Administrator access. Administrator access can be added after they have set their password.']);
+        }
         $staffIdentifier = StaffIdentifier::normalise($staffIdentifier);
         if ($this->store->findLogin($staffIdentifier, $organisationId) !== null) throw new AccountValidationException(['Those initials are already in use in this organisation.']);
-        return $this->store->createPerson($organisationId, trim($displayName), $staffIdentifier, $this->nullable($email), $roles);
+        return $this->store->createPerson($organisationId, trim($displayName), $staffIdentifier, $roles);
     }
 
     /** @param list<string> $roles */
-    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, ?string $email, array $roles): void
+    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, array $roles): void
     {
-        $this->validatePerson($organisationId, $displayName, $email, $roles);
+        $this->validatePerson($organisationId, $displayName, $roles);
         $before = $this->store->findUserById($userId);
         if ($before === null || (int) ($before['organisation_id'] ?? 0) !== $organisationId) throw new AccountValidationException(['That person is not part of this organisation.']);
         $wasAdmin = in_array('administrator', (array) ($before['roles'] ?? []), true) || (bool) ($before['is_admin'] ?? false);
+        if (!$wasAdmin && in_array('administrator', $roles, true)
+            && (($before['account_state'] ?? '') !== 'claimed' || !is_string($before['password_hash'] ?? null))) {
+            throw new AccountValidationException(['Administrator access can be added only after this person has set their password.']);
+        }
         if ($wasAdmin && !in_array('administrator', $roles, true) && $this->store->activeAdministratorCount($organisationId) < 2) {
             throw new AccountValidationException(['The organisation must retain at least one active administrator.']);
         }
         $staffIdentifier = StaffIdentifier::normalise($staffIdentifier);
         $existing = $this->store->findLogin($staffIdentifier, $organisationId);
         if ($existing !== null && (int) ($existing['id'] ?? 0) !== $userId) throw new AccountValidationException(['Those initials are already in use in this organisation.']);
-        $this->store->updatePerson($organisationId, $userId, trim($displayName), $staffIdentifier, $this->nullable($email), $roles);
+        $this->store->updatePerson($organisationId, $userId, trim($displayName), $staffIdentifier, $roles);
     }
 
     /** @param list<string> $roles */
-    private function validatePerson(int $organisationId, string $displayName, ?string $email, array $roles): void
+    private function validatePerson(int $organisationId, string $displayName, array $roles): void
     {
         if ($organisationId < 1 || !$this->store->organisationExists($organisationId)) throw new AccountValidationException(['Organisation is invalid.']);
         if (trim($displayName) === '') throw new AccountValidationException(['User name/login must not be blank.']);
         $roles = array_values(array_unique(array_map('strval', $roles)));
         if (array_diff($roles, ['teacher', 'technician', 'administrator']) !== []) throw new AccountValidationException(['Role selection is invalid.']);
         if ($roles === []) throw new AccountValidationException(['Select at least one role.']);
-        if ($email !== null && trim($email) !== '' && filter_var(trim($email), FILTER_VALIDATE_EMAIL) === false) throw new AccountValidationException(['Email address is invalid.']);
     }
 
     /** @return array<string, mixed> */
@@ -143,7 +147,8 @@ final class AccountService
         return $account !== null && ($account['is_active'] ?? false)
             && ($organisationId === null || (int) ($account['organisation_id'] ?? 0) === $organisationId)
             && ($account['account_state'] ?? '') === 'awaiting_first_login'
-            && ($account['password_hash'] ?? null) === null;
+            && ($account['password_hash'] ?? null) === null
+            && !(bool) ($account['is_admin'] ?? false);
     }
 
     public function claimFirstLogin(string $login, string $password, string $confirmation, ?int $organisationId = null): array
@@ -151,15 +156,15 @@ final class AccountService
         if ($organisationId === null) throw new AccountValidationException(['Open your school’s Reqsheet address to log in.']);
         try { $login = StaffIdentifier::normalise(strtoupper($login)); } catch (AccountValidationException) { throw new AccountValidationException(['Invalid login details.']); }
         $account = $this->store->findLogin($login, $organisationId);
-        if ($account === null || !($account['is_active'] ?? false) || (int) ($account['organisation_id'] ?? 0) !== $organisationId || ($account['account_state'] ?? '') !== 'awaiting_first_login' || ($account['password_hash'] ?? null) !== null) {
+        if ($account === null || !($account['is_active'] ?? false) || (int) ($account['organisation_id'] ?? 0) !== $organisationId || (bool) ($account['is_admin'] ?? false) || ($account['account_state'] ?? '') !== 'awaiting_first_login' || ($account['password_hash'] ?? null) !== null) {
             throw new AccountValidationException(['This account has already been claimed or is unavailable.']);
         }
         $this->validatePassword($password, $confirmation);
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
         $this->store->claimFirstLogin((int) $account['id'], $passwordHash);
-        $account['password_hash'] = $passwordHash;
-        $account['account_state'] = 'claimed';
-        return $account;
+        $fresh = $this->store->findUserById((int) $account['id']);
+        if ($fresh === null) throw new AccountValidationException(['This account is unavailable.']);
+        return $fresh;
     }
 
     public function changePassword(int $userId, int $organisationId, string $currentPassword, string $newPassword, string $confirmation): void
@@ -200,23 +205,26 @@ final class AccountService
         if ($errors !== []) throw new AccountValidationException($errors);
     }
 
-    private function validatePassword(string $password, string $confirmation): void
+    public function validatePassword(string $password, string $confirmation): void
     {
         if (strlen($password) < self::MIN_PASSWORD_LENGTH) throw new AccountValidationException(['Password must be at least 8 characters.']);
         if ($password !== $confirmation) throw new AccountValidationException(['Password confirmation does not match.']);
     }
 
-    private function validateContactEmail(?string $email): ?string
+    public function verifyPassword(int $userId, int $organisationId, string $password): array
     {
-        $email = $this->nullable($email);
-        if ($email !== null && filter_var($email, FILTER_VALIDATE_EMAIL) === false) throw new AccountValidationException(['Organisation contact email is invalid.']);
-        return $email;
+        $account = $this->store->findUserById($userId);
+        if ($account === null || (int) ($account['organisation_id'] ?? 0) !== $organisationId || !($account['is_active'] ?? false)
+            || !is_string($account['password_hash'] ?? null) || !password_verify($password, $account['password_hash'])) {
+            throw new AccountValidationException(['Current password is incorrect.']);
+        }
+        return $account;
     }
 
-    private function nullable(?string $value): ?string
+    /** @return array{state:?string,until:?string} */
+    public function organisationAccountStatus(int $organisationId): array
     {
-        $value = $value === null ? '' : trim($value);
-        return $value === '' ? null : $value;
+        return $this->store->organisationAccountStatus($organisationId);
     }
 
     private function validatedTenantSlug(string $organisationName, ?string $tenantSlug): string

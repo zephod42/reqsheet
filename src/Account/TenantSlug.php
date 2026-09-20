@@ -20,28 +20,36 @@ final class TenantSlug
             if (is_string($transliterated)) $value = $transliterated;
         }
         $value = str_replace(["'", '’'], '', $value);
-        $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
-        return trim($value, '-');
+        $value = preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
+        return substr($value, 0, 12);
     }
 
     public static function normalise(string $value): string
     {
-        $value = strtolower(trim($value));
+        $value = trim($value);
         if (!self::isValid($value)) {
-            if ($value === 'www') {
+            if (strtolower($value) === 'www') {
                 throw new AccountValidationException(['This school short code is reserved. Please choose another.']);
             }
-            throw new AccountValidationException(['School short code must use lowercase letters, digits, and hyphens; it must not start or end with a hyphen.']);
+            throw new AccountValidationException(['Use 3–12 lowercase letters or numbers.']);
         }
         return $value;
     }
 
     public static function isValid(string $value): bool
     {
-        if ($value === '' || strlen($value) > 63 || preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $value) !== 1) {
+        if (strlen($value) < 3 || strlen($value) > 12 || preg_match('/^[a-z0-9]+$/D', $value) !== 1) {
             return false;
         }
         return !in_array($value, self::RESERVED, true);
+    }
+
+    /** Existing slugs remain routable even when they pre-date the creation policy. */
+    public static function isRoutable(string $value): bool
+    {
+        return $value !== '' && strlen($value) <= 63
+            && preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $value) === 1
+            && strtolower($value) !== 'www';
     }
 
     /** @return list<string> */

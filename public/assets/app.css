@@ -135,6 +135,7 @@ small { font-size: .82rem; }
 .account-identity { display: grid; grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr); gap: .45rem 1rem; }
 .account-identity dt { font-weight: 700; }
 .account-identity dd { margin: 0; }
+.recovery-key textarea { min-height: 4.5rem; font-family: var(--technical); overflow-wrap: anywhere; resize: none; }
 
 .lesson-block {
     display: flex;

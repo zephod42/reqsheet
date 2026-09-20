@@ -24,10 +24,10 @@ interface AccountStore extends TenantStore
     public function findPeopleForOrganisation(int $organisationId): array;
 
     /** @param list<string> $roles */
-    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, ?string $email, array $roles): int;
+    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, array $roles): int;
 
     /** @param list<string> $roles */
-    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, ?string $email, array $roles): void;
+    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, array $roles): void;
 
     public function activeAdministratorCount(int $organisationId): int;
 
@@ -47,7 +47,6 @@ interface AccountStore extends TenantStore
         string $role,
         string $passwordHash,
         string $tenantSlug = '',
-        ?string $contactEmail = null,
     ): int;
 
     public function createUser(
@@ -63,4 +62,7 @@ interface AccountStore extends TenantStore
     public function updatePassword(int $userId, int $organisationId, string $passwordHash): void;
 
     public function resetPassword(int $userId, int $organisationId): void;
+
+    /** @return array{state:?string,until:?string} */
+    public function organisationAccountStatus(int $organisationId): array;
 }

@@ -25,6 +25,8 @@ use Reqsheet\Http\TeacherDayPage;
 use Reqsheet\Http\AdminPeoplePage;
 use Reqsheet\Http\LoginPage;
 use Reqsheet\Http\MyAccountPage;
+use Reqsheet\Http\AccountRecoveryPage;
+use Reqsheet\Http\RecoveryKeyPage;
 use Reqsheet\Http\HomePage;
 use Reqsheet\Http\PageLayout;
 use Reqsheet\Http\RequestExceptionLogger;
@@ -52,6 +54,9 @@ use Reqsheet\Timetable\TimetableResourceCsvExporter;
 use Reqsheet\Timetable\TimetableCsvExportException;
 use Reqsheet\Settings\PdoOrganisationSettingsStore;
 use Reqsheet\Settings\SettingsService;
+use Reqsheet\Recovery\PdoRecoveryStore;
+use Reqsheet\Recovery\RecoveryService;
+use Reqsheet\Recovery\RecoverySession;
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -130,6 +135,46 @@ if ($tenantOrganisationId !== null && $currentUser !== null && (int) $currentUse
     http_response_code(404);
     header('Content-Type: text/plain; charset=UTF-8');
     echo "School not found\n";
+    exit;
+}
+
+if ($route === ApplicationRoute::ACCOUNT_RECOVERY) {
+    if ($tenantOrganisationId === null || $tenantContext?->organisation === null) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Not found\n";
+        exit;
+    }
+    $https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && strtolower((string) $_SERVER['HTTPS']) !== 'off';
+    if (!$https) {
+        http_response_code(400);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Account Recovery requires HTTPS.\n";
+        exit;
+    }
+    if ($currentUser !== null) {
+        header('Location: ' . SessionAuth::landingPath($currentUser), true, 302);
+        exit;
+    }
+    if (!in_array($method, ['GET', 'POST'], true) || (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 16384) {
+        http_response_code($method === 'POST' ? 413 : 405);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo $method === 'POST' ? "Request too large\n" : "Method not allowed\n";
+        exit;
+    }
+    try {
+        $connection = (new Database(DatabaseConfig::fromEnvironment($environment)))->connection();
+        $accounts = new AccountService(new PdoAccountStore($connection));
+        $recovery = new RecoveryService(new PdoRecoveryStore($connection), $accounts);
+        $page = new AccountRecoveryPage($recovery, $accounts, $tenantContext->organisation, (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $page->handle($method, $_POST);
+    } catch (\Throwable $exception) {
+        $logRequestFailure('account-recovery', $exception);
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
     exit;
 }
 
@@ -241,7 +286,13 @@ if ($route === ApplicationRoute::ONBOARDING) {
             throw new \RuntimeException('Onboarding account was invalid.');
         }
         SessionAuth::login($account);
-        header('Location: /settings', true, 302);
+        $recovery = new RecoveryService(new PdoRecoveryStore($connection), $accounts);
+        $issued = $recovery->issueForAdministrator((int) $tenantOrganisationId, (int) $account['id'], true);
+        $account = $accounts->findUserById((int) $account['id']);
+        if ($account === null) throw new \RuntimeException('Onboarding account was unavailable after recovery-key issue.');
+        SessionAuth::login($account);
+        RecoverySession::present((int) $tenantOrganisationId, (int) $account['id'], $issued);
+        header('Location: /recovery-key', true, 302);
     } catch (\Throwable) {
         http_response_code(404);
         header('Content-Type: text/plain; charset=UTF-8');
@@ -260,6 +311,38 @@ if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::DEMO, Applicati
 if ($route === ApplicationRoute::LOGOUT) {
     SessionAuth::logout();
     header('Location: /login', true, 302);
+    exit;
+}
+
+if ($route === ApplicationRoute::RECOVERY_KEY) {
+    if ($tenantOrganisationId === null || !SessionAuth::isAdmin($currentUser)) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && strtolower((string) $_SERVER['HTTPS']) !== 'off';
+    if (!$https) {
+        http_response_code(400);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Organisation Recovery Key management requires HTTPS.\n";
+        exit;
+    }
+    try {
+        $connection = (new Database(DatabaseConfig::fromEnvironment($environment)))->connection();
+        $accounts = new AccountService(new PdoAccountStore($connection));
+        $page = new RecoveryKeyPage(new RecoveryService(new PdoRecoveryStore($connection), $accounts), $accounts, $currentUser);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $page->handle($method, $_POST);
+    } catch (\Throwable $exception) {
+        $logRequestFailure('recovery-key', $exception);
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Service unavailable\n";
+    }
+    exit;
+}
+
+if ($currentUser !== null && ($currentUser['account_state'] ?? 'claimed') === 'recovery_pending') {
+    header('Location: /recovery-key', true, 302);
     exit;
 }
 
@@ -290,7 +373,12 @@ if ($route === ApplicationRoute::SETUP) {
     }
     try {
         $config = DatabaseConfig::fromEnvironment($environment);
-        $page = new SetupPage(new AccountService(new PdoAccountStore((new Database($config))->connection())), $canonicalHost ?? $tenantContext?->baseHost ?? '');
+        $connection = (new Database($config))->connection();
+        $page = new SetupPage(
+            new AccountService(new PdoAccountStore($connection)),
+            $canonicalHost ?? $tenantContext?->baseHost ?? '',
+            new OnboardingHandoffService(new PdoOnboardingHandoffStore($connection)),
+        );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_POST);
     } catch (\Throwable $exception) {

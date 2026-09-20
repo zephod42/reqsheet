@@ -94,16 +94,6 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
         }
     }
 
-    public function contactEmail(int $organisationId): ?string
-    {
-        $s = $this->prepare('SELECT contact_email FROM organisations WHERE id = :id'); $s->execute(['id' => $organisationId]); $value = $s->fetchColumn(); return $value === false || $value === null ? null : (string) $value;
-    }
-
-    public function saveContactEmail(int $organisationId, ?string $email): void
-    {
-        $s = $this->prepare('UPDATE organisations SET contact_email = :email WHERE id = :id'); $s->execute(['email' => $email, 'id' => $organisationId]);
-    }
-
     /** @return list<int> */
     private static function days(string $value): array
     {
