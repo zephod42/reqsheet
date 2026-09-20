@@ -182,6 +182,28 @@ foreach (['information_schema.TABLE_CONSTRAINTS', 'information_schema.STATISTICS
 if (str_contains($staffMigration, 'account_recovery_flows_target_valid')) {
     throw new RuntimeException('Staff-minimisation migration contains the incompatible recovery target CHECK.');
 }
+$publicIndex = file_get_contents(dirname(__DIR__) . '/public/index.php');
+if ($publicIndex === false) {
+    throw new RuntimeException('Public front controller could not be read.');
+}
+foreach ([
+    'Reqsheet is designed to be simple and intuitive.',
+    'Use an AI assistant, such as ChatGPT, to populate the Reqsheet CSV',
+    'Your new timetable will be created and activated automatically.',
+    'mailto:feedback@reqsheet.com',
+    'mailto:accounts@reqsheet.com',
+    '<h1 class="about-wordmark">Reqsheet.</h1>',
+    'Reqsheet is a lightweight organiser for school departments.',
+] as $publicFragment) {
+    if (!str_contains($publicIndex, $publicFragment)) {
+        throw new RuntimeException('Public page content is missing: ' . $publicFragment);
+    }
+}
+foreach (['The prep room wall, reimagined for the 21st century.', '<h1>ABOUT REQSHEET</h1>'] as $removedAboutFragment) {
+    if (str_contains($publicIndex, $removedAboutFragment)) {
+        throw new RuntimeException('Obsolete About page content remains: ' . $removedAboutFragment);
+    }
+}
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
     new MigrationFile('0002', 'earlier', 'earlier.sql', ''),

@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use Reqsheet\Http\TeacherAccess;
 use Reqsheet\Http\TeacherWeekPage;
 use Reqsheet\Http\TeacherDayPage;
+use Reqsheet\Http\CsrfToken;
 use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Teacher\TeacherPlanningStore;
 use Reqsheet\Timetable\TimetableSlot;
@@ -27,13 +28,14 @@ final class TeacherWeekPageTest
         $page = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-09'), ['staff_identifier' => 'NEV']);
         $view = $page->handle('GET', ['date' => '2026-09-09'], []);
         assertContainsValue('Week beginning Monday 7 September 2026', $view, 'Week heading was not rendered.');
+        assertNotContainsValue('This Week', $view, 'Week heading used the navigation label instead of the selected week.');
         assertContainsValue('Period One', $view, 'Configured teaching-period label was not rendered.');
         assertContainsValue('Break', $view, 'Configured separator was not rendered.');
         assertContainsValue('Lunch', $view, 'Lunch separator was not rendered in the teacher view.');
         assertSameValue(1, substr_count($view, '>Break<'), 'Break was repeated outside the period axis.');
         assertSameValue(1, substr_count($view, '>Lunch<'), 'Lunch was repeated outside the period axis.');
         assertContainsValue('class="separator-cell"', $view, 'Separator cells were not visibly marked as neutral cells.');
-        assertContainsValue('Niall Evans (NE)', $view, 'Authenticated teacher identity was not rendered.');
+        assertContainsValue('>NE</p>', $view, 'Authenticated teacher initials were not rendered.');
         assertContainsValue('13PHY', $view, 'Lesson class was not rendered.');
         assertContainsValue('LAB-A', $view, 'Lesson room was not rendered.');
         assertContainsValue('Bring goggles', $view, 'Requisitions were not rendered.');
@@ -46,6 +48,12 @@ final class TeacherWeekPageTest
         assertContainsValue('today-row', $view, 'Current day was not gently highlighted.');
         assertSameValue(true, $store->ensured, 'Teacher week did not prepare effective recurring assignments for the selected week.');
 
+        $store->firstDay = 3;
+        $alternateWeek = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-23'), ['staff_identifier' => 'NEV']);
+        assertContainsValue('Week beginning Wednesday 23 September 2026', $alternateWeek->handle('GET', ['date' => '2026-09-23'], []), 'Week heading ignored the configured first day.');
+        assertContainsValue('Week beginning Wednesday 30 September 2026', $alternateWeek->handle('GET', ['date' => '2026-09-30'], []), 'Future week heading did not follow navigation selection.');
+        $store->firstDay = 1;
+
         $editing = $page->handle('GET', ['date' => '2026-09-09', 'edit' => 500], []);
         assertContainsValue('Lesson outline', $editing, 'Planning editor did not expose lesson outline.');
         assertContainsValue('Risk assessment', $editing, 'Planning editor did not expose risk assessment.');
@@ -53,6 +61,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Nothing required', $editing, 'Planning editor did not expose the explicit blank requisition action.');
 
         $page->handle('POST', [], [
+            'csrf_token' => CsrfToken::value(),
             'date' => '2026-09-09', 'occurrence_id' => 500,
             'lesson_outline' => 'Updated outline', 'requisitions' => 'Updated requisitions', 'risk_assessment' => 'Updated risk',
         ]);
@@ -73,9 +82,33 @@ final class TeacherWeekPageTest
         assertContainsValue('Plan the experiment', $day, 'Day view did not show the complete lesson outline.');
         assertContainsValue('Bring goggles', $day, 'Day view did not show the complete requisition text.');
         assertContainsValue('Wear eye protection', $day, 'Day view did not show the complete risk assessment.');
-        assertContainsValue('/teacher?date=2026-09-07&edit=500', $day, 'Day view did not reuse the existing lesson editor.');
+        assertContainsValue('name="section" value="outline"', $day, 'Day view did not provide inline outline editing.');
+        assertContainsValue('name="section" value="requisitions"', $day, 'Day view did not provide inline requisition editing.');
+        assertContainsValue('name="section" value="risk"', $day, 'Day view did not provide inline risk editing.');
+        assertNotContainsValue('href="/teacher?date=2026-09-07&edit=500"', $day, 'Day view still redirected to the week editor.');
         assertContainsValue('Previous day', $day, 'Day view did not render previous-day navigation.');
         assertContainsValue('type="date"', $day, 'Day view did not render a date picker.');
+        $savedDayResponse = $dayPage->handle('POST', [], [
+            'csrf_token' => CsrfToken::value(), 'date' => '2026-09-07', 'occurrence_id' => 500,
+            'section' => 'outline', 'value' => 'Updated directly in day view',
+        ]);
+        assertContainsValue('Day View', $savedDayResponse, 'Day View save did not remain on the selected page.');
+        assertNotContainsValue('href="/teacher?date=', $savedDayResponse, 'Day View save redirected to the week editor.');
+        $editedDay = $dayPage->handle('GET', ['date' => '2026-09-07']);
+        assertContainsValue('Updated directly in day view', $editedDay, 'Day View did not display the saved inline edit.');
+        assertSameValue('13PHY', $store->occurrences[500]['snapshot_class_code'], 'Day View changed recurring lesson data.');
+        $unchanged = $store->occurrences[500]['requirements_text'];
+        $dayPage->handle('GET', ['date' => '2026-09-07', 'edit' => 500]);
+        assertSameValue($unchanged, $store->occurrences[500]['requirements_text'], 'Opening an inline editor changed requisitions.');
+        $rejected = $dayPage->handle('POST', [], [
+            'date' => '2026-09-07', 'occurrence_id' => 500, 'section' => 'risk', 'value' => 'Unsubmitted risk',
+        ]);
+        assertContainsValue('Unsubmitted risk', $rejected, 'Failed CSRF validation did not preserve entered text.');
+        $dayPage->handle('POST', [], [
+            'csrf_token' => CsrfToken::value(), 'date' => '2026-09-07', 'occurrence_id' => 500,
+            'section' => 'requisitions', 'value' => '', 'nothing_required' => 'yes',
+        ]);
+        assertSameValue('nothing_required', $store->occurrences[500]['state'], 'Inline Nothing required editing changed state semantics.');
         $emptyDay = $dayPage->handle('GET', ['date' => '2026-09-08']);
         assertContainsValue('No lessons are scheduled for this date.', $emptyDay, 'Day view did not render its empty state.');
 
@@ -107,6 +140,7 @@ final class TeacherStore implements TeacherPlanningStore
     /** @var list<TimetableSlot> */
         public array $slots = [];
     public bool $ensured = false;
+    public int $firstDay = 1;
 
     public function __construct()
     {
@@ -122,7 +156,7 @@ final class TeacherStore implements TeacherPlanningStore
     }
 
     public function teacherBelongsToOrganisation(int $teacherId, int $organisationId): bool { return $teacherId === 10 && $organisationId === 1; }
-    public function activeFirstDayOfWeek(int $organisationId): int { return 1; }
+    public function activeFirstDayOfWeek(int $organisationId): int { return $this->firstDay; }
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion { return $organisationId === 1 && $date >= $this->version->effectiveFrom ? $this->version : null; }
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
     public function slotsForVersion(int $versionId): array { return $this->slots; }

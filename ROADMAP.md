@@ -83,6 +83,12 @@ Bounded usability milestone completed 2026-09-19:
 - My Account renders only the current user’s identity and supports CSRF-protected self-service password changes under the existing password policy. Identity fields remain administrator-managed.
 - Administrator Settings now contains the “Reqsheet account” placeholder section. Membership status, plans, pricing, renewals, payment management, and billing integration remain future work and must be specified before implementation.
 
+Teacher and public-page polish completed 2026-09-20:
+
+- Teacher Week View identifies the selected week using the configured first working day, including past and future navigation.
+- Teacher Day View edits lesson outline, requisitions, and risk assessment inline on the selected date with CSRF protection, preserved validation input, explicit Save/Cancel controls, and shared dated-occurrence persistence.
+- Public Demo, Contact, and About pages now use the agreed concise copy and responsive presentation; Contact exposes feedback and account mail links without collecting visitor data.
+
 Teacher day view and timetable-settings refinement completed 2026-09-19:
 
 - The timetable settings editor now exposes the standard working-day, week-start, period, timing and separator controls without the legacy per-day custom timing UI; saved legacy timing data remains preserved by the backend.

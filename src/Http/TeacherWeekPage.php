@@ -28,6 +28,9 @@ final class TeacherWeekPage
         $message = null;
         if ($method === 'POST') {
             try {
+                if (!CsrfToken::valid($input['csrf_token'] ?? null)) {
+                    throw new TimetableValidationException(['Your request expired. Please try again.']);
+                }
                 $this->service->save(
                     $this->organisationId,
                     $this->teacherId,
@@ -71,8 +74,7 @@ final class TeacherWeekPage
         $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1><a class="this-week' . ($isCurrentWeek ? ' selected-state' : '') . '"' . ($isCurrentWeek ? ' aria-current="date"' : '') . ' href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
         $identity = trim((string) ($this->user['staff_identifier'] ?? ''));
-        $initials = trim((string) ($this->user['staff_identifier'] ?? ''));
-        $identityLabel = $identity !== '' ? $identity . ($initials !== '' ? ' (' . $initials . ')' : '') : ($initials !== '' ? $initials : 'Teacher');
+        $identityLabel = $identity !== '' ? $identity : 'Teacher';
         $body .= '<p class="teacher-identity">' . $this->e($identityLabel) . '</p>';
         $body .= '<div class="timetable-scroll"><table class="week-grid"><caption class="visually-hidden">Teacher timetable week</caption><thead><tr><th scope="col">Period</th>';
         foreach ($week->days as $day) {
@@ -130,7 +132,7 @@ final class TeacherWeekPage
         $id = $editing === null ? 0 : (int) $editing['id'];
         $date = $editing === null ? '' : (string) $editing['lesson_date'];
         $context = $editing === null ? 'Select a lesson' : (string) $editing['snapshot_class_code'] . ' · ' . (string) $editing['snapshot_room_code'] . ' | ' . $date . ' · ' . (string) ($editing['slot_label'] ?? 'Teaching');
-        return '<dialog id="lesson-editor"' . $open . '><form method="post"><input type="hidden" name="occurrence_id" value="' . $id . '"><input type="hidden" name="date" value="' . $this->e($date) . '"><button type="button" class="close secondary" data-close>Close</button><p class="eyebrow">Lesson planning</p><h2>Edit lesson planning</h2><p class="lesson-context">' . $this->e($context) . '</p><label class="field-outline">Lesson outline<textarea name="lesson_outline">' . $this->e((string) ($editing['planning_notes'] ?? '')) . '</textarea></label><label class="field-requisitions">Requisitions<textarea name="requisitions">' . $this->e((string) ($editing['requirements_text'] ?? '')) . '</textarea><span class="check-label"><input type="checkbox" data-nothing-required> Nothing required</span></label><label class="field-risk">Risk assessment<textarea name="risk_assessment">' . $this->e((string) ($editing['risk_assessment_text'] ?? '')) . '</textarea></label><div class="form-actions"><button type="submit">Save planning</button></div></form></dialog>';
+        return '<dialog id="lesson-editor"' . $open . '><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="occurrence_id" value="' . $id . '"><input type="hidden" name="date" value="' . $this->e($date) . '"><button type="button" class="close secondary" data-close>Close</button><p class="eyebrow">Lesson planning</p><h2>Edit lesson planning</h2><p class="lesson-context">' . $this->e($context) . '</p><label class="field-outline">Lesson outline<textarea name="lesson_outline">' . $this->e((string) ($editing['planning_notes'] ?? '')) . '</textarea></label><label class="field-requisitions">Requisitions<textarea name="requisitions">' . $this->e((string) ($editing['requirements_text'] ?? '')) . '</textarea><span class="check-label"><input type="checkbox" data-nothing-required> Nothing required</span></label><label class="field-risk">Risk assessment<textarea name="risk_assessment">' . $this->e((string) ($editing['risk_assessment_text'] ?? '')) . '</textarea></label><div class="form-actions"><button type="submit">Save planning</button></div></form></dialog>';
     }
 
     private function parseDate(string $value): DateTimeImmutable
