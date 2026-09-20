@@ -33,6 +33,9 @@ final class AdminPeoplePageTest
         assertNotContainsValue('OTH', $view, 'People page leaked another organisation.');
         assertNotContainsValue('Teacher no.', $view, 'People table exposed the internal teacher number column.');
         assertContainsValue('Add Person', $view, 'People page did not move creation behind an Add Person control.');
+        $addPersonPosition = strpos($view, 'data-open-dialog="person-add"');
+        $peopleTablePosition = strpos($view, 'class="people-table-wrap"');
+        assertSameValue(true, $addPersonPosition !== false && $peopleTablePosition !== false && $addPersonPosition < $peopleTablePosition, 'Add Person control was not rendered immediately above the staff table.');
         assertNotContainsValue('Email', $view, 'People still displayed or collected staff email addresses.');
         assertNotContainsValue('name="display_name"', $view, 'People still collected staff names.');
         assertContainsValue('Delete User', $view, 'People did not offer deletion.');
