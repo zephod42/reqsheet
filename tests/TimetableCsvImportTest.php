@@ -73,7 +73,7 @@ final class TimetableCsvImportTest
         $duplicate = $rows; $duplicate[] = $rows[1];
         self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::writeRows($duplicate)), true), 'duplicates the slot');
         $extra = $rows; $extra[1][2] = 'UNKNOWN';
-        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::writeRows($extra)), true), 'unknown or unexpected slot');
+        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::writeRows($extra)), true), 'Missing CSV slot');
     }
 
     private static function resourceAndConflictValidation(): void
@@ -82,8 +82,9 @@ final class TimetableCsvImportTest
         $service = new TimetableCsvImportPreviewService($store);
         $parser = new TimetableCsvParser();
         $blank = (new BlankTimetableCsvExporter($store))->export(1, 1)->content;
-        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, ['Monday|P1|R1' => ['C1', 'ZZZ']])), true), 'unknown, inactive, or ambiguous eligible Teacher');
-        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, ['Monday|P1|R1' => ['NOPE', 'AAA']])), true), 'unknown or ambiguous Class');
+        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, ['Monday|P1|R1' => ['C1', 'ZZZ']])), true), 'following teachers do not exist');
+        $newClassPreview = $service->preview(1, 1, $parser->parse(self::fill($blank, ['Monday|P1|R1' => ['NOPE', 'AAA']])), true);
+        assertSameValue(['NOPE'], $newClassPreview->newClassCodes, 'Unknown class code was not proposed for creation.');
         self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, ['Monday|P1|R1' => ['C1', '']])), true), 'provide both Class and Teacher');
         self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, [
             'Monday|P1|R1' => ['C1', 'AAA'], 'Monday|P1|R2' => ['C2', 'AAA'],
@@ -91,6 +92,12 @@ final class TimetableCsvImportTest
         self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, [
             'Monday|P1|R1' => ['C1', 'AAA'], 'Monday|P1|R2' => ['C1', 'BBB'],
         ])), true), 'Class C1 is assigned twice');
+
+        $rows = self::csvRows($blank);
+        $rows[] = ['Monday', 'P1', 'ROOM-35', 'IGNORED', 'NOT-A-TEACHER'];
+        $skipped = $service->preview(1, 1, $parser->parse(self::writeRows($rows)), true);
+        assertSameValue([['code' => 'ROOM-35', 'row_count' => 1]], $skipped->skippedRooms, 'Unknown room rows were not reported as skipped.');
+        assertSameValue([], $skipped->newClassCodes, 'A discarded room row proposed a class.');
     }
 
     private static function parserLimitsAndMalformedInput(): void
@@ -113,10 +120,11 @@ final class TimetableCsvImportTest
         $rows = (new TimetableCsvParser())->parse($blank);
         $service = new TimetableCsvImportPreviewService($store);
         $store->lessons[] = new RecurringLesson(99, 1, 10, 1, 101, 1, 'C1', 'R1', 501, 401);
-        self::expectError(fn () => $service->preview(1, 1, $rows, true), 'only for an empty timetable');
+        $populatedPreview = $service->preview(1, 1, $rows, true);
+        assertSameValue(0, count($populatedPreview->assignments), 'A populated source timetable prevented a new import preview.');
         $store->lessons = [];
         self::expectError(fn () => $service->preview(2, 1, $rows, true), 'not available for this organisation');
-        self::expectError(fn () => $service->preview(1, 1, (new TimetableCsvParser())->parse(self::fill($blank, ['Monday|P1|R1' => ['C1', 'XXX']])), true), 'unknown, inactive, or ambiguous');
+        self::expectError(fn () => $service->preview(1, 1, (new TimetableCsvParser())->parse(self::fill($blank, ['Monday|P1|R1' => ['C1', 'XXX']])), true), 'following teachers do not exist');
     }
 
     private static function httpPreviewSecurity(): void

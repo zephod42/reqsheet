@@ -15,6 +15,8 @@ use Reqsheet\Timetable\TimetableSlotService;
 use Reqsheet\Timetable\TimetableTemplateService;
 use Reqsheet\Timetable\ResourceTimetableStore;
 use Reqsheet\Timetable\TimetableResourceService;
+use Reqsheet\Timetable\TimetableCsvImportDraftStore;
+use Reqsheet\Timetable\TimetableCsvImportResult;
 
 final class AdminTimetablePage
 {
@@ -105,7 +107,12 @@ final class AdminTimetablePage
             'no_teaching_periods' => 'The selected timetable has no teaching periods to export.',
             default => null,
         };
-        if (($query['csv_imported'] ?? null) === '1') $message = 'Timetable imported successfully.';
+        $importResult = ($query['csv_imported'] ?? null) === '1' && isset($this->user['id']) ? (new TimetableCsvImportDraftStore())->takeSuccess($this->organisationId, (int) $this->user['id']) : null;
+        if ($importResult instanceof TimetableCsvImportResult) {
+            $message = 'Timetable imported successfully. New timetable: ' . $importResult->versionName . ' is now active.';
+            if ($importResult->createdClassCodes !== []) $message .= ' Class codes added: ' . implode(', ', $importResult->createdClassCodes) . '.';
+            foreach ($importResult->skippedRooms as $room) $message .= ' Lessons for room ' . $room['code'] . ' not imported as room ' . $room['code'] . ' does not exist within the selected timetable template (' . $room['row_count'] . ' row' . ($room['row_count'] === 1 ? '' : 's') . ').';
+        } elseif (($query['csv_imported'] ?? null) === '1') $message = 'Timetable imported successfully and is now active.';
         $requestedView = (string) ($query['view'] ?? 'teacher');
         $view = in_array($requestedView, ['teacher', 'room', 'class'], true) ? $requestedView : 'teacher';
         $users = $store->usersForOrganisation($this->organisationId);
@@ -375,10 +382,7 @@ final class AdminTimetablePage
 
     private function importPanel(ResourceTimetableStore $store, TimetableVersion $version): string
     {
-        $html = '<details class="editor-section"><summary><strong>Import CSV</strong></summary><p>Upload a completed Reqsheet CSV for deterministic validation and a read-only preview.</p>';
-        if ($store->lessonsForVersion($version->id) !== []) {
-            return $html . '<p class="notice">CSV import is available only for an empty timetable. Create or select an empty timetable before importing.</p></details>';
-        }
+        $html = '<details class="editor-section"><summary><strong>Import CSV</strong></summary><p>Upload a completed Reqsheet CSV for deterministic validation and a read-only preview. This source timetable may already contain lessons; confirmation creates and activates a new timetable.</p>';
         return $html . AdminTimetableCsvImport::uploadForm($version->id) . '</details>';
     }
 

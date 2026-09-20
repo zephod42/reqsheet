@@ -207,17 +207,14 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
             throw new \RuntimeException('Unable to begin timetable CSV import transaction.');
         }
         try {
+            $organisation = $this->prepare('SELECT id FROM organisations WHERE id = :organisation_id FOR UPDATE');
+            $organisation->execute(['organisation_id' => $organisationId]);
+            if ($organisation->fetchColumn() === false) throw new TimetableCsvImportException(['The organisation is not available.']);
             $version = $this->prepare('SELECT organisation_id FROM timetable_versions WHERE id = :version_id FOR UPDATE');
             $version->execute(['version_id' => $versionId]);
             $owner = $version->fetchColumn();
             if ($owner === false || (int) $owner !== $organisationId) {
                 throw new TimetableCsvImportException(['The selected timetable is not available for this organisation.']);
-            }
-
-            $lessons = $this->prepare('SELECT id FROM recurring_lessons WHERE timetable_version_id = :version_id LIMIT 1 FOR UPDATE');
-            $lessons->execute(['version_id' => $versionId]);
-            if ($lessons->fetchColumn() !== false) {
-                throw new TimetableCsvImportException(['The selected timetable is no longer empty. Create or select an empty timetable before importing.']);
             }
 
             foreach ([
@@ -238,6 +235,62 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             throw $exception;
         }
+    }
+
+    public function createCsvImportVersion(int $organisationId, int $sourceVersionId, string $requestedLabel): array
+    {
+        if (!$this->pdo->inTransaction()) throw new \RuntimeException('Timetable CSV import transaction is not active.');
+        $sourceStatement = $this->prepare('SELECT id, organisation_id, first_day_of_week FROM timetable_versions WHERE id = :id FOR UPDATE');
+        $sourceStatement->execute(['id' => $sourceVersionId]);
+        $source = $sourceStatement->fetch();
+        if ($source === false || (int) $source['organisation_id'] !== $organisationId) throw new TimetableCsvImportException(['The source timetable is not available for this organisation.']);
+
+        $base = trim($requestedLabel) !== '' ? trim($requestedLabel) : 'Timetable_imported';
+        $label = $base;
+        $suffix = 1;
+        while (true) {
+            $check = $this->prepare('SELECT 1 FROM timetable_versions WHERE organisation_id = :organisation_id AND label = :label LIMIT 1');
+            $check->execute(['organisation_id' => $organisationId, 'label' => $label]);
+            if ($check->fetchColumn() === false) break;
+            $suffix++;
+            $tail = '_'. $suffix;
+            $label = mb_substr($base, 0, 255 - mb_strlen($tail)) . $tail;
+        }
+        $insert = $this->prepare('INSERT INTO timetable_versions (organisation_id, label, effective_from, effective_to, first_day_of_week) VALUES (:organisation_id, :label, :effective_from, NULL, :first_day)');
+        $insert->execute(['organisation_id' => $organisationId, 'label' => $label, 'effective_from' => '1000-01-01', 'first_day' => (int) $source['first_day_of_week']]);
+        $versionId = (int) $this->pdo->lastInsertId();
+        $slots = $this->prepare('SELECT id, day_of_week, sequence_number, kind, teaching_period_number, label, starts_at, ends_at FROM timetable_slots WHERE timetable_version_id = :version_id ORDER BY day_of_week, sequence_number');
+        $slots->execute(['version_id' => $sourceVersionId]);
+        $slotMap = [];
+        foreach ($slots->fetchAll() as $slot) {
+            $copy = $this->prepare('INSERT INTO timetable_slots (timetable_version_id, day_of_week, sequence_number, kind, teaching_period_number, label, starts_at, ends_at) VALUES (:version_id, :day, :sequence, :kind, :period, :label, :starts_at, :ends_at)');
+            $copy->execute(['version_id' => $versionId, 'day' => (int) $slot['day_of_week'], 'sequence' => (int) $slot['sequence_number'], 'kind' => (string) $slot['kind'], 'period' => $slot['teaching_period_number'] === null ? null : (int) $slot['teaching_period_number'], 'label' => (string) $slot['label'], 'starts_at' => (string) $slot['starts_at'], 'ends_at' => (string) $slot['ends_at']]);
+            $slotMap[(int) $slot['id']] = (int) $this->pdo->lastInsertId();
+        }
+        return ['id' => $versionId, 'label' => $label, 'slot_map' => $slotMap];
+    }
+
+    public function ensureCsvImportClass(int $organisationId, string $code): array
+    {
+        if (!$this->pdo->inTransaction()) throw new \RuntimeException('Timetable CSV import transaction is not active.');
+        $code = trim($code);
+        $find = $this->prepare('SELECT id FROM organisation_classes WHERE organisation_id = :organisation_id AND class_code = :code FOR UPDATE');
+        $find->execute(['organisation_id' => $organisationId, 'code' => $code]);
+        $id = $find->fetchColumn();
+        if ($id !== false) return ['id' => (int) $id, 'created' => false];
+        $insert = $this->prepare('INSERT INTO organisation_classes (organisation_id, class_code) VALUES (:organisation_id, :code)');
+        $insert->execute(['organisation_id' => $organisationId, 'code' => $code]);
+        return ['id' => (int) $this->pdo->lastInsertId(), 'created' => true];
+    }
+
+    public function activateCsvImportVersion(int $organisationId, int $versionId): void
+    {
+        if (!$this->pdo->inTransaction()) throw new \RuntimeException('Timetable CSV import transaction is not active.');
+        $check = $this->prepare('SELECT id FROM timetable_versions WHERE id = :version_id AND organisation_id = :organisation_id FOR UPDATE');
+        $check->execute(['version_id' => $versionId, 'organisation_id' => $organisationId]);
+        if ($check->fetchColumn() === false) throw new TimetableCsvImportException(['The imported timetable is not available for this organisation.']);
+        $update = $this->prepare('UPDATE organisations SET active_timetable_version_id = :version_id WHERE id = :organisation_id');
+        $update->execute(['version_id' => $versionId, 'organisation_id' => $organisationId]);
     }
 
     public function insertCsvImportLesson(

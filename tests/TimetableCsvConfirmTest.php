@@ -42,27 +42,28 @@ final class TimetableCsvConfirmTest
         $uploadPage = new AdminTimetableCsvImport(new TimetableCsvParser(), new TimetableCsvImportPreviewService($store), $drafts, 1, $admin, true);
         $previewHtml = self::previewHtml($uploadPage, $store);
         assertContainsValue('Import Timetable', $previewHtml, 'Validated preview omitted the confirmation action.');
-        assertContainsValue('does not activate the timetable', $previewHtml, 'Preview omitted the activation boundary.');
+        assertContainsValue('activates it immediately', $previewHtml, 'Preview omitted the automatic activation boundary.');
         $draft = $drafts->save(self::preview($store), 80);
 
         $confirmation = self::confirmation($store, $drafts, $admin, 1);
         $response = $confirmation->handle(['csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'], 'action' => 'import']);
         assertSameValue(303, $response->status, 'Successful import did not use a post/redirect/get response.');
-        assertSameValue('/admin/timetable?version=1&csv_imported=1', $response->location, 'Successful import returned to the wrong timetable.');
+        assertSameValue('/admin/timetable?version=3&csv_imported=1', $response->location, 'Successful import returned to the wrong timetable.');
         assertSameValue(3, count($store->lessons), 'Imported lesson count was incorrect.');
         assertSameValue([2, 1, 1], array_map(static fn (RecurringLesson $lesson): int => $lesson->durationPeriods, $store->lessons), 'Single/multi-period grouping changed during import.');
         assertSameValue([10, 10, 11], array_map(static fn (RecurringLesson $lesson): int => $lesson->teacherUserId, $store->lessons), 'Imported teacher relationships were incorrect.');
         assertSameValue([501, 501, 502], array_map(static fn (RecurringLesson $lesson): ?int => $lesson->classId, $store->lessons), 'Imported class relationships were incorrect.');
         assertSameValue([401, 401, 402], array_map(static fn (RecurringLesson $lesson): ?int => $lesson->roomId, $store->lessons), 'Imported room relationships were incorrect.');
-        assertSameValue(2, $store->active[1], 'CSV import changed timetable activation.');
+        assertSameValue(3, $store->active[1], 'CSV import did not activate the newly created timetable.');
+        assertSameValue('Import target_imported_', substr((string) $store->versions[3]->label, 0, 23), 'Imported timetable did not receive an automatic name.');
         assertSameValue([900 => 4], $store->occurrences, 'CSV import changed historical occurrence state.');
 
-        $page = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10, 'csv_imported' => '1'], []);
+        $page = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 3, 'view' => 'teacher', 'resource' => 10, 'csv_imported' => '1'], []);
         assertContainsValue('Timetable imported successfully.', $page, 'Builder omitted the successful import message.');
         assertContainsValue('rowspan="2"', $page, 'Imported multi-period lesson was absent from the teacher projection.');
-        $room = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 1, 'view' => 'room', 'resource' => 401], []);
+        $room = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 3, 'view' => 'room', 'resource' => 401], []);
         assertContainsValue('C1', $room, 'Imported lesson was absent from the room projection.');
-        $class = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 1, 'view' => 'class', 'resource' => 502], []);
+        $class = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 3, 'view' => 'class', 'resource' => 502], []);
         assertContainsValue('Teacher BBB', $class, 'Imported lesson was absent from the class projection.');
 
         $repeat = $confirmation->handle(['csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'], 'action' => 'import']);
@@ -77,15 +78,14 @@ final class TimetableCsvConfirmTest
         $populated->insertResourceLesson(1, 11, 2, 201, 1, 502, 402);
         $before = $populated->lessons;
         $response = self::confirmation($populated, $drafts)->handle(['csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'], 'action' => 'import']);
-        assertSameValue(422, $response->status, 'Timetable populated after preview was imported.');
-        assertContainsValue('no longer empty', $response->html, 'Populated-timetable error was not actionable.');
-        assertSameValue($before, $populated->lessons, 'Rejected import mutated a populated timetable.');
+        assertSameValue(303, $response->status, 'A populated source timetable prevented a new import.');
+        assertSameValue(4, count($populated->lessons), 'Import into a new timetable did not retain the source lesson and add the proposed lessons.');
+        assertSameValue($before[0], $populated->lessons[0], 'Import changed the populated source timetable.');
 
-        foreach (['teacher', 'class', 'room', 'structure', 'setting'] as $change) {
+        foreach (['teacher', 'room', 'structure', 'setting'] as $change) {
             $store = self::store();
             [$drafts, $draft] = self::draft($store);
             if ($change === 'teacher') $store->users[0]['staff_identifier'] = 'NEW';
-            if ($change === 'class') $store->classes[0]['code'] = 'CHANGED';
             if ($change === 'room') $store->rooms[0]['code'] = 'CHANGED';
             if ($change === 'structure') $store->slots[0] = new TimetableSlot(101, 1, 1, 1, 'teaching', 1, 'Changed P1');
             if ($change === 'setting') $store->allowConjoinedPeriods = false;
@@ -225,10 +225,36 @@ final class AtomicResourceConfigurationStore extends ResourceConfigurationStore 
         if ($this->transaction) throw new \RuntimeException('Concurrent fake import attempted.');
         $version = $this->findVersion($versionId);
         if ($version === null || $version->organisationId !== $organisationId) throw new TimetableCsvImportException(['The selected timetable is not available for this organisation.']);
-        if ($this->lessonsForVersion($versionId) !== []) throw new TimetableCsvImportException(['The selected timetable is no longer empty. Create or select an empty timetable before importing.']);
         $this->transaction = true; $this->snapshot = $this->lessons; $this->insertions = 0;
         return $this->allowConjoinedPeriods;
     }
+
+    public function createCsvImportVersion(int $organisationId, int $sourceVersionId, string $requestedLabel): array
+    {
+        $source = $this->versions[$sourceVersionId] ?? null;
+        if ($source === null || $source->organisationId !== $organisationId) throw new TimetableCsvImportException(['The source timetable is not available for this organisation.']);
+        $label = $requestedLabel; $suffix = 1;
+        while (in_array($label, array_map(static fn (TimetableVersion $version): string => (string) $version->label, $this->versions), true)) $label = $requestedLabel . '_' . (++$suffix);
+        $id = max(array_keys($this->versions)) + 1;
+        $this->versions[$id] = new TimetableVersion($id, $organisationId, $label, new DateTimeImmutable('1000-01-01'), null, $source->firstDayOfWeek);
+        $map = [];
+        foreach ($this->slotsForVersion($sourceVersionId) as $slot) {
+            $slotId = max([0, ...array_map(static fn (TimetableSlot $item): int => $item->id, $this->slots)]) + 1;
+            $this->slots[] = new TimetableSlot($slotId, $id, $slot->dayOfWeek, $slot->sequenceNumber, $slot->kind, $slot->teachingPeriodNumber, $slot->label, $slot->startsAt, $slot->endsAt);
+            $map[$slot->id] = $slotId;
+        }
+        return ['id' => $id, 'label' => $label, 'slot_map' => $map];
+    }
+
+    public function ensureCsvImportClass(int $organisationId, string $code): array
+    {
+        foreach ($this->classes as $class) if ((int) ($class['organisation_id'] ?? $organisationId) === $organisationId && (string) $class['code'] === $code) return ['id' => (int) $class['id'], 'created' => false];
+        $id = max([500, ...array_map(static fn (array $class): int => (int) $class['id'], $this->classes)]) + 1;
+        $this->classes[] = ['id' => $id, 'code' => $code, 'organisation_id' => $organisationId];
+        return ['id' => $id, 'created' => true];
+    }
+
+    public function activateCsvImportVersion(int $organisationId, int $versionId): void { $this->active[$organisationId] = $versionId; }
 
     public function insertCsvImportLesson(int $organisationId, int $versionId, int $teacherUserId, int $dayOfWeek, int $startSlotId, int $durationPeriods, int $classId, int $roomId): int
     {

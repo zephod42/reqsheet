@@ -47,7 +47,14 @@ final class AdminTimetableCsvImport
     {
         $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable / CSV import</p><h1>Import preview</h1></div><a class="button secondary" href="/admin/timetable?version=' . $preview->versionId . '">Back to timetable</a></section>';
         $body .= '<section class="editor-section" data-import-draft="' . $this->e($draftId) . '"><div class="section-heading"><div><p class="eyebrow">Selected timetable</p><h2>' . $this->e($preview->versionName) . '</h2></div></div>';
-        $body .= '<p class="notice"><strong>Nothing has been saved.</strong> This validated preview expires after 15 minutes. Importing does not activate the timetable or change the currently active timetable.</p>';
+        $body .= '<p class="notice"><strong>Nothing has been saved.</strong> Confirmation creates a new timetable, imports the retained lessons, and activates it immediately. The source timetable remains unchanged. This preview expires after 15 minutes.</p>';
+        $body .= '<dl class="summary-list"><div><dt>Source timetable</dt><dd>' . $this->e($preview->versionName) . '</dd></div><div><dt>Proposed new timetable</dt><dd>' . $this->e($preview->proposedVersionName) . '</dd></div></dl>';
+        if ($preview->newClassCodes !== []) $body .= '<p class="notice"><strong>New class codes to add:</strong> ' . $this->e(implode(', ', $preview->newClassCodes)) . '</p>';
+        if ($preview->skippedRooms !== []) {
+            $body .= '<div class="notice warning"><strong>Rooms to skip</strong><ul>';
+            foreach ($preview->skippedRooms as $room) $body .= '<li>Lessons for room ' . $this->e($room['code']) . ' will not be imported because room ' . $this->e($room['code']) . ' does not exist within the selected timetable template (' . $room['row_count'] . ' row' . ($room['row_count'] === 1 ? '' : 's') . ').</li>';
+            $body .= '</ul></div>';
+        }
         $body .= '<dl class="summary-list"><div><dt>Proposed lessons</dt><dd>' . count($preview->assignments) . '</dd></div><div><dt>Occupied periods</dt><dd>' . $preview->occupiedPeriods . '</dd></div><div><dt>Free room/period slots</dt><dd>' . $preview->freeSlots . '</dd></div></dl>';
         if ($preview->assignments === []) {
             $body .= '<p class="message">The CSV is structurally valid and contains no lesson assignments.</p>';

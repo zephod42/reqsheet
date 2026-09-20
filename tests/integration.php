@@ -295,6 +295,7 @@ try {
         $csvClassB = $configurationStore->createClass($organisationId, 'CSV-B');
         $csvRoomA = $configurationStore->createRoom($organisationId, 'CSV-R1');
         $csvRoomB = $configurationStore->createRoom($organisationId, 'CSV-R2');
+        $sourceLesson = $configurationStore->insertLesson($targetVersion, $teacherA, 1, $targetP1, 1, 'SOURCE-UNCHANGED', 'CSV-R1');
         $blankExport = (new BlankTimetableCsvExporter($configurationStore))->export($organisationId, $targetVersion);
         $completed = integrationPopulateCsv($blankExport->content, [
             'Monday|P1|CSV-R1' => ['CSV-A', 'INA'],
@@ -307,6 +308,7 @@ try {
         $preview = $previewValidator->preview($organisationId, $targetVersion, $parser->parse($completed), true);
         $draft = [
             'version_id' => $targetVersion,
+            'proposed_version_name' => 'CSV import target_imported_20260920_143025',
             'assignments' => $preview->assignments,
             'occupied_periods' => $preview->occupiedPeriods,
             'free_slots' => $preview->freeSlots,
@@ -315,14 +317,17 @@ try {
         $importer = new TimetableCsvImportService($configurationStore, new BlankTimetableCsvExporter($configurationStore), $parser, $previewValidator);
         $imported = $importer->import($organisationId, $draft);
         integrationAssert($imported->lessonCount === 3 && $imported->occupiedPeriods === 4 && $imported->freeSlots === $blankExport->rowCount - 4, 'Atomic CSV import returned incorrect proposal counts.');
-        $importedLessons = $configurationStore->lessonsForVersion($targetVersion);
+        $importedLessons = $configurationStore->lessonsForVersion($imported->versionId);
         integrationAssert(count($importedLessons) === 3, 'Atomic CSV import inserted the wrong lesson count.');
-        integrationAssert($importedLessons[0]->startSlotId === $targetP1 && $importedLessons[0]->durationPeriods === 2, 'Consecutive CSV periods were not persisted as one multi-period lesson.');
-        integrationAssert($importedLessons[1]->startSlotId === $targetP3 && $importedLessons[1]->durationPeriods === 1, 'CSV lesson was incorrectly grouped across Break.');
-        integrationAssert($importedLessons[2]->startSlotId === $targetTuesdayP1 && $importedLessons[2]->durationPeriods === 1, 'Single-period CSV lesson was not persisted.');
+        $importedSlots = $configurationStore->slotsForVersion($imported->versionId);
+        $slotAt = static function (int $day, int $sequence) use ($importedSlots): int { foreach ($importedSlots as $slot) if ($slot->dayOfWeek === $day && $slot->sequenceNumber === $sequence) return $slot->id; throw new RuntimeException('Imported slot was not cloned.'); };
+        integrationAssert($importedLessons[0]->startSlotId === $slotAt(1, 1) && $importedLessons[0]->durationPeriods === 2, 'Consecutive CSV periods were not persisted as one multi-period lesson.');
+        integrationAssert($importedLessons[1]->startSlotId === $slotAt(1, 4) && $importedLessons[1]->durationPeriods === 1, 'CSV lesson was incorrectly grouped across Break.');
+        integrationAssert($importedLessons[2]->startSlotId === $slotAt(2, 1) && $importedLessons[2]->durationPeriods === 1, 'Single-period CSV lesson was not persisted.');
         integrationAssert($importedLessons[0]->teacherUserId === $teacherA && $importedLessons[0]->classId === $csvClassA && $importedLessons[0]->roomId === $csvRoomA, 'Imported teacher/class/room relationships were incorrect.');
         integrationAssert($importedLessons[2]->teacherUserId === $teacherB && $importedLessons[2]->classId === $csvClassB && $importedLessons[2]->roomId === $csvRoomB, 'Imported secondary relationships were incorrect.');
-        integrationAssert($configurationStore->activeVersionId($organisationId) === $versionId, 'CSV import changed the active timetable.');
+        integrationAssert($configurationStore->activeVersionId($organisationId) === $imported->versionId, 'CSV import did not activate the new timetable.');
+        integrationAssert(count($configurationStore->lessonsForVersion($targetVersion)) === 1 && $configurationStore->lessonsForVersion($targetVersion)[0]->id === $sourceLesson, 'CSV import changed the populated source timetable.');
         integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM lesson_occurrences')->fetchColumn() === $historicalOccurrences, 'CSV import changed historical occurrences.');
         integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM requisitions')->fetchColumn() === $historicalRequisitions, 'CSV import changed historical requisitions.');
 
@@ -358,13 +363,15 @@ try {
         integrationAssert($lockPreventedSecond, 'Concurrent import was not blocked by the timetable-version row lock.');
         $firstImporter->insertCsvImportLesson($organisationId, $concurrentVersion, $teacherA, 1, $concurrentSlot, 1, $csvClassA, $csvRoomA);
         $firstImporter->commitCsvImport();
-        $secondRejectedPopulated = false;
+        $secondCanStart = false;
         try {
             $secondImporter->beginCsvImport($organisationId, $concurrentVersion);
+            $secondCanStart = true;
+            $secondImporter->rollbackCsvImport();
         } catch (TimetableCsvImportException) {
-            $secondRejectedPopulated = true;
+            $secondImporter->rollbackCsvImport();
         }
-        integrationAssert($secondRejectedPopulated, 'Second concurrent importer succeeded after the first import committed.');
+        integrationAssert($secondCanStart, 'A later import could not start after the first committed.');
         integrationAssert(count($configurationStore->lessonsForVersion($concurrentVersion)) === 1, 'Concurrent import handling duplicated lessons.');
     } finally {
         cleanTestDatabase($pdo);

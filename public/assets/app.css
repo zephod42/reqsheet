@@ -96,6 +96,7 @@ small { font-size: .82rem; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .technical, .timetable, .lesson-block, .week-grid, .admin-week-grid { font-family: var(--technical); }
 .notice, .message { border: 1px solid var(--rule); padding: .75rem; margin: var(--space-4) 0; }
+.warning { background: #fffbe8; border-color: #b7a34a; }
 .error { background: #fff3f3; }
 .muted { color: var(--muted); }
 .eyebrow { margin: 0 0 .25rem; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }

@@ -27,49 +27,56 @@ No second timetable model is required:
 - `recurring_lessons` is the assignment target. It already records version, teacher, weekday, start slot, duration, class and room resources/codes.
 - `lesson_occurrences` and `requisitions` are dated historical records. Import must not update or delete them.
 - `TimetableRules`, `RecurringLessonService`, `TimetableSlot`, and `PdoTimetableConfigurationStore` contain the ownership, span, adjacency, and conflict rules that an importer must reuse rather than reimplement inconsistently.
-- Timetable activation remains the separate organisation-scoped operation already provided by `activateVersion()`.
+- Timetable activation remains the organisation-scoped operation already provided by `activateVersion()`; confirmed CSV imports call the same activation semantics inside their atomic transaction.
 
 ## Milestone 2: upload, validation, and preview
 
-An administrator selects an empty timetable and uploads the completed file through **Import CSV**. The upload is a CSRF-protected `POST` to `/admin/timetable/import`; only `.csv` files up to 2 MiB and 20,000 data rows are accepted. Uploaded bytes are read from PHP's temporary upload location and are not moved into the document root or retained after the request.
+An administrator selects a source timetable and uploads the completed file through **Import CSV**. The source may already contain assignments; it is used only for structure and remains unchanged. The upload is a CSRF-protected `POST` to `/admin/timetable/import`; only `.csv` files up to 2 MiB and 20,000 data rows are accepted. Uploaded bytes are read from PHP's temporary upload location and are not moved into the document root or retained after the request.
 
 Validation is deterministic:
 
 - the header must be exactly `Day,Period,Room,Class,Teacher`;
 - text must be valid UTF-8 and every record must have five columns;
 - the server regenerates the complete Day + Period + Room matrix from the selected organisation-owned version and current organisation rooms;
-- every expected combination must occur exactly once, although row order may differ from the blank export;
-- unknown, additional, missing, and duplicate combinations are rejected with CSV row details where a source row exists;
+- after rows for unrecognized rooms are discarded, every expected recognized-room combination must occur exactly once, although row order may differ from the blank export;
+- missing and duplicate recognized-room combinations are rejected with CSV row details where a source row exists; discarded room rows are reported as warnings;
 - Class and Teacher must either both be blank or both be populated;
-- teachers resolve exactly by active, Teacher-role, organisation-scoped staff code; classes and rooms resolve exactly within the same organisation;
+- teachers resolve exactly by active, Teacher-role, organisation-scoped staff code; unknown or ineligible teachers block the import; existing classes are reused and missing classes are proposed for creation;
 - occupied cells are checked for simultaneous teacher, class, and room conflicts.
 
-Identical Class and Teacher values form one multi-period lesson only when they are in consecutive teaching slots in the same room and day. A gap, room/day change, Break, Lunch, or other non-teaching separator ends the lesson. Multi-period proposals are rejected when conjoined periods are disabled in organisation Settings. The selected timetable must be empty when previewed; no existing assignment is deleted, replaced, or merged.
+Identical Class and Teacher values form one multi-period lesson only when they are in consecutive teaching slots in the same room and day. A gap, room/day change, Break, Lunch, or other non-teaching separator ends the lesson. Multi-period proposals are rejected when conjoined periods are disabled in organisation Settings. The selected source timetable does not need to be empty; no existing assignment is deleted, replaced, or merged.
 
-Successful validation produces an escaped, read-only preview showing the selected timetable, proposed lesson and occupied/free counts, resources, and multi-period spans. It does not expose a confirmation action in this milestone and performs no inserts or updates. A separate **Export Resource Reference** download provides only eligible teacher codes/names, class codes, and room codes using `Resource Type,Code,Name`; it excludes emails, passwords, account state, and session information.
+Successful validation produces an escaped, read-only preview showing the source timetable, automatically proposed `<source>_imported_YYYYMMDD_HHMMSS` name, the immediate-activation destination, lesson and occupied/free counts, proposed new classes, skipped-room warnings, resources, and multi-period spans. It performs no inserts or updates. A separate **Export Resource Reference** download provides only eligible teacher codes/names, class codes, and room codes using `Resource Type,Code,Name`; it excludes emails, passwords, account state, and session information.
 
 The preview's canonical proposed assignments are stored in the current administrator session for 15 minutes with a random draft ID, organisation ID, user ID, version ID, structure digest, and expiry. Only one current draft is retained, so a later valid preview supersedes it. Uploaded file bytes are not stored. The draft is tenant/user-bound and is deliberately non-authoritative.
 
 ## Milestone 3: confirmed atomic import
 
-The validated preview now provides explicit **Import Timetable** and **Cancel** actions. Both are CSRF-protected posts containing only the random draft identifier; organisation, user, timetable version, proposal, and counts are read from the server-side session draft. The preview states that import does not activate the timetable.
+The validated preview now provides explicit **Import Timetable** and **Cancel** actions. Both are CSRF-protected posts containing only the random draft identifier; organisation, user, source timetable, proposal, and counts are read from the server-side session draft. Confirmation creates a new timetable and activates it immediately; the source timetable is never the assignment target.
 
-Confirmation requires the same authenticated administrator, organisation, and unexpired session draft that created the preview. Cancel consumes the draft without changing the database. A successful import also consumes it and redirects to the selected builder with `Timetable imported successfully.` Expired, cancelled, completed, foreign-user, and foreign-tenant drafts cannot be reused.
+Confirmation requires the same authenticated administrator, organisation, and unexpired session draft that created the preview. Cancel consumes the draft without changing the database. A successful import also consumes it and redirects to the newly created timetable builder with its generated name, created classes, and skipped-room warnings. Expired, cancelled, completed, foreign-user, and foreign-tenant drafts cannot be reused.
 
 Confirmation uses one InnoDB transaction on one PDO connection:
 
-1. Lock the selected `timetable_versions` row with `FOR UPDATE` and verify organisation ownership.
-2. Lock/check the version's `recurring_lessons` range and reject a timetable that is no longer empty.
+1. Lock the organisation activation state and selected source `timetable_versions` row with `FOR UPDATE` and verify organisation ownership.
+2. Lock/check the source structure and resources; existing source `recurring_lessons` are not an import target and are not changed.
 3. Lock the current slots, rooms, classes, eligible teachers, and conjoined-period setting used for revalidation.
 4. Regenerate the blank structure, compare its digest with the preview, reconstruct the proposed occupied rows from the server draft, and rerun the complete Milestone 2 resolver/grouping/conflict validator.
-5. Compare the newly resolved canonical proposal and counts with the draft, then insert every `recurring_lessons` row through an organisation-constrained insert.
-6. Commit after all inserts succeed; any validation or storage failure rolls back the whole transaction.
+5. Compare the newly resolved canonical proposal and counts with the draft, generate a unique timetable name, clone the complete source slot structure, and create missing organisation classes.
+6. Insert every `recurring_lessons` row into the cloned version, activate that version through the normal organisation activation field, and commit only after all operations succeed.
 
-The version-row lock serialises imports targeting the same timetable. A second importer waits and then sees the committed assignments, so it fails the empty-timetable check rather than duplicating lessons. Manual activation remains separate. Import neither creates dated occurrences nor updates/deletes occurrences or requisitions, and it does not change the active timetable ID.
+The organisation lock serialises imports and activation changes. A second importer receives a unique generated name and a separate timetable rather than duplicating assignments into the source. Previous versions remain available for normal manual reactivation. Import neither creates dated occurrences nor updates/deletes occurrences or requisitions.
 
 Ordinary state changes after preview—such as a populated target, changed structure/rooms, removed or changed teacher/class resources, disabled multi-period support, or new conflicts—produce an actionable validation response and no HTTP 503. Unexpected transaction failures are rolled back, logged through the request-ID exception logger, and shown without SQL details.
 
 Preview text is HTML-escaped, and spreadsheet formula-like values remain inert strings in Reqsheet. Uploaded content is never executed or interpreted as HTML.
+
+## Revised resource rules
+
+- Unknown class codes are created once during successful confirmation only; they are listed in the preview and in the success message.
+- Unknown room rows are discarded before structural validation, are never used to create rooms/classes/lessons, and are listed with row counts in the preview and success message.
+- Unknown or ineligible teachers in recognized rooms block the entire import and no timetable, class, or lesson is committed.
+- Every confirmed import creates a new structurally independent timetable and activates it immediately. The source timetable can remain populated and can later be reactivated through the normal timetable controls.
 
 ## Operational notes and remaining risks
 

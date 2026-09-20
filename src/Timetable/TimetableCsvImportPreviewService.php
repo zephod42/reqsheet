@@ -15,9 +15,6 @@ final class TimetableCsvImportPreviewService
         if ($version === null || $version->organisationId !== $organisationId) {
             throw new TimetableCsvImportException(['The selected timetable is not available for this organisation.']);
         }
-        if ($this->store->lessonsForVersion($versionId) !== []) {
-            throw new TimetableCsvImportException(['CSV import is available only for an empty timetable. Create or select an empty timetable before importing.']);
-        }
         $rooms = $this->store->roomsForOrganisation($organisationId);
         if ($rooms === []) throw new TimetableCsvImportException(['Add at least one room before importing a timetable CSV.']);
         $slots = $this->store->slotsForVersion($versionId);
@@ -57,7 +54,16 @@ final class TimetableCsvImportPreviewService
 
         $seen = [];
         $occupied = [];
+        $skippedRooms = [];
+        $recognisedRows = 0;
+        $newClassCodes = [];
+        $missingTeachers = [];
         foreach ($rows as $row) {
+            if (!isset($roomsByCode[$row['room']])) {
+                $skippedRooms[$row['room']] = ($skippedRooms[$row['room']] ?? 0) + 1;
+                continue;
+            }
+            $recognisedRows++;
             $key = self::key($row['day'], $row['period'], $row['room']);
             if (!isset($expected[$key])) {
                 self::error($errors, sprintf('CSV row %d references an unknown or unexpected slot: %s / %s / %s.', $row['row'], $row['day'], $row['period'], $row['room']));
@@ -75,14 +81,22 @@ final class TimetableCsvImportPreviewService
             if ($row['class'] === '') continue;
 
             $teacherMatches = $teachers[$row['teacher']] ?? [];
+            if ($teacherMatches === []) {
+                $missingTeachers[$row['teacher']] = true;
+                continue;
+            }
             if (count($teacherMatches) !== 1 || empty($teacherMatches[0]['is_active'])) {
                 self::error($errors, sprintf('CSV row %d references an unknown, inactive, or ambiguous eligible Teacher code "%s".', $row['row'], $row['teacher']));
                 continue;
             }
             $classMatches = $classes[$row['class']] ?? [];
-            if (count($classMatches) !== 1) {
-                self::error($errors, sprintf('CSV row %d references an unknown or ambiguous Class code "%s".', $row['row'], $row['class']));
+            if (count($classMatches) > 1) {
+                self::error($errors, sprintf('CSV row %d references an ambiguous Class code "%s".', $row['row'], $row['class']));
                 continue;
+            }
+            if ($classMatches === []) {
+                $newClassCodes[$row['class']] = true;
+                $classMatches = [['id' => 0, 'code' => $row['class']]];
             }
             $structure = $expected[$key];
             $occupied[] = [
@@ -96,9 +110,15 @@ final class TimetableCsvImportPreviewService
                 self::error($errors, sprintf('Missing CSV slot: %s / %s / %s.', $slot['day'], $slot['period'], $slot['room']['code']));
             }
         }
-        if (count($rows) !== count($expected)) {
-            self::error($errors, sprintf('The CSV contains %d data rows; %d are required for this timetable structure.', count($rows), count($expected)));
+        if ($recognisedRows !== count($expected)) {
+            self::error($errors, sprintf('The CSV contains %d retained data rows; %d are required for this timetable structure.', $recognisedRows, count($expected)));
         }
+        if ($missingTeachers !== []) {
+            $codes = array_keys($missingTeachers);
+            sort($codes);
+            self::error($errors, 'Import failed. The following teachers do not exist or are not eligible teachers: ' . implode(', ', $codes) . '. Please add the teachers in People and run the import again.');
+        }
+        if ($recognisedRows === 0) $errors[] = 'The CSV contains no importable rows for rooms in the selected timetable template.';
         if ($errors !== []) throw new TimetableCsvImportException($errors);
 
         self::validateConflicts($occupied, $errors);
@@ -116,6 +136,11 @@ final class TimetableCsvImportPreviewService
             'rooms' => array_map(static fn (array $room): array => [(int) $room['id'], (string) $room['code']], $rooms),
         ], JSON_THROW_ON_ERROR));
 
+        $skipped = [];
+        foreach ($skippedRooms as $code => $count) $skipped[] = ['code' => (string) $code, 'row_count' => (int) $count];
+        usort($skipped, static fn (array $left, array $right): int => $left['code'] <=> $right['code']);
+        $newClassCodes = array_keys($newClassCodes);
+        sort($newClassCodes);
         return new TimetableCsvImportPreview(
             $organisationId,
             $versionId,
@@ -124,6 +149,9 @@ final class TimetableCsvImportPreviewService
             count($expected) - count($occupied),
             $assignments,
             $identity,
+            TimetableCsvImportPreview::proposedName(trim((string) $version->label) !== '' ? (string) $version->label : 'Timetable ' . $versionId),
+            $skipped,
+            $newClassCodes,
         );
     }
 

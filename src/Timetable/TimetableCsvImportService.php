@@ -37,20 +37,31 @@ final class TimetableCsvImportService
                 throw new TimetableCsvImportException(['A teacher, class, room, or timetable setting changed after preview. Upload and validate the CSV again.']);
             }
 
+            $createdClasses = [];
+            foreach ($current->newClassCodes as $code) {
+                $resource = $this->store->ensureCsvImportClass($organisationId, (string) $code);
+                if ($resource['created']) $createdClasses[] = (string) $code;
+            }
+            $target = $this->store->createCsvImportVersion($organisationId, $versionId, (string) ($draft['proposed_version_name'] ?? TimetableCsvImportPreview::proposedName($current->versionName)));
             foreach ($current->assignments as $assignment) {
+                $slotKey = (string) $assignment['start_slot_id'];
+                $targetSlot = (int) ($target['slot_map'][$slotKey] ?? 0);
+                if ($targetSlot < 1) throw new TimetableCsvImportException(['The imported timetable structure could not be copied. Upload and validate the CSV again.']);
                 $this->store->insertCsvImportLesson(
                     $organisationId,
-                    $versionId,
+                    (int) $target['id'],
                     $assignment['teacher_id'],
                     $assignment['day_of_week'],
-                    $assignment['start_slot_id'],
+                    $targetSlot,
                     $assignment['duration'],
-                    $assignment['class_id'],
+                    $this->classIdForImport($organisationId, $assignment['class_code']),
                     $assignment['room_id'],
                 );
             }
+            $this->store->activateCsvImportVersion($organisationId, (int) $target['id']);
             $this->store->commitCsvImport();
-            return new TimetableCsvImportResult($versionId, count($current->assignments), $current->occupiedPeriods, $current->freeSlots);
+            $skippedRooms = is_array($draft['skipped_rooms'] ?? null) ? $draft['skipped_rooms'] : $current->skippedRooms;
+            return new TimetableCsvImportResult((int) $target['id'], count($current->assignments), $current->occupiedPeriods, $current->freeSlots, (string) $target['label'], $createdClasses, $skippedRooms);
         } catch (TimetableCsvImportException $exception) {
             $this->store->rollbackCsvImport();
             throw $exception;
@@ -61,6 +72,12 @@ final class TimetableCsvImportService
             $this->store->rollbackCsvImport();
             throw new TimetableCsvImportTechnicalException('The timetable import transaction failed.', 0, $exception);
         }
+    }
+
+    private function classIdForImport(int $organisationId, string $code): int
+    {
+        $resource = $this->store->ensureCsvImportClass($organisationId, $code);
+        return (int) $resource['id'];
     }
 
     /**
@@ -121,12 +138,8 @@ final class TimetableCsvImportService
         foreach ($assignments as $assignment) {
             if (!is_array($assignment)) return [];
             $normalised[] = [
-                'teacher_id' => (int) ($assignment['teacher_id'] ?? 0),
                 'teacher_code' => (string) ($assignment['teacher_code'] ?? ''),
-                'teacher_name' => (string) ($assignment['teacher_name'] ?? ''),
-                'class_id' => (int) ($assignment['class_id'] ?? 0),
                 'class_code' => (string) ($assignment['class_code'] ?? ''),
-                'room_id' => (int) ($assignment['room_id'] ?? 0),
                 'room_code' => (string) ($assignment['room_code'] ?? ''),
                 'day_of_week' => (int) ($assignment['day_of_week'] ?? 0),
                 'day' => (string) ($assignment['day'] ?? ''),
@@ -135,7 +148,7 @@ final class TimetableCsvImportService
                 'duration' => (int) ($assignment['duration'] ?? 0),
             ];
         }
-        usort($normalised, static fn (array $left, array $right): int => [$left['day_of_week'], $left['start_slot_id'], $left['room_id']] <=> [$right['day_of_week'], $right['start_slot_id'], $right['room_id']]);
+        usort($normalised, static fn (array $left, array $right): int => [$left['day_of_week'], $left['start_slot_id'], $left['room_code']] <=> [$right['day_of_week'], $right['start_slot_id'], $right['room_code']]);
         return $normalised;
     }
 

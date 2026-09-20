@@ -9,6 +9,7 @@ use Reqsheet\Http\SessionAuth;
 final class TimetableCsvImportDraftStore
 {
     private const SESSION_KEY = 'timetable_csv_import_draft';
+    private const SUCCESS_KEY = 'timetable_csv_import_success';
     public const LIFETIME_SECONDS = 900;
 
     /** @return array<string, mixed> */
@@ -22,10 +23,13 @@ final class TimetableCsvImportDraftStore
             'user_id' => $userId,
             'version_id' => $preview->versionId,
             'version_name' => $preview->versionName,
+            'proposed_version_name' => $preview->proposedVersionName,
             'assignments' => $preview->assignments,
             'occupied_periods' => $preview->occupiedPeriods,
             'free_slots' => $preview->freeSlots,
             'structure_identity' => $preview->structureIdentity,
+            'skipped_rooms' => $preview->skippedRooms,
+            'new_class_codes' => $preview->newClassCodes,
             'created_at' => $now,
             'expires_at' => $now + self::LIFETIME_SECONDS,
         ];
@@ -56,6 +60,22 @@ final class TimetableCsvImportDraftStore
     {
         SessionAuth::start();
         unset($_SESSION[self::SESSION_KEY]);
+    }
+
+    public function saveSuccess(TimetableCsvImportResult $result, int $organisationId, int $userId): void
+    {
+        SessionAuth::start();
+        $_SESSION[self::SUCCESS_KEY] = ['organisation_id' => $organisationId, 'user_id' => $userId, 'result' => $result];
+    }
+
+    /** @return TimetableCsvImportResult|null */
+    public function takeSuccess(int $organisationId, int $userId): ?TimetableCsvImportResult
+    {
+        SessionAuth::start();
+        $flash = $_SESSION[self::SUCCESS_KEY] ?? null;
+        unset($_SESSION[self::SUCCESS_KEY]);
+        if (!is_array($flash) || (int) ($flash['organisation_id'] ?? 0) !== $organisationId || (int) ($flash['user_id'] ?? 0) !== $userId || !(($flash['result'] ?? null) instanceof TimetableCsvImportResult)) return null;
+        return $flash['result'];
     }
 
     public function discardOwned(string $draftId, int $organisationId, int $userId, ?int $now = null): bool

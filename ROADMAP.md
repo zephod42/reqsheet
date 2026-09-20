@@ -59,6 +59,12 @@ Canonical timetable CSV milestone 3 completed 2026-09-19:
 - Every recurring assignment is inserted atomically or the complete operation rolls back; the version lock serialises competing imports, while completed/cancelled drafts cannot be reused.
 - Import leaves manual activation, dated occurrences and requisitions unchanged and returns successful administrators to the populated timetable builder.
 
+Canonical timetable CSV revised destination workflow completed 2026-09-20:
+
+- A confirmed CSV import clones the selected source timetable's complete structure into a new automatically named timetable, creates missing classes atomically, inserts retained assignments, and activates the new timetable immediately.
+- Populated source timetables remain unchanged; previous templates remain available for normal reactivation and historical occurrences/requisitions are not rewritten.
+- Unknown rooms are skipped with preview/success warnings, unknown classes are created during confirmation, and unknown or ineligible teachers in recognized rooms block the transaction.
+
 Upcoming implementation sequence:
 
 1. Manual live testing on Pumba: exercise signup/setup, tenant isolation, realistic resource-based timetable entry, teacher/room/class projections, teacher week/day editing, account/password workflows, technician workflows, and printing with representative schools.

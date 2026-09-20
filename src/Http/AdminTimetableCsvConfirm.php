@@ -47,6 +47,7 @@ final class AdminTimetableCsvConfirm
             return new AdminTimetableCsvImportResponse(422, $this->error($exception->errors(), $versionId));
         }
         $this->drafts->discardOwned($draftId, $this->organisationId, (int) $this->user['id']);
+        $this->drafts->saveSuccess($result, $this->organisationId, (int) $this->user['id']);
         return new AdminTimetableCsvImportResponse(303, '', '/admin/timetable?version=' . $result->versionId . '&csv_imported=1');
     }
 

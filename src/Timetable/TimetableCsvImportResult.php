@@ -11,5 +11,10 @@ final readonly class TimetableCsvImportResult
         public int $lessonCount,
         public int $occupiedPeriods,
         public int $freeSlots,
+        public string $versionName = '',
+        /** @var list<string> */
+        public array $createdClassCodes = [],
+        /** @var list<array{code:string,row_count:int}> */
+        public array $skippedRooms = [],
     ) {}
 }
