@@ -305,7 +305,48 @@ if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::DEMO, Applicati
     $heading = ucfirst($route);
     $content = '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>';
     if ($route === ApplicationRoute::ABOUT) {
-        $content = '<section class="content-narrow about-page"><h1 class="about-wordmark">Reqsheet.</h1><p>Reqsheet is a lightweight organiser for school departments. Think of it as the digital equivalent of Post-it notes on the prep room wall: a simple, shared space where everyone can see what needs to happen and when.</p><p>By design, Reqsheet stores only the information needed to organise your department. No unnecessary personal details, no complicated administration, and no features getting in the way of the job.</p><p>Built on 20 years of experience working in school science departments, Reqsheet brings teachers and technicians together in one clear, straightforward system.</p><p><strong>Maximum clarity. Minimum effort.</strong></p></section>';
+        $content = <<<'HTML'
+<section class="content-narrow about-page">
+    <h1 class="about-wordmark">Reqsheet.</h1>
+    <div class="about-introduction">
+        <p>Reqsheet is a lightweight organiser for school departments. Think of it as the digital equivalent of Post-it notes on the prep room wall: a simple, shared space where everyone can see what needs to happen and when.</p>
+        <p>By design, Reqsheet stores only the information needed to organise your department. No unnecessary personal details, no complicated administration, and no features getting in the way of the job.</p>
+        <p>Built on 20 years of experience working in school science departments, Reqsheet brings teachers and technicians together in one clear, straightforward system.</p>
+        <p><strong>Maximum clarity. Minimum effort.</strong></p>
+    </div>
+    <section class="about-principles">
+        <h2>Our principles</h2>
+        <section>
+            <h3>Data collection</h3>
+            <p>Reqsheet is designed to collect the bare minimum of information necessary to operate. We will never sell your information to a third party. Wherever possible, we simply won't collect it in the first place.</p>
+            <p>Reqsheet does not ask for your name, home address or email address. We require only a school name, a school short code and staff initials to identify your organisation and its users. These can be as real — or as fictional — as you choose.</p>
+            <p>Collecting unnecessary personal information creates risks for everyone. By avoiding it in the first place, we aim to keep Reqsheet simple and minimise the consequences of a potential data breach.</p>
+        </section>
+        <section>
+            <h3>Economic model</h3>
+            <p>Reqsheet is currently free to use, but hosting it isn't free.</p>
+            <p>If you'd like to support the project, you can share your feedback at <a href="mailto:feedback@reqsheet.com">feedback@reqsheet.com</a> or make a donation using the options below.</p>
+            <div class="donation-placeholder"><strong>Donations</strong><p>Donation options coming soon.</p></div>
+        </section>
+        <section>
+            <h3>Advertising</h3>
+            <p>Reqsheet does not support itself through advertising. On-page adverts make interfaces busier, introduce unnecessary distractions and don't align with our principles of keeping things clean, simple and fast.</p>
+        </section>
+        <section>
+            <h3>Freemium</h3>
+            <p>Reqsheet is a tool. Giving some users a deliberately restricted version of that tool isn't in the interests of Reqsheet or its users.</p>
+            <p>We want everyone to have access to the same useful, fully functional application.</p>
+        </section>
+        <section>
+            <h3>Charging</h3>
+            <p><strong>Ultimately, Reqsheet is intended to operate as a software-as-a-service (SaaS) business.</strong></p>
+            <p>By keeping the application lightweight and simple, we hope to offer it for a minimal annual fee, potentially in the region of £20, €20 or $20 per school, depending on scale and operating costs. Pricing is still being evaluated.</p>
+            <p>If we introduce charging, existing users will receive suitable advance notice and will be able to continue using Reqsheet for free for at least 60 days after that notice. This will give schools time to decide whether to continue with Reqsheet or move to another system — even if that's Post-it notes on the prep room wall!</p>
+            <p>Payments will be handled by an independent third-party provider, which may collect personal information according to its own terms and privacy policy. Reqsheet itself will not request or store your personal payment details.</p>
+        </section>
+    </section>
+</section>
+HTML;
     } elseif ($route === ApplicationRoute::DEMO) {
         $content = '<section class="content-narrow public-copy demo-page"><h1>Demo</h1><p>Reqsheet is designed to be simple and intuitive. A few short tutorials will appear here in time, but for now, here\'s how to get started.</p><ol><li>Sign up and set up your school using the on-screen instructions.</li><li>Create your timetable template in Settings, configuring your working days and teaching periods.</li><li>Add your rooms and use People to create your staff accounts.</li><li>Export your blank timetable CSV from the timetable builder.</li><li>Download your department\'s existing timetable from your school\'s MIS or other timetable system.</li><li>Use an AI assistant, such as ChatGPT, to populate the Reqsheet CSV using your existing timetable information.</li><li>Import the completed CSV into Reqsheet. Your new timetable will be created and activated automatically.</li></ol><p>Of course, you can build your timetable manually if you prefer, although importing it can save a considerable amount of time.</p><p>Once your timetable, rooms, staff and class codes are in place, you\'re pretty much good to go!</p><p>Reqsheet is ready for your teachers and technicians to start using.</p></section>';
     } elseif ($route === ApplicationRoute::CONTACT) {

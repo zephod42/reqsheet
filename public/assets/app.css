@@ -102,9 +102,14 @@ small { font-size: .82rem; }
 .public-copy { line-height: 1.55; }
 .demo-page ol { padding-left: 1.5rem; }
 .demo-page li { margin: .75rem 0; padding-left: .25rem; }
-.about-page { max-width: 42rem; text-align: center; font-size: 1.08rem; }
-.about-wordmark { margin: 0 0 2rem; font-size: clamp(3.2rem, 10vw, 6rem); font-weight: 780; letter-spacing: -.07em; line-height: 1; }
+.about-page { max-width: 44rem; text-align: left; font-size: 1.08rem; }
+.about-wordmark { margin: 0 0 2rem; text-align: center; font-size: clamp(2.4rem, 7.5vw, 4.5rem); font-weight: 780; letter-spacing: -.07em; line-height: 1; }
 .about-page p { margin: 1.25rem 0; }
+.about-principles { margin-top: 3.5rem; border-top: 1px solid var(--rule); padding-top: 2.5rem; }
+.about-principles h2 { margin: 0 0 2rem; font-size: clamp(1.6rem, 3vw, 2rem); }
+.about-principles h3 { margin: 2.25rem 0 0; font-size: 1.15rem; }
+.donation-placeholder { margin: 1.5rem 0 2rem; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--secondary-pale); padding: .85rem 1rem; }
+.donation-placeholder p { margin: .35rem 0 0; color: var(--muted); }
 .public-landing { min-height: calc(100vh - 3.6rem); display: grid; place-content: center; justify-items: center; padding: clamp(2rem, 6vh, 5rem) 1rem; text-align: center; }
 .public-landing h1 { margin: 0; font-size: clamp(3.2rem, 10vw, 7rem); font-weight: 780; letter-spacing: -.07em; line-height: 1; }
 .public-landing-tagline { margin: 1rem 0 2rem; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.35rem); }

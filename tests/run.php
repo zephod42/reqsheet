@@ -194,15 +194,35 @@ foreach ([
     'mailto:accounts@reqsheet.com',
     '<h1 class="about-wordmark">Reqsheet.</h1>',
     'Reqsheet is a lightweight organiser for school departments.',
+    'Our principles',
+    'Data collection',
+    'Economic model',
+    'Advertising',
+    'Freemium',
+    'Charging',
+    'Reqsheet is currently free to use, but hosting it isn\'t free.',
+    'mailto:feedback@reqsheet.com',
+    'Donations',
+    'Donation options coming soon.',
+    'Ultimately, Reqsheet is intended to operate as a software-as-a-service (SaaS) business.',
+    'potentially in the region of £20, €20 or $20 per school',
+    'at least 60 days after that notice',
 ] as $publicFragment) {
     if (!str_contains($publicIndex, $publicFragment)) {
         throw new RuntimeException('Public page content is missing: ' . $publicFragment);
     }
 }
+if (!preg_match('/<div class="donation-placeholder">(.*?)<\/div>/s', $publicIndex, $donationMatch) || str_contains($donationMatch[1], 'href=')) {
+    throw new RuntimeException('Donation placeholder unexpectedly contains an active link.');
+}
 foreach (['The prep room wall, reimagined for the 21st century.', '<h1>ABOUT REQSHEET</h1>'] as $removedAboutFragment) {
     if (str_contains($publicIndex, $removedAboutFragment)) {
         throw new RuntimeException('Obsolete About page content remains: ' . $removedAboutFragment);
     }
+}
+$publicCss = file_get_contents(dirname(__DIR__) . '/public/assets/app.css');
+if ($publicCss === false || !str_contains($publicCss, '.about-page { max-width: 44rem; text-align: left;') || !str_contains($publicCss, '.about-wordmark { margin: 0 0 2rem; text-align: center;')) {
+    throw new RuntimeException('About page reading-layout styles are missing.');
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
