@@ -84,6 +84,10 @@ final class PdoRecoveryStore implements RecoveryStore
                 throw new RecoveryException('Those initials are already reserved by an account that cannot be recovered here. Choose different initials to create a new administrator.');
             }
             $userId = $account === false ? null : (int) $account['id'];
+            $requestedInitials = $userId === null ? $staffIdentifier : null;
+            if (($userId === null) === ($requestedInitials === null)) {
+                throw new \LogicException('Recovery flow target is invalid.');
+            }
 
             $clear = $this->prepare('DELETE FROM account_recovery_rate_limits WHERE organisation_id = :organisation_id AND client_hash = :client_hash');
             $clear->bindValue(':organisation_id', $organisationId, PDO::PARAM_INT);
@@ -93,7 +97,7 @@ final class PdoRecoveryStore implements RecoveryStore
             $insert->bindValue(':token_hash', $flowTokenHash, PDO::PARAM_LOB);
             $insert->bindValue(':organisation_id', $organisationId, PDO::PARAM_INT);
             $insert->bindValue(':user_id', $userId, $userId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-            $insert->bindValue(':requested_initials', $userId === null ? $staffIdentifier : null);
+            $insert->bindValue(':requested_initials', $requestedInitials, $requestedInitials === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
             $insert->bindValue(':generation', (int) $organisationRow['recovery_key_generation'], PDO::PARAM_INT);
             $insert->bindValue(':expires_at', $expiresAt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.u'));
             $insert->execute();
@@ -117,6 +121,12 @@ final class PdoRecoveryStore implements RecoveryStore
             $row = $flow->fetch();
             $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
             if ($row === false || $row['consumed_at'] !== null || new \DateTimeImmutable((string) $row['expires_at'], new \DateTimeZone('UTC')) <= $now) return null;
+
+            $existingTarget = $row['user_id'] !== null && $row['requested_initials'] === null;
+            $newTarget = $row['user_id'] === null
+                && is_string($row['requested_initials'])
+                && preg_match('/^[A-Z]{3}$/D', $row['requested_initials']) === 1;
+            if (!$existingTarget && !$newTarget) return null;
 
             if ((int) $generation !== (int) $row['recovery_key_generation']) return null;
             if ($row['user_id'] === null) {

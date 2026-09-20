@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
+use Reqsheet\Database\MigrationFile;
 use Reqsheet\Database\MigrationRunner;
 use Reqsheet\Timetable\PdoTimetableGenerationStore;
 use Reqsheet\Timetable\PdoTimetableConfigurationStore;
@@ -113,6 +114,55 @@ function insertId(PDO $pdo): int
     return (int) $pdo->lastInsertId();
 }
 
+function applyMigrationsThrough(PDO $pdo, string $lastVersion): void
+{
+    $record = null;
+    foreach (MigrationFile::discover(dirname(__DIR__) . '/database/migrations') as $migration) {
+        if (strcmp($migration->version, $lastVersion) > 0) break;
+        $pdo->exec($migration->sql);
+        $record ??= $pdo->prepare('INSERT INTO schema_migrations (version) VALUES (:version)');
+        if ($record === false || !$record->execute(['version' => $migration->version])) {
+            throw new RuntimeException('Unable to record integration migration ' . $migration->version . '.');
+        }
+    }
+}
+
+function integrationColumn(PDO $pdo, string $table, string $column): ?array
+{
+    $statement = $pdo->prepare(
+        'SELECT IS_NULLABLE, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, DATETIME_PRECISION
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column',
+    );
+    $statement->execute(['table' => $table, 'column' => $column]);
+    $row = $statement->fetch();
+    return $row === false ? null : $row;
+}
+
+function assertMigration0013Schema(PDO $pdo): void
+{
+    integrationAssert(integrationColumn($pdo, 'users', 'display_name') === null, 'Migration 0013 retained users.display_name.');
+    $prepared = integrationColumn($pdo, 'lesson_occurrences', 'prepared_at');
+    integrationAssert($prepared !== null && $prepared['IS_NULLABLE'] === 'YES' && $prepared['DATA_TYPE'] === 'datetime' && (int) $prepared['DATETIME_PRECISION'] === 6, 'Migration 0013 prepared_at definition is incorrect.');
+    $userId = integrationColumn($pdo, 'account_recovery_flows', 'user_id');
+    integrationAssert($userId !== null && $userId['IS_NULLABLE'] === 'YES' && $userId['DATA_TYPE'] === 'bigint', 'Migration 0013 did not make recovery user_id nullable.');
+    $initials = integrationColumn($pdo, 'account_recovery_flows', 'requested_initials');
+    integrationAssert($initials !== null && $initials['IS_NULLABLE'] === 'YES' && $initials['DATA_TYPE'] === 'char' && (int) $initials['CHARACTER_MAXIMUM_LENGTH'] === 3, 'Migration 0013 requested_initials definition is incorrect.');
+
+    $legacyCheck = $pdo->query("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND CONSTRAINT_NAME = 'users_display_name_not_blank'")->fetchColumn();
+    $legacyIndex = $pdo->query("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND INDEX_NAME = 'users_login'")->fetchColumn();
+    $invalidTargetCheck = $pdo->query("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'account_recovery_flows' AND CONSTRAINT_NAME = 'account_recovery_flows_target_valid'")->fetchColumn();
+    integrationAssert((int) $legacyCheck === 0 && (int) $legacyIndex === 0, 'Migration 0013 retained a legacy display-name dependency.');
+    integrationAssert((int) $invalidTargetCheck === 0, 'Migration 0013 installed the incompatible recovery target CHECK.');
+
+    $foreignKey = $pdo->query(
+        "SELECT DELETE_RULE, UPDATE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+         WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'account_recovery_flows'
+           AND CONSTRAINT_NAME = 'account_recovery_flows_user_fk'",
+    )->fetch();
+    integrationAssert($foreignKey !== false && $foreignKey['DELETE_RULE'] === 'CASCADE' && $foreignKey['UPDATE_RULE'] === 'CASCADE', 'Migration 0013 changed the recovery-flow user foreign key actions.');
+}
+
 /** @param array<string, array{0:string,1:string}> $assignments */
 function integrationPopulateCsv(string $csv, array $assignments): string
 {
@@ -147,8 +197,52 @@ try {
 
     cleanTestDatabase($pdo);
     try {
+        applyMigrationsThrough($pdo, '0012');
+        $statement = $pdo->prepare('INSERT INTO organisations (name, tenant_slug) VALUES (:name, :slug)');
+        $statement->execute(['name' => 'Partial Migration School', 'slug' => 'partial-migration']);
+        $partialOrganisation = insertId($pdo);
+        $statement = $pdo->prepare("INSERT INTO users (organisation_id, display_name, staff_identifier, operational_role, is_admin, password_hash, account_state) VALUES (:organisation_id, :display_name, 'PAR', 'teacher', TRUE, :password_hash, 'claimed')");
+        $statement->execute(['organisation_id' => $partialOrganisation, 'display_name' => 'Legacy Partial Admin', 'password_hash' => password_hash('partial-password', PASSWORD_DEFAULT)]);
+        $partialUser = insertId($pdo);
+        $statement = $pdo->prepare('INSERT INTO account_recovery_flows (token_hash, organisation_id, user_id, recovery_key_generation, expires_at) VALUES (:token_hash, :organisation_id, :user_id, 0, UTC_TIMESTAMP(6) + INTERVAL 1 HOUR)');
+        $statement->bindValue(':token_hash', random_bytes(32), PDO::PARAM_LOB);
+        $statement->bindValue(':organisation_id', $partialOrganisation, PDO::PARAM_INT);
+        $statement->bindValue(':user_id', $partialUser, PDO::PARAM_INT);
+        $statement->execute();
+
+        $pdo->exec('ALTER TABLE users DROP CHECK users_display_name_not_blank, DROP INDEX users_login, DROP COLUMN display_name');
+        $pdo->exec('ALTER TABLE lesson_occurrences ADD COLUMN prepared_at DATETIME(6) NULL AFTER updated_at');
+        $originalFailure = null;
+        try {
+            $pdo->exec("ALTER TABLE account_recovery_flows
+                MODIFY COLUMN user_id BIGINT UNSIGNED NULL,
+                ADD COLUMN requested_initials CHAR(3) NULL AFTER user_id,
+                ADD CONSTRAINT account_recovery_flows_target_valid CHECK (
+                    (user_id IS NOT NULL AND requested_initials IS NULL)
+                    OR (user_id IS NULL AND requested_initials IS NOT NULL)
+                )");
+        } catch (PDOException $exception) {
+            $originalFailure = (int) ($exception->errorInfo[1] ?? 0);
+        }
+        integrationAssert($originalFailure === 3823, 'The original migration failure was not reproduced as MySQL error 3823.');
+        integrationAssert(integrationColumn($pdo, 'account_recovery_flows', 'requested_initials') === null, 'Failed recovery ALTER partially added requested_initials.');
+        integrationAssert(integrationColumn($pdo, 'account_recovery_flows', 'user_id')['IS_NULLABLE'] === 'NO', 'Failed recovery ALTER partially changed user_id nullability.');
+        integrationAssert((int) $pdo->query("SELECT COUNT(*) FROM schema_migrations WHERE version = '0013'")->fetchColumn() === 0, 'Failed migration 0013 was incorrectly recorded.');
+
+        $repairCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
+        integrationAssert($repairCount === 1, 'Partially applied schema did not run exactly the 0013 repair.');
+        assertMigration0013Schema($pdo);
+        integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM users WHERE id = ' . $partialUser . " AND organisation_id = " . $partialOrganisation . " AND staff_identifier = 'PAR' AND is_admin = TRUE")->fetchColumn() === 1, 'Migration repair changed the preserved user account.');
+        integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM account_recovery_flows WHERE user_id = ' . $partialUser . ' AND requested_initials IS NULL')->fetchColumn() === 1, 'Migration repair changed an existing recovery flow.');
+        integrationAssert((new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run() === 0, 'Repaired migration was not idempotently recorded.');
+    } finally {
+        cleanTestDatabase($pdo);
+    }
+
+    try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
         integrationAssert($migrationCount === 13, 'Expected all migrations to apply to the clean test database.');
+        assertMigration0013Schema($pdo);
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         foreach (TEST_TABLES as $table) {

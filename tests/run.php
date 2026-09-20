@@ -174,10 +174,13 @@ $staffMigration = file_get_contents($migrationDirectory . '/0013_remove_staff_na
 if ($staffMigration === false) {
     throw new RuntimeException('Staff-minimisation migration could not be read.');
 }
-foreach (['DROP CHECK users_display_name_not_blank', 'DROP INDEX users_login', 'DROP COLUMN display_name', 'ADD COLUMN prepared_at', 'requested_initials'] as $expectedStaffFragment) {
+foreach (['information_schema.TABLE_CONSTRAINTS', 'information_schema.STATISTICS', 'information_schema.COLUMNS', 'DROP CHECK users_display_name_not_blank', 'DROP INDEX users_login', 'DROP COLUMN display_name', 'ADD COLUMN prepared_at', 'MODIFY COLUMN user_id BIGINT UNSIGNED NULL', 'requested_initials', 'DEALLOCATE PREPARE'] as $expectedStaffFragment) {
     if (!str_contains(strtoupper($staffMigration), strtoupper($expectedStaffFragment))) {
         throw new RuntimeException('Staff-minimisation migration is missing: ' . $expectedStaffFragment);
     }
+}
+if (str_contains($staffMigration, 'account_recovery_flows_target_valid')) {
+    throw new RuntimeException('Staff-minimisation migration contains the incompatible recovery target CHECK.');
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),
