@@ -70,7 +70,7 @@ final class TeacherWeekPage
         $isCurrentWeek = $this->today >= $week->start && $this->today <= $week->end;
         $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1><a class="this-week' . ($isCurrentWeek ? ' selected-state' : '') . '"' . ($isCurrentWeek ? ' aria-current="date"' : '') . ' href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
-        $identity = trim((string) ($this->user['display_name'] ?? ''));
+        $identity = trim((string) ($this->user['staff_identifier'] ?? ''));
         $initials = trim((string) ($this->user['staff_identifier'] ?? ''));
         $identityLabel = $identity !== '' ? $identity . ($initials !== '' ? ' (' . $initials . ')' : '') : ($initials !== '' ? $initials : 'Teacher');
         $body .= '<p class="teacher-identity">' . $this->e($identityLabel) . '</p>';

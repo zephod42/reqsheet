@@ -11,7 +11,7 @@ interface RecoveryStore
 
     public function issueKey(int $organisationId, int $administratorId, string $digest, bool $onlyIfMissing): int;
 
-    /** @return array{user_id:int,generation:int}|null */
+    /** @return array{user_id:?int,generation:int}|null */
     public function createFlow(int $organisationId, string $staffIdentifier, string $keyDigest, string $flowTokenHash, string $clientHash, \DateTimeImmutable $expiresAt): ?array;
 
     /** @return array{user_id:int,generation:int}|null */

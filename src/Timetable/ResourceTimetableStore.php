@@ -16,7 +16,7 @@ interface ResourceTimetableStore extends TimetableConfigurationStore
 
     public function createClass(int $organisationId, string $code): int;
 
-    public function createTeacher(int $organisationId, string $code, string $displayName): int;
+    public function createTeacher(int $organisationId, string $code): int;
 
     public function roomBelongsToOrganisation(int $roomId, int $organisationId): bool;
 

@@ -30,7 +30,6 @@ final class SessionAuth
         $_SESSION['user'] = [
             'id' => (int) $account['id'],
             'organisation_id' => (int) $account['organisation_id'],
-            'display_name' => (string) ($account['display_name'] ?? ''),
             'staff_identifier' => $account['staff_identifier'] ?? null,
             'operational_role' => isset($account['operational_role']) ? (string) $account['operational_role'] : null,
             'is_admin' => (bool) ($account['is_admin'] ?? false),
@@ -46,7 +45,7 @@ final class SessionAuth
         session_regenerate_id(true);
     }
 
-    /** @return array{id:int,organisation_id:int,display_name:string,staff_identifier:?string,operational_role:?string,is_admin:bool,roles:list<string>}|null */
+    /** @return array{id:int,organisation_id:int,staff_identifier:?string,operational_role:?string,is_admin:bool,roles:list<string>}|null */
     public static function current(): ?array
     {
         self::start();
@@ -62,7 +61,7 @@ final class SessionAuth
         }
         return [
             'id' => (int) $user['id'], 'organisation_id' => (int) $user['organisation_id'],
-            'display_name' => (string) ($user['display_name'] ?? ''), 'staff_identifier' => isset($user['staff_identifier']) ? (string) $user['staff_identifier'] : null,
+            'staff_identifier' => isset($user['staff_identifier']) ? (string) $user['staff_identifier'] : null,
             'operational_role' => isset($user['operational_role']) ? (string) $user['operational_role'] : null,
             'is_admin' => (bool) ($user['is_admin'] ?? false),
             'roles' => array_values(array_unique(array_map('strval', (array) ($user['roles'] ?? [])))),

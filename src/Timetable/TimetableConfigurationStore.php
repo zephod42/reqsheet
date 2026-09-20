@@ -19,7 +19,7 @@ interface TimetableConfigurationStore
 
     public function activateVersion(int $organisationId, int $versionId): void;
 
-    /** @return list<array{id: int, display_name: string, staff_identifier: ?string, is_active: bool}> */
+    /** @return list<array{id: int, staff_identifier: ?string, is_active: bool}> */
     public function usersForOrganisation(int $organisationId): array;
 
     /** @return list<string> */

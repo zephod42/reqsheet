@@ -25,17 +25,26 @@ final class AdminPeoplePage
                 $error = true;
             } else {
                 try {
-                    if (($input['action'] ?? '') === 'reset_password') {
+                    if (($input['action'] ?? '') === 'delete') {
+                        $id = (int) ($input['person_id'] ?? 0);
+                        $this->accounts->deletePerson((int) ($this->user['id'] ?? 0), $this->organisationId, $id, ($input['confirm_delete'] ?? '') === 'yes', ($input['confirm_last_admin'] ?? '') === 'yes');
+                        if ($id === (int) ($this->user['id'] ?? 0)) {
+                            SessionAuth::logout();
+                            header('Location: /login', true, 303);
+                            return '';
+                        }
+                        $message = 'User deleted. Login access and existing sessions have been revoked.';
+                    } elseif (($input['action'] ?? '') === 'reset_password') {
                         if (($input['confirm_reset'] ?? '') !== 'yes') throw new AccountValidationException(['Confirm the password reset before continuing.']);
                         $this->accounts->resetPassword((int) ($this->user['id'] ?? 0), $this->organisationId, (int) ($input['person_id'] ?? 0));
                         $message = 'Password reset. The account is ready for initial password setup.';
                     } else {
                     $roles = is_array($input['roles'] ?? null) ? array_values(array_map('strval', $input['roles'])) : [];
                     if (($input['action'] ?? '') === 'edit') {
-                        $this->accounts->updatePerson($this->organisationId, (int) ($input['person_id'] ?? 0), (string) ($input['display_name'] ?? ''), (string) ($input['staff_identifier'] ?? ''), $roles);
+                        $this->accounts->updatePerson($this->organisationId, (int) ($input['person_id'] ?? 0), (string) ($input['staff_identifier'] ?? ''), $roles);
                         $message = 'Person updated.';
                     } else {
-                        $id = $this->accounts->createPerson($this->organisationId, (string) ($input['display_name'] ?? ''), (string) ($input['staff_identifier'] ?? ''), $roles);
+                        $id = $this->accounts->createPerson($this->organisationId, (string) ($input['staff_identifier'] ?? ''), $roles);
                         $message = 'Person created. They can set a password on first login.';
                     }
                     }
@@ -54,17 +63,26 @@ final class AdminPeoplePage
         $notice = $message === null ? '' : '<p class="notice ' . ($error ? 'error' : '') . '">' . $this->e($message) . '</p>';
         $rows = '';
         $dialogs = '';
+        $administratorCount = count(array_filter($people, static fn (array $person): bool => (bool) ($person['is_admin'] ?? false)));
         foreach ($people as $person) {
             $id = (int) $person['id'];
             $roles = $this->roles($person);
             $reset = ($person['is_admin'] ?? false) ? '' : '<form method="post" class="inline-form" onsubmit="return confirm(\'Reset this password?\')"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="reset_password"><input type="hidden" name="person_id" value="' . $id . '"><input type="hidden" name="confirm_reset" value="yes"><button type="submit" class="secondary">Reset password</button></form>';
-            $rows .= '<tr><th scope="row">' . $this->e((string) $person['display_name']) . '</th><td>' . (!empty($person['staff_identifier']) ? $this->e((string) $person['staff_identifier']) : '<span class="muted">—</span>') . '</td><td>' . $this->e($this->roleLabels($roles)) . '</td><td><button type="button" class="secondary" data-open-dialog="person-' . $id . '">' . 'Edit</button>' . $reset . '</td></tr>';
+            $rows .= '<tr><td>' . (!empty($person['staff_identifier']) ? $this->e((string) $person['staff_identifier']) : '<span class="muted">—</span>') . '</td><td>' . $this->e($this->roleLabels($roles)) . '</td><td><button type="button" class="secondary" data-open-dialog="person-' . $id . '">' . 'Edit</button>' . $reset . '<button type="button" class="secondary" data-open-dialog="delete-' . $id . '">Delete User</button></td></tr>';
             $dialogs .= str_replace('pattern="[A-Za-z]{3}" autocomplete="username"', 'pattern="[A-Z]{3}" title="Please use three capital letters." autocomplete="username"', $this->personDialog($person, $roles));
+            $dialogs .= $this->deleteDialog($person, $administratorCount === 1 && (bool) ($person['is_admin'] ?? false));
         }
-        if ($rows === '') $rows = '<tr><td colspan="4">No people have been added yet.</td></tr>';
+        if ($rows === '') $rows = '<tr><td colspan="3">No people have been added yet.</td></tr>';
         $addDialog = str_replace('pattern="[A-Za-z]{3}" autocomplete="username"', 'pattern="[A-Z]{3}" title="Please use three capital letters." autocomplete="username"', $this->personDialog(null, []));
-        $body = '<section class="content-wide"><div class="page-header"><div><p class="eyebrow">Admin</p><h1>People</h1></div><a class="button secondary" href="/admin/timetable">Timetable</a></div>' . $notice . '<p>People belong only to this organisation. Staff codes must use three capital letters. Roles are cumulative and can be changed by an administrator.</p><div class="people-table-wrap"><table class="people-table"><caption class="visually-hidden">People in this organisation</caption><thead><tr><th scope="col">Full name</th><th scope="col">Initials</th><th scope="col">Roles / permissions</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>' . $rows . '</tbody></table></div><p><button type="button" data-open-dialog="person-add">Add Person</button></p>' . $dialogs . $addDialog . '</section><script>' . $this->script() . '</script>';
+        $body = '<section class="content-wide"><div class="page-header"><div><p class="eyebrow">Admin</p><h1>People</h1></div><a class="button secondary" href="/admin/timetable">Timetable</a></div>' . $notice . '<p>People belong only to this organisation. Staff codes must use three capital letters. Roles are cumulative and can be changed by an administrator.</p><div class="people-table-wrap"><table class="people-table"><caption class="visually-hidden">People in this organisation</caption><thead><tr><th scope="col">Initials</th><th scope="col">Roles / permissions</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>' . $rows . '</tbody></table></div><p><button type="button" data-open-dialog="person-add">Add Person</button></p>' . $dialogs . $addDialog . '</section><script>' . $this->script() . '</script>';
         return $body;
+    }
+
+    private function deleteDialog(array $person, bool $lastAdministrator): string
+    {
+        $id = (int) $person['id'];
+        $warning = $lastAdministrator ? '<div class="notice error"><strong>WARNING: You are deleting the last administrator account.</strong><p>Your organisation will have no active administrator until a new one is created using the Organisation Recovery Key.</p><p>Make sure you have securely stored your recovery key before continuing.</p></div><label class="check-label"><input type="checkbox" name="confirm_last_admin" value="yes" required> I understand the last-administrator warning.</label>' : '';
+        return '<dialog id="delete-' . $id . '" class="person-dialog"><form method="post"><h2>Delete User: ' . $this->e((string) $person['staff_identifier']) . '</h2><p>This removes login access immediately. Historical lessons and requisitions retain their account references. These initials remain reserved.</p>' . $warning . '<input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="delete"><input type="hidden" name="person_id" value="' . $id . '"><label class="check-label"><input type="checkbox" name="confirm_delete" value="yes" required> I confirm deletion of this user.</label><div class="form-actions"><button type="submit">Delete User</button><button type="button" class="secondary" data-close-dialog>Cancel</button></div></form></dialog>';
     }
 
     /** @param array<string, mixed>|null $person @param list<string> $roles */
@@ -77,7 +95,7 @@ final class AdminPeoplePage
         foreach (['teacher' => 'Teacher', 'technician' => 'Technician', 'administrator' => 'Administrator'] as $value => $label) {
             $roleInputs .= '<label class="check-label"><input type="checkbox" name="roles[]" value="' . $value . '"' . (in_array($value, $roles, true) ? ' checked' : '') . '> ' . $label . '</label>';
         }
-        return '<dialog id="person-' . $id . '" class="person-dialog"><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="' . $action . '">' . ($person === null ? '' : '<input type="hidden" name="person_id" value="' . (int) $person['id'] . '">') . '<button type="button" class="close secondary" data-close-dialog>Cancel</button><p class="eyebrow">Administrator</p><h2>' . $title . '</h2><label>Full name<input name="display_name" value="' . $this->e((string) ($person['display_name'] ?? '')) . '" required></label><label>Initials<input class="staff-identifier" name="staff_identifier" value="' . $this->e((string) ($person['staff_identifier'] ?? '')) . '" maxlength="3" pattern="[A-Za-z]{3}" autocomplete="username" required></label><fieldset><legend>Roles and permissions</legend>' . $roleInputs . '<small>Select at least one role.</small></fieldset><div class="form-actions"><button type="submit">Save</button><button type="button" class="secondary" data-close-dialog>Cancel</button></div></form></dialog>';
+        return '<dialog id="person-' . $id . '" class="person-dialog"><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="' . $action . '">' . ($person === null ? '' : '<input type="hidden" name="person_id" value="' . (int) $person['id'] . '">') . '<button type="button" class="close secondary" data-close-dialog>Cancel</button><p class="eyebrow">Administrator</p><h2>' . $title . '</h2><label>Initials<input class="staff-identifier" name="staff_identifier" value="' . $this->e((string) ($person['staff_identifier'] ?? '')) . '" maxlength="3" pattern="[A-Za-z]{3}" autocomplete="username" required></label><fieldset><legend>Roles and permissions</legend>' . $roleInputs . '<small>Select at least one role.</small></fieldset><div class="form-actions"><button type="submit">Save</button><button type="button" class="secondary" data-close-dialog>Cancel</button></div></form></dialog>';
     }
 
     /** @param array<string, mixed> $person @return list<string> */

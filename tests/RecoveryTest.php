@@ -20,8 +20,8 @@ final class RecoveryTest
     {
         $accountStore = new AccountStoreFake();
         $accounts = new AccountService($accountStore);
-        $organisationId = $accounts->createOrganisationAdmin('Recovery School', 'Admin One', 'ADM', 'teacher', 'old-password', 'old-password', 'recoveryschl');
-        $administratorId = (int) $accountStore->accounts['Admin One']['id'];
+        $organisationId = $accounts->createOrganisationAdmin('Recovery School', 'ADM', 'teacher', 'old-password', 'old-password', 'recoveryschl');
+        $administratorId = (int) $accountStore->accounts['ADM']['id'];
         $store = new RecoveryStoreFake();
         $service = new RecoveryService($store, $accounts);
 
@@ -35,6 +35,13 @@ final class RecoveryTest
 
         self::expectRecovery(static fn () => $service->begin($organisationId, 'ADM', 'wrong-key', 'client-a'), 'Incorrect recovery key was accepted.');
         self::expectRecovery(static fn () => $service->begin($organisationId, 'NON', $first['key'], 'client-b'), 'Non-administrator recovery was accepted.');
+        self::expectRecovery(static fn () => $service->begin($organisationId, 'DEL', $first['key'], 'client-deleted'), 'Deleted account initials were reused.');
+        self::expectRecovery(static fn () => $service->begin(2, 'ADM', $first['key'], 'client-cross'), 'Recovery key was accepted in another organisation.');
+        $abandoned = $service->begin($organisationId, 'NEW', $first['key'], 'client-abandoned');
+        assertSameValue(null, $abandoned['user_id'], 'Unknown initials created an account before password selection.');
+        assertSameValue([], $store->created, 'Abandoned recovery left an account behind.');
+        $service->cancel($organisationId, $abandoned['token']);
+        self::expectRecovery(static fn () => $service->complete($organisationId, $abandoned['token'], 'new-admin-pass', 'new-admin-pass'), 'Cancelled new-account recovery created an administrator.');
         assertSameValue(1, $store->generation, 'Failed recovery rotated the organisation key.');
 
         $attemptOne = $service->begin($organisationId, 'ADM', $first['key'], 'client-c');
@@ -75,6 +82,15 @@ final class RecoveryTest
         assertContainsValue('Recovery key saved', $acknowledgedView, 'Recovery key acknowledgement did not complete.');
         assertNotContainsValue($replacement['key'], $acknowledgedView, 'Recovery key was displayed again after acknowledgement.');
         assertSameValue(null, RecoverySession::presentation($organisationId, $administratorId), 'Acknowledged plaintext key remained in server-side presentation state.');
+        $createFlow = $service->begin($organisationId, 'NEW', $replacement['key'], 'client-new');
+        self::expectRecovery(static fn () => $service->complete($organisationId, $createFlow['token'], 'short', 'short'), 'Weak password created a recovered administrator.');
+        assertSameValue([], $store->created, 'Failed password validation created an account.');
+        $newAdmin = $service->complete($organisationId, $createFlow['token'], 'new-admin-pass', 'new-admin-pass');
+        assertSameValue(['administrator'], $store->created['roles'], 'Recovery-created administrator was assigned operational roles.');
+        assertSameValue('recovery_pending', $store->created['account_state'], 'Recovery-created administrator bypassed acknowledgement.');
+        assertSameValue(true, password_verify('new-admin-pass', $store->created['password_hash']), 'Recovery-created administrator did not receive the selected password.');
+        self::expectRecovery(static fn () => $service->complete($organisationId, $createFlow['token'], 'new-admin-pass', 'new-admin-pass'), 'New-account recovery flow was replayable.');
+        assertSameValue(4, $newAdmin['generation'], 'Creating an administrator did not rotate the key.');
         SessionAuth::logout();
     }
 
@@ -90,6 +106,7 @@ final class RecoveryStoreFake implements RecoveryStore
     public ?string $digest = null;
     public int $generation = 0;
     public bool $acknowledged = false;
+    public array $created = [];
     /** @var array<string,array{user_id:int,generation:int,used:bool}> */
     private array $flows = [];
 
@@ -103,19 +120,22 @@ final class RecoveryStoreFake implements RecoveryStore
     }
     public function createFlow(int $organisationId, string $staffIdentifier, string $keyDigest, string $flowTokenHash, string $clientHash, \DateTimeImmutable $expiresAt): ?array
     {
-        if (!$this->acknowledged || $staffIdentifier !== 'ADM' || $this->digest === null || !hash_equals($this->digest, $keyDigest)) return null;
-        $key = bin2hex($flowTokenHash); $this->flows[$key] = ['user_id' => 1, 'generation' => $this->generation, 'used' => false];
-        return ['user_id' => 1, 'generation' => $this->generation];
+        if ($organisationId !== 1 || !$this->acknowledged || $this->digest === null || !hash_equals($this->digest, $keyDigest)) return null;
+        if (in_array($staffIdentifier, ['NON', 'DEL'], true)) throw new RecoveryException('Choose different initials.');
+        $userId = $staffIdentifier === 'ADM' ? 1 : null;
+        $key = bin2hex($flowTokenHash); $this->flows[$key] = ['user_id' => $userId, 'generation' => $this->generation, 'used' => false, 'expires_at' => $expiresAt];
+        return ['user_id' => $userId, 'generation' => $this->generation];
     }
     public function completeFlow(int $organisationId, string $flowTokenHash, string $passwordHash, string $replacementDigest): ?array
     {
         $key = bin2hex($flowTokenHash); $flow = $this->flows[$key] ?? null;
-        if ($flow === null || $flow['used'] || $flow['generation'] !== $this->generation) return null;
+        if ($organisationId !== 1 || $flow === null || $flow['used'] || $flow['generation'] !== $this->generation || $flow['expires_at'] <= new \DateTimeImmutable()) return null;
+        if ($flow['user_id'] === null) $this->created = ['roles' => ['administrator'], 'account_state' => 'recovery_pending', 'password_hash' => $passwordHash];
         $oldGeneration = $this->generation;
         foreach ($this->flows as &$candidate) if ($candidate['generation'] === $oldGeneration) $candidate['used'] = true;
         unset($candidate);
         $this->digest = $replacementDigest; $this->generation++; $this->acknowledged = false;
-        return ['user_id' => $flow['user_id'], 'generation' => $this->generation];
+        return ['user_id' => $flow['user_id'] ?? 2, 'generation' => $this->generation];
     }
     public function acknowledge(int $organisationId, int $administratorId, int $generation): void
     {

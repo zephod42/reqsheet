@@ -169,7 +169,7 @@ final class TimetableCsvImportTest
         $export = (new AdminTimetableResourceCsvExport(new TimetableResourceCsvExporter($store), 1, ['roles' => ['administrator'], 'is_admin' => true]))->create();
         $rows = self::csvRows($export->content);
         assertSameValue(['Resource Type', 'Code', 'Name'], $rows[0], 'Resource reference headers changed.');
-        foreach ([['Teacher', 'AAA', 'Teacher A'], ['Class', 'C1', 'C1'], ['Room', 'R1', 'R1']] as $value) {
+        foreach ([['Teacher', 'AAA', 'AAA'], ['Class', 'C1', 'C1'], ['Room', 'R1', 'R1']] as $value) {
             assertSameValue(true, in_array($value, $rows, true), 'Resource reference omitted ' . implode('/', $value));
         }
         foreach (['XXX', 'OTHER'] as $value) assertSameValue(false, str_contains($export->content, $value), 'Resource reference exposed cross-tenant data.');
@@ -190,7 +190,7 @@ final class TimetableCsvImportTest
         $store->slots = [new TimetableSlot(101, 1, 1, 1, 'teaching', 1, 'P1'), new TimetableSlot(102, 1, 1, 2, 'teaching', 2, 'P2'), new TimetableSlot(103, 1, 1, 3, 'break', null, 'Break'), new TimetableSlot(104, 1, 1, 4, 'teaching', 3, 'P3'), new TimetableSlot(201, 1, 2, 1, 'teaching', 1, 'P1')];
         $store->rooms = [['id' => 401, 'code' => 'R1', 'organisation_id' => 1], ['id' => 402, 'code' => 'R2', 'organisation_id' => 1], ['id' => 499, 'code' => 'OTHER', 'organisation_id' => 2]];
         $store->classes = [['id' => 501, 'code' => 'C1', 'organisation_id' => 1], ['id' => 502, 'code' => 'C2', 'organisation_id' => 1], ['id' => 599, 'code' => 'OTHER', 'organisation_id' => 2]];
-        $store->users = [['id' => 10, 'display_name' => 'Teacher A', 'staff_identifier' => 'AAA', 'is_active' => true, 'organisation_id' => 1], ['id' => 11, 'display_name' => 'Teacher B', 'staff_identifier' => 'BBB', 'is_active' => true, 'organisation_id' => 1], ['id' => 20, 'display_name' => 'Other Teacher', 'staff_identifier' => 'XXX', 'is_active' => true, 'organisation_id' => 2]];
+        $store->users = [['id' => 10, 'staff_identifier' => 'AAA', 'is_active' => true, 'organisation_id' => 1], ['id' => 11, 'staff_identifier' => 'BBB', 'is_active' => true, 'organisation_id' => 1], ['id' => 20, 'staff_identifier' => 'XXX', 'is_active' => true, 'organisation_id' => 2]];
         return $store;
     }
 

@@ -183,7 +183,7 @@ final class TimetableCsvConfirmTest
         $store->slots = [new TimetableSlot(101, 1, 1, 1, 'teaching', 1, 'P1'), new TimetableSlot(102, 1, 1, 2, 'teaching', 2, 'P2'), new TimetableSlot(103, 1, 1, 3, 'break', null, 'Break'), new TimetableSlot(104, 1, 1, 4, 'teaching', 3, 'P3'), new TimetableSlot(201, 1, 2, 1, 'teaching', 1, 'P1')];
         $store->rooms = [['id' => 401, 'code' => 'R1', 'organisation_id' => 1], ['id' => 402, 'code' => 'R2', 'organisation_id' => 1]];
         $store->classes = [['id' => 501, 'code' => 'C1', 'organisation_id' => 1], ['id' => 502, 'code' => 'C2', 'organisation_id' => 1]];
-        $store->users = [['id' => 10, 'display_name' => 'Teacher A', 'staff_identifier' => 'AAA', 'is_active' => true, 'organisation_id' => 1], ['id' => 11, 'display_name' => 'Teacher B', 'staff_identifier' => 'BBB', 'is_active' => true, 'organisation_id' => 1]];
+        $store->users = [['id' => 10, 'staff_identifier' => 'AAA', 'is_active' => true, 'organisation_id' => 1], ['id' => 11, 'staff_identifier' => 'BBB', 'is_active' => true, 'organisation_id' => 1]];
         return $store;
     }
 

@@ -19,24 +19,24 @@ final class AccountTest
         assertSameValue(true, $accounts->setupAvailable(), 'Setup was not available with no organisations.');
         assertSameValue(true, SetupAccess::allowed(['REQSHEET_SETUP_KEY' => 'setup'], ['PHP_AUTH_USER' => 'setup', 'PHP_AUTH_PW' => 'setup']), 'Setup key was not accepted.');
 
-        $organisationId = $accounts->createFirstOrganisation('Test School', 'Niall Evans', 'NEV', 'teacher', 'pilot-pass', 'pilot-pass');
+        $organisationId = $accounts->createFirstOrganisation('Test School', 'NEV', 'teacher', 'pilot-pass', 'pilot-pass');
         assertSameValue(1, $organisationId, 'First organisation was not created.');
         assertSameValue(false, $accounts->setupAvailable(), 'Setup remained available after organisation creation.');
-        self::expectValidation(static fn () => $accounts->createFirstOrganisation('Legacy Second School', 'Legacy Admin', 'LAD', 'teacher', 'pilot-pass', 'pilot-pass'));
-        $secondOrganisationId = $accounts->createOrganisationAdmin('Second School', 'Second Admin', 'SAD', 'teacher', 'second-pass', 'second-pass');
+        self::expectValidation(static fn () => $accounts->createFirstOrganisation('Legacy Second School', 'LAD', 'teacher', 'pilot-pass', 'pilot-pass'));
+        $secondOrganisationId = $accounts->createOrganisationAdmin('Second School', 'SAD', 'teacher', 'second-pass', 'second-pass');
         assertSameValue(2, $secondOrganisationId, 'Normal organisation signup could not create a second organisation.');
         $secondAccount = $accounts->authenticate('SAD', 'second-pass', 2);
         assertSameValue(2, $secondAccount['organisation_id'], 'Second admin was not assigned to the new organisation.');
         self::expectValidation(static fn () => $accounts->authenticate('SAD', 'second-pass', 1));
-        assertSameValue(1, $store->accounts['Niall Evans']['organisation_id'], 'First organisation account changed tenant.');
-        assertSameValue(true, password_verify('pilot-pass', (string) $store->accounts['Niall Evans']['password_hash']), 'Password was not hashed.');
-        assertSameValue(false, str_contains((string) $store->accounts['Niall Evans']['password_hash'], 'pilot-pass'), 'Plaintext password was stored.');
-        assertSameValue(true, (bool) $store->accounts['Niall Evans']['is_admin'], 'First user was not made admin.');
-        assertSameValue('NEV', $store->accounts['Niall Evans']['staff_identifier'], 'First-user initials were not stored.');
-        self::expectValidation(static fn () => $accounts->createOrganisationAdmin('Duplicate Slug School', 'Duplicate Admin', 'DAD', 'teacher', 'duplicate-pass', 'duplicate-pass', 'secondschool'));
-        self::expectValidation(static fn () => $accounts->createPerson(1, 'Invalid Initials', 'AB', ['teacher']));
-        self::expectValidation(static fn () => $accounts->createPerson(1, 'Duplicate Initials', 'NEV', ['teacher']));
-        $sameInitialsOrganisation = $accounts->createOrganisationAdmin('Third School', 'Third Admin', 'NEV', 'teacher', 'third-pass', 'third-pass', 'thirdschool');
+        assertSameValue(1, $store->accounts['NEV']['organisation_id'], 'First organisation account changed tenant.');
+        assertSameValue(true, password_verify('pilot-pass', (string) $store->accounts['NEV']['password_hash']), 'Password was not hashed.');
+        assertSameValue(false, str_contains((string) $store->accounts['NEV']['password_hash'], 'pilot-pass'), 'Plaintext password was stored.');
+        assertSameValue(true, (bool) $store->accounts['NEV']['is_admin'], 'First user was not made admin.');
+        assertSameValue('NEV', $store->accounts['NEV']['staff_identifier'], 'First-user initials were not stored.');
+        self::expectValidation(static fn () => $accounts->createOrganisationAdmin('Duplicate Slug School', 'DAD', 'teacher', 'duplicate-pass', 'duplicate-pass', 'secondschool'));
+        self::expectValidation(static fn () => $accounts->createPerson(1, 'AB', ['teacher']));
+        self::expectValidation(static fn () => $accounts->createPerson(1, 'NEV', ['teacher']));
+        $sameInitialsOrganisation = $accounts->createOrganisationAdmin('Third School', 'NEV', 'teacher', 'third-pass', 'third-pass', 'thirdschool');
         assertSameValue(3, $sameInitialsOrganisation, 'The same initials could not be reused in another organisation.');
 
         $account = $accounts->authenticate('nev', 'pilot-pass', 1);
@@ -47,22 +47,22 @@ final class AccountTest
         assertSameValue(false, SessionAuth::hasRole($account, 'technician'), 'Teacher was granted technician access.');
         assertSameValue(true, SessionAuth::isAdmin($account), 'Admin permission was not recognised.');
         self::expectValidation(static fn () => $accounts->authenticate('NEV', 'wrong-pass', 1));
-        $store->accounts['Niall Evans']['is_active'] = false;
+        $store->accounts['NEV']['is_active'] = false;
         self::expectValidation(static fn () => $accounts->authenticate('NEV', 'pilot-pass', 1));
-        $store->accounts['Niall Evans']['is_active'] = true;
+        $store->accounts['NEV']['is_active'] = true;
 
-        $created = $accounts->createUser(1, 'New Technician', 'NTE', 'technician', false);
+        $created = $accounts->createUser(1, 'NTE', 'technician', false);
         assertSameValue(4, $created, 'Admin-created user was not created.');
-        assertSameValue('awaiting_first_login', $store->accounts['New Technician']['account_state'], 'Unclaimed account state was not explicit.');
+        assertSameValue('awaiting_first_login', $store->accounts['NTE']['account_state'], 'Unclaimed account state was not explicit.');
         self::expectValidation(static fn () => $accounts->authenticate('NTE', 'anything', 1));
         assertSameValue(false, $accounts->needsFirstLogin('NTE', 2), 'First-login state leaked across tenant context.');
-        self::expectValidation(static fn () => $accounts->createPerson(1, 'Unclaimed Admin', 'UAD', ['administrator']));
+        self::expectValidation(static fn () => $accounts->createPerson(1, 'UAD', ['administrator']));
         $claimed = $accounts->claimFirstLogin('NTE', 'new-pass', 'new-pass', 1);
         assertSameValue('claimed', $claimed['account_state'], 'First-login claim did not claim account.');
-        assertSameValue(true, password_verify('new-pass', (string) $store->accounts['New Technician']['password_hash']), 'Claimed password was not hashed.');
+        assertSameValue(true, password_verify('new-pass', (string) $store->accounts['NTE']['password_hash']), 'Claimed password was not hashed.');
         self::expectValidation(static fn () => $accounts->claimFirstLogin('NTE', 'again-pass', 'again-pass', 1));
         $accounts->resetPassword(1, 1, $created);
-        assertSameValue('awaiting_first_login', $store->accounts['New Technician']['account_state'], 'Administrator reset did not return the account to initial-password state.');
+        assertSameValue('awaiting_first_login', $store->accounts['NTE']['account_state'], 'Administrator reset did not return the account to initial-password state.');
         self::expectValidation(static fn () => $accounts->authenticate('NTE', '', 1));
         self::expectValidation(static fn () => $accounts->resetPassword(1, 2, $created));
         $resetClaim = $accounts->claimFirstLogin('NTE', 'replacement-pass', 'replacement-pass', 1);
@@ -102,16 +102,26 @@ final class AccountStoreFake implements AccountStore
     public function findOrganisationByTenantSlug(string $tenantSlug): ?array { foreach ($this->accounts as $account) if (($account['tenant_slug'] ?? '') === $tenantSlug) return ['id' => (int) $account['organisation_id'], 'name' => 'Test organisation', 'tenant_slug' => $tenantSlug]; return null; }
     public function findLogin(string $login, ?int $organisationId = null): ?array { foreach ($this->accounts as $account) if (strcasecmp((string) ($account['staff_identifier'] ?? ''), $login) === 0 && ($organisationId === null || (int) $account['organisation_id'] === $organisationId)) return $account; return null; }
     public function findUserById(int $userId): ?array { foreach ($this->accounts as $account) if ((int) $account['id'] === $userId) return $account; return null; }
-    public function findPeopleForOrganisation(int $organisationId): array { return array_values(array_filter($this->accounts, static fn (array $account): bool => (int) $account['organisation_id'] === $organisationId)); }
+    public function findPeopleForOrganisation(int $organisationId): array { return array_values(array_filter($this->accounts, static fn (array $account): bool => (int) $account['organisation_id'] === $organisationId && ($account['is_active'] ?? false))); }
     public function activeAdministratorCount(int $organisationId): int { return count(array_filter($this->accounts, static fn (array $account): bool => (int) $account['organisation_id'] === $organisationId && ($account['is_admin'] ?? false) && ($account['is_active'] ?? false))); }
-    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, array $roles): int { if (!$this->organisationExists($organisationId)) throw new AccountValidationException(['Organisation is invalid.']); $id = $this->nextId++; $this->accounts[$displayName] = ['id' => $id, 'organisation_id' => $organisationId, 'display_name' => $displayName, 'staff_identifier' => $staffIdentifier, 'roles' => $roles, 'operational_role' => in_array('teacher', $roles, true) ? 'teacher' : (in_array('technician', $roles, true) ? 'technician' : null), 'is_admin' => in_array('administrator', $roles, true), 'teacher_number' => in_array('teacher', $roles, true) ? $this->nextTeacherNumber($organisationId) : null, 'password_hash' => null, 'account_state' => 'awaiting_first_login', 'is_active' => true, 'auth_version' => 1]; return $id; }
-    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, array $roles): void { foreach ($this->accounts as $key => &$account) if ((int) $account['id'] === $userId && (int) $account['organisation_id'] === $organisationId) { unset($this->accounts[$key]); $account['display_name'] = $displayName; $account['staff_identifier'] = $staffIdentifier; $account['roles'] = $roles; $account['is_admin'] = in_array('administrator', $roles, true); $account['operational_role'] = in_array('teacher', $roles, true) ? 'teacher' : (in_array('technician', $roles, true) ? 'technician' : null); $this->accounts[$displayName] = $account; unset($account); return; } unset($account); throw new AccountValidationException(['That person is not part of this organisation.']); }
-    public function createFirstOrganisation(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { if ($this->organisationCount() !== 0) throw new AccountValidationException(['First-run setup is no longer available.']); return $this->createOrganisationAdmin($organisationName, $displayName, $staffIdentifier, $role, $passwordHash, $tenantSlug); }
-    public function createOrganisationAdmin(string $organisationName, string $displayName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { $organisationId = $this->nextOrganisationId++; $this->accounts[$displayName] = ['id' => $this->nextId++, 'organisation_id' => $organisationId, 'display_name' => $displayName, 'staff_identifier' => $staffIdentifier, 'roles' => [$role, 'administrator'], 'operational_role' => $role, 'is_admin' => true, 'is_teacher' => $role === 'teacher', 'is_technician' => $role === 'technician', 'teacher_number' => $role === 'teacher' ? 1 : null, 'password_hash' => $passwordHash, 'account_state' => 'claimed', 'is_active' => true, 'tenant_slug' => $tenantSlug, 'auth_version' => 1]; return $organisationId; }
-    public function createUser(int $organisationId, string $displayName, string $staffIdentifier, string $role, bool $isAdmin): int { return $this->createPerson($organisationId, $displayName, $staffIdentifier, array_values(array_filter([$role, $isAdmin ? 'administrator' : null]))); }
+    public function createPerson(int $organisationId, string $staffIdentifier, array $roles): int { if (!$this->organisationExists($organisationId)) throw new AccountValidationException(['Organisation is invalid.']); $id = $this->nextId++; $this->accounts[isset($this->accounts[$staffIdentifier]) ? $organisationId . ":" . $staffIdentifier : $staffIdentifier] = ['id' => $id, 'organisation_id' => $organisationId, 'staff_identifier' => $staffIdentifier, 'roles' => $roles, 'operational_role' => in_array('teacher', $roles, true) ? 'teacher' : (in_array('technician', $roles, true) ? 'technician' : null), 'is_admin' => in_array('administrator', $roles, true), 'teacher_number' => in_array('teacher', $roles, true) ? $this->nextTeacherNumber($organisationId) : null, 'password_hash' => null, 'account_state' => 'awaiting_first_login', 'is_active' => true, 'auth_version' => 1]; return $id; }
+    public function updatePerson(int $organisationId, int $userId, string $staffIdentifier, array $roles): void { foreach ($this->accounts as $key => &$account) if ((int) $account['id'] === $userId && (int) $account['organisation_id'] === $organisationId) { unset($this->accounts[$key]); $account['staff_identifier'] = $staffIdentifier; $account['roles'] = $roles; $account['is_admin'] = in_array('administrator', $roles, true); $account['operational_role'] = in_array('teacher', $roles, true) ? 'teacher' : (in_array('technician', $roles, true) ? 'technician' : null); $this->accounts[isset($this->accounts[$staffIdentifier]) ? $organisationId . ":" . $staffIdentifier : $staffIdentifier] = $account; unset($account); return; } unset($account); throw new AccountValidationException(['That person is not part of this organisation.']); }
+    public function createFirstOrganisation(string $organisationName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { if ($this->organisationCount() !== 0) throw new AccountValidationException(['First-run setup is no longer available.']); return $this->createOrganisationAdmin($organisationName, $staffIdentifier, $role, $passwordHash, $tenantSlug); }
+    public function createOrganisationAdmin(string $organisationName, string $staffIdentifier, string $role, string $passwordHash, string $tenantSlug = ''): int { $organisationId = $this->nextOrganisationId++; $this->accounts[isset($this->accounts[$staffIdentifier]) ? $organisationId . ":" . $staffIdentifier : $staffIdentifier] = ['id' => $this->nextId++, 'organisation_id' => $organisationId, 'staff_identifier' => $staffIdentifier, 'roles' => [$role, 'administrator'], 'operational_role' => $role, 'is_admin' => true, 'is_teacher' => $role === 'teacher', 'is_technician' => $role === 'technician', 'teacher_number' => $role === 'teacher' ? 1 : null, 'password_hash' => $passwordHash, 'account_state' => 'claimed', 'is_active' => true, 'tenant_slug' => $tenantSlug, 'auth_version' => 1]; return $organisationId; }
+    public function createUser(int $organisationId, string $staffIdentifier, string $role, bool $isAdmin): int { return $this->createPerson($organisationId, $staffIdentifier, array_values(array_filter([$role, $isAdmin ? 'administrator' : null]))); }
     public function claimFirstLogin(int $userId, string $passwordHash): void { foreach ($this->accounts as &$account) { if ($account['id'] === $userId) { $account['password_hash'] = $passwordHash; $account['account_state'] = 'claimed'; } } unset($account); }
     public function updatePassword(int $userId, int $organisationId, string $passwordHash): void { foreach ($this->accounts as &$account) { if ($account['id'] === $userId && $account['organisation_id'] === $organisationId) { $account['password_hash'] = $passwordHash; return; } } unset($account); throw new AccountValidationException(['This account is unavailable.']); }
     public function resetPassword(int $userId, int $organisationId): void { foreach ($this->accounts as &$account) { if ($account['id'] === $userId && $account['organisation_id'] === $organisationId && !($account['is_admin'] ?? false)) { $account['password_hash'] = null; $account['account_state'] = 'awaiting_first_login'; return; } } unset($account); throw new AccountValidationException(['That person is not available for password reset.']); }
+    public function deletePerson(int $administratorId, int $organisationId, int $userId, bool $confirmLastAdministrator): void
+    {
+        $admin = $this->findUserById($administratorId);
+        $target = $this->findUserById($userId);
+        if ($admin === null || $admin['organisation_id'] !== $organisationId || !$admin['is_active'] || !$admin['is_admin'] || $admin['account_state'] !== 'claimed') throw new AccountValidationException(['You are not authorised to delete users.']);
+        if ($target === null || $target['organisation_id'] !== $organisationId || !$target['is_active']) throw new AccountValidationException(['That person is not part of this organisation.']);
+        if ($target['is_admin'] && $this->activeAdministratorCount($organisationId) === 1 && !$confirmLastAdministrator) throw new AccountValidationException(['Confirm the last-administrator warning before continuing.']);
+        foreach ($this->accounts as &$account) if ($account['id'] === $userId) { $account['is_active'] = false; $account['auth_version']++; }
+        unset($account);
+    }
     public function organisationAccountStatus(int $organisationId): array { return ['state' => null, 'until' => null]; }
     private function nextTeacherNumber(int $organisationId): int { $numbers = array_map(static fn (array $account): int => (int) ($account['teacher_number'] ?? 0), array_filter($this->accounts, static fn (array $account): bool => (int) $account['organisation_id'] === $organisationId)); return ($numbers === [] ? 0 : max($numbers)) + 1; }
 }

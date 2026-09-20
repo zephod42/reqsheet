@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use PDO;
 use PDOStatement;
 use Reqsheet\Http\TechnicianPage;
+use Reqsheet\Http\CsrfToken;
 use Reqsheet\Technician\PdoTechnicianPlanningStore;
 use Reqsheet\Technician\TechnicianPlanningStore;
 
@@ -22,7 +23,7 @@ final class TechnicianPageTest
         assertSameValue(count($placeholders[1]), count(array_unique($placeholders[1])), 'Technician effective-template lookup reused a named placeholder that native MySQL PDO cannot bind.');
 
         $store = new TechnicianPageStoreFake();
-        $page = new TechnicianPage($store, 1, 20, ['display_name' => 'Tech', 'roles' => ['technician']]);
+        $page = new TechnicianPage($store, 1, 20, ['staff_identifier' => 'TEC', 'roles' => ['technician']]);
         $warning = null;
         set_error_handler(static function (int $severity, string $message): bool {
             throw new \ErrorException($message, 0, $severity);
@@ -47,7 +48,12 @@ final class TechnicianPageTest
         assertContainsValue('Very long requisition text', $day, 'Technician grid did not show the saved requisition.');
         assertContainsValue('title="Very long requisition text', $day, 'Technician grid did not expose full requisition text for hover.');
         assertContainsValue('ROOM FREE', $day, 'Technician grid did not distinguish a genuinely free room.');
+        assertContainsValue('Mark as Prepped', $day, 'Occupied technician lesson did not expose preparation control.');
         assertNotContainsValue('Save My rooms', $day, 'Personal room saving remained exposed.');
+
+        $prepared = $page->handle('POST', [], ['date' => '2026-09-21', 'action' => 'set_prepared', 'occurrence_id' => 50, 'prepared' => 'yes', 'csrf_token' => CsrfToken::value()]);
+        assertContainsValue('Lesson marked as prepped', $prepared, 'Technician preparation update did not report success.');
+        assertSameValue([1, 20, 50, true], $store->preparationUpdate, 'Technician preparation update was not tenant/user scoped.');
 
         $print = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'all', 'print' => 'week'], []);
         assertSameValue(3, substr_count($print, 'class="technician-sheet"'), 'Selected-week print did not use the configured working days.');
@@ -92,11 +98,13 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
 {
     public array $rooms = [['id' => 1, 'code' => 'LAB-A'], ['id' => 2, 'code' => 'LAB-B']];
     public bool $hasActiveTimetable = true;
+    public array $preparationUpdate = [];
     public function technicianBelongsToOrganisation(int $userId, int $organisationId): bool { return $userId === 20 && $organisationId === 1; }
     public function roomsForOrganisation(int $organisationId): array { return $this->rooms; }
     public function teachersForOrganisation(int $organisationId): array { return [['id' => 10, 'name' => 'John Smith']]; }
     public function defaultRoomIds(int $organisationId, int $userId): array { return [1]; }
     public function saveDefaultRoomIds(int $organisationId, int $userId, array $roomIds): void {}
+    public function setPrepared(int $organisationId, int $userId, int $occurrenceId, bool $prepared): bool { $this->preparationUpdate = [$organisationId, $userId, $occurrenceId, $prepared]; return true; }
     public function workingDays(int $organisationId): array { return [1, 4, 5]; }
     public function workingWeekStart(int $organisationId, DateTimeImmutable $date): DateTimeImmutable { return new DateTimeImmutable('2026-09-21'); }
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array
@@ -111,6 +119,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
                 'id' => 50, 'lesson_date' => $date->format('Y-m-d'), 'snapshot_teacher_user_id' => 10,
                 'teacher_name' => 'John Smith', 'teacher_initials' => 'JSM', 'snapshot_class_code' => '9A/Sc1',
                 'snapshot_room_code' => 'LAB-A', 'snapshot_start_slot_id' => 1, 'snapshot_duration_periods' => 2,
+                'prepared_at' => null,
                 'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => 'Very long requisition text',
                 'planning_notes' => null, 'risk_assessment_text' => null,
             ]],

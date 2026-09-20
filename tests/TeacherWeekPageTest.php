@@ -24,7 +24,7 @@ final class TeacherWeekPageTest
         assertSameValue(7, (new TeacherPlanningService(new TeacherStore(), 1))->weekStart(new DateTimeImmutable('2026-09-13'))->format('N'), 'Week calculation was incorrect.');
 
         $store = new TeacherStore();
-        $page = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-09'), ['display_name' => 'Niall Evans', 'staff_identifier' => 'NE']);
+        $page = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-09'), ['staff_identifier' => 'NEV']);
         $view = $page->handle('GET', ['date' => '2026-09-09'], []);
         assertContainsValue('Week beginning Monday 7 September 2026', $view, 'Week heading was not rendered.');
         assertContainsValue('Period One', $view, 'Configured teaching-period label was not rendered.');
@@ -65,7 +65,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Updated requisitions', $reloaded, 'Saved requisitions did not reload.');
         assertContainsValue('Updated risk', $reloaded, 'Saved risk assessment did not reload.');
 
-        $dayPage = new TeacherDayPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-07'), ['display_name' => 'Niall Evans', 'staff_identifier' => 'NE', 'roles' => ['teacher']]);
+        $dayPage = new TeacherDayPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-07'), ['staff_identifier' => 'NEV', 'roles' => ['teacher']]);
         $day = $dayPage->handle('GET', ['date' => '2026-09-07']);
         assertContainsValue('Day View', $day, 'Teacher day view heading was not rendered.');
         assertContainsValue("Today's lessons", $day, 'Teacher day view did not identify the selected day.');

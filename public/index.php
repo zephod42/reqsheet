@@ -303,8 +303,14 @@ if ($route === ApplicationRoute::ONBOARDING) {
 
 if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::DEMO, ApplicationRoute::CONTACT], true)) {
     $heading = ucfirst($route);
+    $content = '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>';
+    if ($route === ApplicationRoute::ABOUT) {
+        $content = '<section class="content-narrow about-page"><h1>ABOUT REQSHEET</h1><p>The prep room wall, reimagined for the 21st century.</p><p>Reqsheet is a lightweight organiser for school departments. Think of it as the digital equivalent of Post-it notes on the prep room wall: a simple, shared space where everyone can see what needs to happen and when.</p><p>By design, Reqsheet stores only the information needed to organise your department. No unnecessary personal details, no complicated administration, and no features getting in the way of the job.</p><p>Built on 20 years of experience working in school science departments, Reqsheet brings teachers and technicians together in one clear, straightforward system.</p><p><strong>Maximum clarity. Minimum effort.</strong></p></section>';
+    } elseif ($route === ApplicationRoute::CONTACT) {
+        $content = '<section class="content-narrow"><h1>Contact</h1><p>For feedback about Reqsheet, email <a href="mailto:feedback@reqsheet.com">feedback@reqsheet.com</a>.</p></section>';
+    }
     header('Content-Type: text/html; charset=UTF-8');
-    echo PageLayout::render($heading, '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>', $currentUser);
+    echo PageLayout::render($heading, $content, $currentUser);
     exit;
 }
 

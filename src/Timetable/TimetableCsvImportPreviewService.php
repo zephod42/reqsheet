@@ -207,7 +207,7 @@ final class TimetableCsvImportPreviewService
             $groups[] = [
                 'teacher_id' => (int) $cell['teacher']['id'],
                 'teacher_code' => (string) $cell['teacher']['staff_identifier'],
-                'teacher_name' => (string) $cell['teacher']['display_name'],
+                'teacher_name' => (string) ($cell['teacher']['staff_identifier'] ?? ''),
                 'class_id' => (int) $cell['class']['id'],
                 'class_code' => (string) $cell['class']['code'],
                 'room_id' => (int) $cell['room']['id'],

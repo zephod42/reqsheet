@@ -18,7 +18,20 @@ final class TechnicianPage
         $message = null;
         // Room selection is deliberately request-scoped. Personal room defaults are retained in
         // the database for compatibility, but are no longer exposed or loaded here.
-        $date = $this->date((string) ($query['date'] ?? 'today'));
+        $date = $this->date((string) ($query['date'] ?? ($input['date'] ?? 'today')));
+        if ($method === 'POST' && (string) ($input['action'] ?? '') === 'set_prepared') {
+            if (!CsrfToken::valid($input['csrf_token'] ?? null)) {
+                http_response_code(403);
+                return PageLayout::render('Technician', '<p class="error">The form expired. Please try again.</p>', $this->user);
+            }
+            $occurrenceId = filter_var($input['occurrence_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            $state = (string) ($input['prepared'] ?? '');
+            if ($occurrenceId === false || !in_array($state, ['yes', 'no'], true) || !$this->store->setPrepared($this->organisationId, $this->userId, (int) $occurrenceId, $state === 'yes')) {
+                $message = 'That dated lesson could not be updated.';
+            } else {
+                $message = $state === 'yes' ? 'Lesson marked as prepped.' : 'Lesson marked as not prepped.';
+            }
+        }
         if (isset($query['teacher']) || isset($query['room'])) {
             $rows = isset($query['teacher']) ? $this->store->weekForTeacher($this->organisationId, (int) $query['teacher'], $this->weekStart($date)) : $this->store->weekForRoom($this->organisationId, (int) $query['room'], $this->weekStart($date));
             return PageLayout::render('Technician inspection', $this->inspectionPage($date, $rows), $this->user);
@@ -87,7 +100,11 @@ final class TechnicianPage
     private function cell(array $occurrence): string
     {
         $text = trim((string) ($occurrence['requirements_text'] ?? '')); $label = $text === '' ? (($occurrence['state'] ?? '') === 'nothing_required' ? 'Nothing required' : 'Not requisitioned') : $text;
-        return '<details class="technician-cell"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition" title="' . $this->e($label) . '">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) $occurrence['period_label']) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p><details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
+        $prepared = !empty($occurrence['prepared_at']);
+        $marker = $prepared ? '<span class="technician-prepped" aria-label="Prepared" title="Prepared">✓</span>' : '<span class="technician-prepped technician-prepped-empty" aria-hidden="true"></span>';
+        $csrf = $this->e(CsrfToken::value());
+        $toggle = '<form method="post" class="technician-prep-form"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="action" value="set_prepared"><input type="hidden" name="occurrence_id" value="' . (int) $occurrence['id'] . '"><input type="hidden" name="prepared" value="' . ($prepared ? 'no' : 'yes') . '"><input type="hidden" name="date" value="' . $this->e((string) $occurrence['lesson_date']) . '"><button type="submit" class="secondary">' . ($prepared ? 'Mark as Not Prepped' : 'Mark as Prepped') . '</button></form>';
+        return '<details class="technician-cell"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition" title="' . $this->e($label) . '">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p>' . $toggle . '<details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
     }
 
     private function weekPrint(DateTimeImmutable $date, array $selected): string

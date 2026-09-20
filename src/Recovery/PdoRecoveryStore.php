@@ -69,28 +69,35 @@ final class PdoRecoveryStore implements RecoveryStore
             $organisation = $this->prepare('SELECT recovery_key_digest, recovery_key_generation, recovery_key_acknowledged_at FROM organisations WHERE id = :id FOR UPDATE');
             $organisation->execute(['id' => $organisationId]);
             $organisationRow = $organisation->fetch();
-            $user = $this->prepare('SELECT id FROM users WHERE organisation_id = :organisation_id AND staff_identifier = :staff_identifier AND is_admin = TRUE AND is_active = TRUE LIMIT 1');
+            $user = $this->prepare('SELECT id, is_admin, is_active FROM users WHERE organisation_id = :organisation_id AND staff_identifier = :staff_identifier LIMIT 1');
             $user->execute(['organisation_id' => $organisationId, 'staff_identifier' => $staffIdentifier]);
-            $userId = $user->fetchColumn();
+            $account = $user->fetch();
             $storedDigest = $organisationRow === false || $organisationRow['recovery_key_digest'] === null ? str_repeat("\0", 32) : (string) $organisationRow['recovery_key_digest'];
-            $valid = $organisationRow !== false && $organisationRow['recovery_key_acknowledged_at'] !== null && $userId !== false && hash_equals($storedDigest, $keyDigest);
+            $valid = $organisationRow !== false && $organisationRow['recovery_key_acknowledged_at'] !== null && preg_match('/^[A-Z]{3}$/D', $staffIdentifier) === 1 && hash_equals($storedDigest, $keyDigest);
             if (!$valid) {
                 $this->recordFailure($organisationId, $clientHash, $limit, $now);
                 return null;
             }
 
+            // Initials availability is disclosed only after the organisation key verifies.
+            if ($account !== false && (!(bool) $account['is_admin'] || !(bool) $account['is_active'])) {
+                throw new RecoveryException('Those initials are already reserved by an account that cannot be recovered here. Choose different initials to create a new administrator.');
+            }
+            $userId = $account === false ? null : (int) $account['id'];
+
             $clear = $this->prepare('DELETE FROM account_recovery_rate_limits WHERE organisation_id = :organisation_id AND client_hash = :client_hash');
             $clear->bindValue(':organisation_id', $organisationId, PDO::PARAM_INT);
             $clear->bindValue(':client_hash', $clientHash, PDO::PARAM_LOB);
             $clear->execute();
-            $insert = $this->prepare('INSERT INTO account_recovery_flows (token_hash, organisation_id, user_id, recovery_key_generation, expires_at) VALUES (:token_hash, :organisation_id, :user_id, :generation, :expires_at)');
+            $insert = $this->prepare('INSERT INTO account_recovery_flows (token_hash, organisation_id, user_id, requested_initials, recovery_key_generation, expires_at) VALUES (:token_hash, :organisation_id, :user_id, :requested_initials, :generation, :expires_at)');
             $insert->bindValue(':token_hash', $flowTokenHash, PDO::PARAM_LOB);
             $insert->bindValue(':organisation_id', $organisationId, PDO::PARAM_INT);
-            $insert->bindValue(':user_id', (int) $userId, PDO::PARAM_INT);
+            $insert->bindValue(':user_id', $userId, $userId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+            $insert->bindValue(':requested_initials', $userId === null ? $staffIdentifier : null);
             $insert->bindValue(':generation', (int) $organisationRow['recovery_key_generation'], PDO::PARAM_INT);
             $insert->bindValue(':expires_at', $expiresAt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.u'));
             $insert->execute();
-            return ['user_id' => (int) $userId, 'generation' => (int) $organisationRow['recovery_key_generation']];
+            return ['user_id' => $userId, 'generation' => (int) $organisationRow['recovery_key_generation']];
         });
     }
 
@@ -103,7 +110,7 @@ final class PdoRecoveryStore implements RecoveryStore
             $organisation->execute(['id' => $organisationId]);
             $generation = $organisation->fetchColumn();
             if ($generation === false) return null;
-            $flow = $this->prepare('SELECT user_id, recovery_key_generation, expires_at, consumed_at FROM account_recovery_flows WHERE token_hash = :token_hash AND organisation_id = :organisation_id FOR UPDATE');
+            $flow = $this->prepare('SELECT user_id, requested_initials, recovery_key_generation, expires_at, consumed_at FROM account_recovery_flows WHERE token_hash = :token_hash AND organisation_id = :organisation_id FOR UPDATE');
             $flow->bindValue(':token_hash', $flowTokenHash, PDO::PARAM_LOB);
             $flow->bindValue(':organisation_id', $organisationId, PDO::PARAM_INT);
             $flow->execute();
@@ -112,14 +119,26 @@ final class PdoRecoveryStore implements RecoveryStore
             if ($row === false || $row['consumed_at'] !== null || new \DateTimeImmutable((string) $row['expires_at'], new \DateTimeZone('UTC')) <= $now) return null;
 
             if ((int) $generation !== (int) $row['recovery_key_generation']) return null;
-            $user = $this->prepare('SELECT is_admin, is_active FROM users WHERE id = :id AND organisation_id = :organisation_id FOR UPDATE');
-            $user->execute(['id' => (int) $row['user_id'], 'organisation_id' => $organisationId]);
-            $account = $user->fetch();
-            if ($account === false || !(bool) $account['is_admin'] || !(bool) $account['is_active']) return null;
+            if ($row['user_id'] === null) {
+                // All account creation/editing/deletion and rotation share this organisation lock.
+                // A collision appearing since verification must never overwrite or promote anyone.
+                $collision = $this->prepare('SELECT id FROM users WHERE organisation_id = :organisation_id AND staff_identifier = :initials FOR UPDATE');
+                $collision->execute(['organisation_id' => $organisationId, 'initials' => $row['requested_initials']]);
+                if ($collision->fetchColumn() !== false) throw new RecoveryException('Those initials have become unavailable. Start Account Recovery again with different initials.');
+                $create = $this->prepare("INSERT INTO users (organisation_id, staff_identifier, operational_role, is_admin, is_teacher, is_technician, password_hash, account_state) VALUES (:organisation_id, :initials, NULL, TRUE, FALSE, FALSE, :password_hash, 'recovery_pending')");
+                $create->execute(['organisation_id' => $organisationId, 'initials' => $row['requested_initials'], 'password_hash' => $passwordHash]);
+                $userId = (int) $this->pdo->lastInsertId();
+            } else {
+                $userId = (int) $row['user_id'];
+                $user = $this->prepare('SELECT is_admin, is_active FROM users WHERE id = :id AND organisation_id = :organisation_id FOR UPDATE');
+                $user->execute(['id' => $userId, 'organisation_id' => $organisationId]);
+                $account = $user->fetch();
+                if ($account === false || !(bool) $account['is_admin'] || !(bool) $account['is_active']) return null;
+            }
 
             $newGeneration = (int) $generation + 1;
             $updateUser = $this->prepare("UPDATE users SET password_hash = :password_hash, account_state = 'recovery_pending', auth_version = auth_version + 1 WHERE id = :id AND organisation_id = :organisation_id AND is_admin = TRUE AND is_active = TRUE");
-            $updateUser->execute(['password_hash' => $passwordHash, 'id' => (int) $row['user_id'], 'organisation_id' => $organisationId]);
+            $updateUser->execute(['password_hash' => $passwordHash, 'id' => $userId, 'organisation_id' => $organisationId]);
             $updateOrganisation = $this->prepare('UPDATE organisations SET recovery_key_digest = :digest, recovery_key_generation = :generation, recovery_key_acknowledged_at = NULL WHERE id = :id AND recovery_key_generation = :old_generation');
             $updateOrganisation->bindValue(':digest', $replacementDigest, PDO::PARAM_LOB);
             $updateOrganisation->bindValue(':generation', $newGeneration, PDO::PARAM_INT);
@@ -128,7 +147,7 @@ final class PdoRecoveryStore implements RecoveryStore
             $updateOrganisation->execute();
             $consume = $this->prepare('UPDATE account_recovery_flows SET consumed_at = UTC_TIMESTAMP(6) WHERE organisation_id = :organisation_id AND recovery_key_generation = :generation AND consumed_at IS NULL');
             $consume->execute(['organisation_id' => $organisationId, 'generation' => (int) $generation]);
-            return ['user_id' => (int) $row['user_id'], 'generation' => $newGeneration];
+            return ['user_id' => $userId, 'generation' => $newGeneration];
         });
     }
 

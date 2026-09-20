@@ -118,6 +118,13 @@ Account recovery and data-minimisation milestone completed 2026-09-20:
 - New school short codes use 3–12 lowercase letters/digits, with `www` reserved case-insensitively; historical slugs remain routable unchanged.
 - My Account preserves all current roles and displays organisation-wide trial/paid countdown metadata when explicitly configured, otherwise `Not configured`. No trial, paid state, billing address, or renewal is invented.
 
+Staff minimisation and technician preparation milestone completed 2026-09-20:
+
+- Staff accounts now use only organisation-scoped three-letter initials; staff names and account emails are not collected, displayed, or retained. Migration `0013` drops legacy display-name storage while preserving IDs, roles, passwords, timetable relationships, and historical records.
+- Administrators can deactivate any organisation account, including themselves and the last administrator, with session revocation and an explicit warning. The organisation recovery key remains usable; recovery can create a new administrator when requested initials are unused.
+- Dated lesson occurrences carry shared preparation state. Technicians can mark and unmark lessons as prepped; the indicator is shown in day/week print layouts without relying on colour.
+- Timetable template saves validate required days, week start, periods, and CSRF before any write, preserving submitted values after validation errors. Public About copy now explains the intentionally minimal product philosophy.
+
 Test-data reset handoff completed 2026-09-19:
 
 - `bin/reset-test-data.php` provides an explicit dry-run and confirmed CLI reset for the disposable Reqsheet test databases. It preserves schema and migration history; fresh school creation remains an administrator verification step after execution.

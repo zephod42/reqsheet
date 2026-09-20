@@ -34,14 +34,14 @@ final class AdminTimetablePageTest
         ]);
         $staff = $page->handle('GET', ['version' => 1, 'teacher' => 10], []);
         assertContains('Pilot timetable', $staff, 'Version context was not rendered.');
-        assertContains('Teacher A', $staff, 'Teacher-first selection was not rendered.');
+        assertContains('TAA', $staff, 'Teacher-first selection was not rendered.');
         assertContains('name="teacher"', $staff, 'Teacher selector was not rendered.');
         assertContains('Break', $staff, 'Configured separator was not rendered.');
         assertContains('Period One', $staff, 'Configured teaching-period label was not rendered.');
         assertContains('Add lesson', $staff, 'Available period was not rendered as an add target.');
 
         $emptyTeacher = $page->handle('GET', ['version' => 1, 'teacher' => 11], []);
-        assertContains('Teacher B', $emptyTeacher, 'Second teacher was not selectable.');
+        assertContains('TBB', $emptyTeacher, 'Second teacher was not selectable.');
         assertContains('Weekly view', $emptyTeacher, 'Empty teacher week was not rendered.');
 
         $created = $page->handle('POST', [], ['action' => 'create_lesson', 'version' => 1, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 1, 'class_code' => '13PHY', 'room_code' => 'P1']);
@@ -104,13 +104,13 @@ final class AdminTimetablePageTest
         assertContains('/admin/timetable/resources.csv', $grid, 'Timetable resource reference export was not exposed.');
         assertContains('action="/admin/timetable/import"', $grid, 'Empty timetable did not expose CSV upload.');
         assertContains('name="csrf_token"', $grid, 'CSV upload did not include CSRF protection.');
-        assertContains('<h2>Teacher A</h2>', $grid, 'Selected teacher heading did not show the resource name.');
+        assertContains('<h2>TAA</h2>', $grid, 'Selected teacher heading did not show the resource initials.');
         assertNotContains('Versioned timetable by teacher/class/room', $grid, 'Redundant generic timetable heading remained.');
         assertContains('class="empty-period"', $grid, 'Empty teaching cells were not clickable.');
 
         $teacherEditor = $page->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10, 'day' => 1, 'start_slot' => 101], []);
         assertContains('id="assignment-editor"', $teacherEditor, 'Teacher cell editor did not open.');
-        assertContains('Teacher: Teacher A [TAA]', $teacherEditor, 'Teacher projection context was not rendered.');
+        assertContains('Teacher: TAA [TAA]', $teacherEditor, 'Teacher projection context was not rendered.');
         assertNotContains('<select id="teacher_user_id"', $teacherEditor, 'Teacher projection redundantly exposed a teacher selector.');
         assertContains('<select id="room_id"', $teacherEditor, 'Teacher projection omitted the room selector.');
         assertContains('<select id="class_id"', $teacherEditor, 'Teacher projection omitted the class selector.');
@@ -166,7 +166,7 @@ class ResourceConfigurationStore extends ConfigurationStore implements ResourceT
     public function lessonsForVersion(int $versionId): array { $this->lessonReads++; return parent::lessonsForVersion($versionId); }
     public function createRoom(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->rooms[] = ['id' => $id, 'code' => trim($code)]; return $id; }
     public function createClass(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->classes[] = ['id' => $id, 'code' => trim($code)]; return $id; }
-    public function createTeacher(int $organisationId, string $code, string $displayName): int { $id = $this->nextResourceId(); $this->users[] = ['id' => $id, 'display_name' => $displayName !== '' ? $displayName : $code, 'staff_identifier' => $code, 'is_active' => true]; $this->teachers[$id] = $organisationId; return $id; }
+    public function createTeacher(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->users[] = ['id' => $id, 'staff_identifier' => $code, 'is_active' => true]; $this->teachers[$id] = $organisationId; return $id; }
     public function roomBelongsToOrganisation(int $roomId, int $organisationId): bool { return $this->roomCode($roomId) !== null; }
     public function classBelongsToOrganisation(int $classId, int $organisationId): bool { return $this->classCode($classId) !== null; }
     public function roomCode(int $roomId): ?string { foreach ($this->rooms as $room) if ($room['id'] === $roomId) return $room['code']; return null; }

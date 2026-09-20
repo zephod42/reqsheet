@@ -148,7 +148,7 @@ try {
     cleanTestDatabase($pdo);
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 12, 'Expected all migrations to apply to the clean test database.');
+        integrationAssert($migrationCount === 13, 'Expected all migrations to apply to the clean test database.');
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         foreach (TEST_TABLES as $table) {
@@ -164,11 +164,10 @@ try {
         $organisationId = $insert('INSERT INTO organisations (name, tenant_slug) VALUES (:name, :tenant_slug)', ['name' => 'Reqsheet Integration School', 'tenant_slug' => 'integration-school']);
         $teacherA = $insert(
             'INSERT INTO users
-                (organisation_id, display_name, staff_identifier, operational_role, is_admin, password_hash, account_state)
-             VALUES (:organisation_id, :display_name, :staff_identifier, :operational_role, :is_admin, :password_hash, :account_state)',
+                (organisation_id, staff_identifier, operational_role, is_admin, password_hash, account_state)
+             VALUES (:organisation_id, :staff_identifier, :operational_role, :is_admin, :password_hash, :account_state)',
             [
                 'organisation_id' => $organisationId,
-                'display_name' => 'Integration Teacher A',
                 'staff_identifier' => 'INA',
                 'operational_role' => 'teacher',
                 'is_admin' => 1,
@@ -177,12 +176,12 @@ try {
             ],
         );
         $teacherB = $insert(
-            "INSERT INTO users (organisation_id, display_name, staff_identifier, operational_role) VALUES (:organisation_id, :display_name, :staff_identifier, 'teacher')",
-            ['organisation_id' => $organisationId, 'display_name' => 'Integration Teacher B', 'staff_identifier' => 'INB'],
+            "INSERT INTO users (organisation_id, staff_identifier, operational_role) VALUES (:organisation_id, :staff_identifier, 'teacher')",
+            ['organisation_id' => $organisationId, 'staff_identifier' => 'INB'],
         );
         $administratorB = $insert(
-            "INSERT INTO users (organisation_id, display_name, staff_identifier, is_admin, password_hash, account_state) VALUES (:organisation_id, :display_name, :staff_identifier, TRUE, :password_hash, 'claimed')",
-            ['organisation_id' => $organisationId, 'display_name' => 'Integration Administrator B', 'staff_identifier' => 'INZ', 'password_hash' => password_hash('admin-b-password', PASSWORD_DEFAULT)],
+            "INSERT INTO users (organisation_id, staff_identifier, is_admin, password_hash, account_state) VALUES (:organisation_id, :staff_identifier, TRUE, :password_hash, 'claimed')",
+            ['organisation_id' => $organisationId, 'staff_identifier' => 'INZ', 'password_hash' => password_hash('admin-b-password', PASSWORD_DEFAULT)],
         );
         $userColumns = array_map('strval', $pdo->query('SHOW COLUMNS FROM users')->fetchAll(PDO::FETCH_COLUMN));
         $organisationColumns = array_map('strval', $pdo->query('SHOW COLUMNS FROM organisations')->fetchAll(PDO::FETCH_COLUMN));
@@ -411,6 +410,47 @@ try {
         integrationAssert((int) $recoveredAccount['id'] === $teacherA && $recoveredAccount['account_state'] === 'claimed', 'Recovered administrator password/account state was not completed.');
         integrationAssert((int) $accountService->authenticate('INZ', 'admin-b-password', $organisationId)['id'] === $administratorB, 'Recovery changed another administrator password.');
         integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 3, 'Recovery created or deleted a staff account.');
+
+        $expectRecoveryFailure = static function (callable $operation, string $message): void {
+            try { $operation(); } catch (RecoveryException | \Reqsheet\Account\AccountValidationException) { return; }
+            throw new RuntimeException($message);
+        };
+        $expectRecoveryFailure(static fn () => $recovery->begin($organisationId, 'INB', $rotated['key'], 'non-admin'), 'A non-administrator account was promoted by recovery.');
+        $beforeCreation = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
+        $abandonedCreation = $recovery->begin($organisationId, 'NEW', $rotated['key'], 'abandoned-new-admin');
+        integrationAssert($abandonedCreation['user_id'] === null, 'New administrator existed before password completion.');
+        $expectRecoveryFailure(static fn () => $recovery->complete($organisationId, $abandonedCreation['token'], 'short', 'short'), 'Weak password created a new administrator.');
+        integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === $beforeCreation, 'Abandoned/failed recovery left an account behind.');
+        $recovery->cancel($organisationId, $abandonedCreation['token']);
+        $expectRecoveryFailure(static fn () => $recovery->complete($organisationId, $abandonedCreation['token'], 'new-admin-password', 'new-admin-password'), 'Cancelled new-admin creation remained usable.');
+
+        $newAttempt = $recovery->begin($organisationId, 'NEW', $rotated['key'], 'new-admin');
+        $competingAttempt = $recovery->begin($organisationId, 'NXT', $rotated['key'], 'competing-new-admin');
+        $createdAdmin = $recovery->complete($organisationId, $newAttempt['token'], 'new-admin-password', 'new-admin-password');
+        $createdAccount = $accountService->findUserById($createdAdmin['user_id']);
+        integrationAssert($createdAccount['roles'] === ['administrator'] && $createdAccount['operational_role'] === null, 'Recovery creation assigned an operational role.');
+        integrationAssert($createdAccount['account_state'] === 'recovery_pending' && password_verify('new-admin-password', $createdAccount['password_hash']), 'New administrator bypassed protected password/acknowledgement state.');
+        $expectRecoveryFailure(static fn () => $recovery->complete($organisationId, $competingAttempt['token'], 'competing-password', 'competing-password'), 'Concurrent new-admin recovery survived rotation.');
+        $expectRecoveryFailure(static fn () => $recovery->begin($organisationId, 'NEW', $rotated['key'], 'old-key'), 'Old key survived new-admin creation.');
+        $recovery->acknowledge($organisationId, $createdAdmin['user_id'], $createdAdmin['generation']);
+
+        $recoveryDigestBeforeDeletion = $recovery->metadata($organisationId);
+        $historicalCount = (int) $pdo->query('SELECT COUNT(*) FROM lesson_occurrences')->fetchColumn();
+        $oldAuthVersion = $accountService->findUserById($teacherA)['auth_version'];
+        $accountService->deletePerson($createdAdmin['user_id'], $organisationId, $teacherA, true, false);
+        integrationAssert(!$accountService->findUserById($teacherA)['is_active'] && $accountService->findUserById($teacherA)['auth_version'] === $oldAuthVersion + 1, 'Deletion did not revoke historical teacher login and sessions.');
+        integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM lesson_occurrences')->fetchColumn() === $historicalCount, 'Deletion removed historical lesson occurrences.');
+        $expectRecoveryFailure(static fn () => $accountService->authenticate('INA', 'recovered-password', $organisationId), 'Deleted administrator retained login access.');
+        $expectRecoveryFailure(static fn () => $recovery->begin($organisationId, 'INA', $createdAdmin['key'], 'deleted-initials'), 'Recovery reactivated a deleted account.');
+        $accountService->deletePerson($createdAdmin['user_id'], $organisationId, $administratorB, true, false);
+        $expectRecoveryFailure(static fn () => $accountService->deletePerson($createdAdmin['user_id'], $organisationId, $createdAdmin['user_id'], true, false), 'Last administrator deletion omitted warning confirmation.');
+        $accountService->deletePerson($createdAdmin['user_id'], $organisationId, $createdAdmin['user_id'], true, true);
+        integrationAssert((new PdoAccountStore($pdo))->activeAdministratorCount($organisationId) === 0, 'Last administrator could not self-delete.');
+        integrationAssert($recovery->metadata($organisationId) === $recoveryDigestBeforeDeletion, 'Deletion invalidated the organisation recovery key.');
+        $emptySchoolAttempt = $recovery->begin($organisationId, 'RES', $createdAdmin['key'], 'no-active-admin');
+        $restored = $recovery->complete($organisationId, $emptySchoolAttempt['token'], 'restored-password', 'restored-password');
+        $recovery->acknowledge($organisationId, $restored['user_id'], $restored['generation']);
+        integrationAssert($accountService->authenticate('RES', 'restored-password', $organisationId)['roles'] === ['administrator'], 'School with no administrators could not recover using its key.');
     } finally {
         cleanTestDatabase($pdo);
     }

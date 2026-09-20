@@ -20,7 +20,7 @@ The public landing page is deliberately simple: `Reqsheet.` appears as large, si
 
 Pilot authentication should support a persistent/remembered login so ordinary users are not repeatedly prompted for a password during normal daily use. The exact session lifetime and security policy remain part of the later account-security pass. Reqsheet does not collect staff or organisation account email addresses. Signup creates a new organisation/school and its first Admin account on the generic base host, then uses a one-time, short-lived tenant-bound onboarding handoff. The tenant host consumes that handoff, establishes the normal tenant-scoped session, generates and presents the one-time Organisation Recovery Key, and requires acknowledgement before the new Admin can continue to `/settings`.
 
-Every organisation recovery key is an independent 256-bit random secret. Only its domain-separated digest is persistent. Tenant-bound Account Recovery can reset any existing administrator in that organisation, never create or promote one, and rotates the organisation key when password selection completes. The replacement key must be acknowledged before unrestricted access. Administrators can also replace a key deliberately with current-password reauthentication. Possession of the key enables administrator takeover; losing both the key and all administrator access can make the organisation unrecoverable.
+Every organisation recovery key is an independent 256-bit random secret. Only its domain-separated digest is persistent. Tenant-bound Account Recovery can reset an existing active administrator or, when the supplied initials are unused, create a new Administrator-only account. It never promotes a non-administrator or reactivates a deleted account. The replacement key must be acknowledged before unrestricted access. Administrators can also replace a key deliberately with current-password reauthentication. Possession of the key enables administrator takeover; losing both the key and all administrator access can make the organisation unrecoverable.
 
 ### Setup gating
 
@@ -142,7 +142,7 @@ The same screen also offers optional settings:
 - Primary accent colour and Secondary accent colour only. White/black base, timetable grid, automatic class colours, and technician print styling remain independent from these settings; arbitrary school CSS is not exposed.
 
 Settings shows the current active timetable template as a compact read-only summary by default. `Create new timetable template` requires only a unique timetable name, working days, first day of the week, and periods per day. `Edit timetable` exposes the detailed configuration controls; activation is an explicit administrator action and exactly one organisation template may be active. Timetable templates do not require administrator-managed effective dates; legacy internal dates remain only for historical compatibility. The assignment builder does not create timetable templates or versions. Admins can manage rooms/labs by adding, renaming, reordering, and deactivating/archiving them.
-- Manage people by creating a Teacher or Technician. The person’s name is used as the login name; an optional abbreviation such as JSM may be recorded; Admin is an optional additional permission.
+- Manage people by creating staff accounts identified solely by organisation-scoped three-letter initials. Admin is an optional additional permission.
 
 The first pilot may create an account with no password until its first login, when the user sets one. This must be represented explicitly as awaiting-first-login, not inferred from a blank password, and is a consciously temporary security weakness requiring review before broader production deployment.
 
@@ -207,7 +207,7 @@ The existing database and service rules remain authoritative: ISO weekdays, vali
 - Teacher week places each configured period or separator name once in the left-hand period axis. Separator rows are neutral grey across the day columns and contain no repeated separator text; custom separator labels are preserved.
 - Selected/current navigation states use the Primary accent treatment consistently across the shared authenticated navigation and timetable controls.
 - Sign up belongs to the generic public splash page only. Authenticated pages retain About, Demo, and Contact in the shared layout without exposing organisation creation as ordinary navigation.
-- Every authenticated user has a read-only My Account identity page for their own name, initials/code, all assigned roles, and organisation-level School Account Status. Users may change only their own password; identity details remain administrator-managed.
+- Every authenticated user has a read-only My Account identity page for their own initials/code, all assigned roles, and organisation-level School Account Status. Users may change only their own password; identity details remain administrator-managed.
 - Administrator Settings includes a restrained “Reqsheet account” membership section. Membership status, pricing, billing, renewals, and payment integration are future work and are not represented as current data.
 - Authenticated informational pages retain the same shared sidebar, including My Account and the appropriate administrator destinations.
 

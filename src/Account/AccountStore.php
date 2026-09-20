@@ -24,16 +24,15 @@ interface AccountStore extends TenantStore
     public function findPeopleForOrganisation(int $organisationId): array;
 
     /** @param list<string> $roles */
-    public function createPerson(int $organisationId, string $displayName, string $staffIdentifier, array $roles): int;
+    public function createPerson(int $organisationId, string $staffIdentifier, array $roles): int;
 
     /** @param list<string> $roles */
-    public function updatePerson(int $organisationId, int $userId, string $displayName, string $staffIdentifier, array $roles): void;
+    public function updatePerson(int $organisationId, int $userId, string $staffIdentifier, array $roles): void;
 
     public function activeAdministratorCount(int $organisationId): int;
 
     public function createFirstOrganisation(
         string $organisationName,
-        string $displayName,
         string $staffIdentifier,
         string $role,
         string $passwordHash,
@@ -42,7 +41,6 @@ interface AccountStore extends TenantStore
 
     public function createOrganisationAdmin(
         string $organisationName,
-        string $displayName,
         string $staffIdentifier,
         string $role,
         string $passwordHash,
@@ -51,7 +49,6 @@ interface AccountStore extends TenantStore
 
     public function createUser(
         int $organisationId,
-        string $displayName,
         string $staffIdentifier,
         string $role,
         bool $isAdmin,
@@ -62,6 +59,8 @@ interface AccountStore extends TenantStore
     public function updatePassword(int $userId, int $organisationId, string $passwordHash): void;
 
     public function resetPassword(int $userId, int $organisationId): void;
+
+    public function deletePerson(int $administratorId, int $organisationId, int $userId, bool $confirmLastAdministrator): void;
 
     /** @return array{state:?string,until:?string} */
     public function organisationAccountStatus(int $organisationId): array;

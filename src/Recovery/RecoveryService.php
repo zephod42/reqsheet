@@ -34,7 +34,7 @@ final class RecoveryService
         return $this->issueForAdministrator($organisationId, $administratorId);
     }
 
-    /** @return array{token:string,user_id:int,generation:int} */
+    /** @return array{token:string,user_id:?int,generation:int} */
     public function begin(int $organisationId, string $staffIdentifier, string $key, string $clientIdentity, ?\DateTimeImmutable $now = null): array
     {
         try {

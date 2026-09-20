@@ -17,7 +17,7 @@ final class TimetableResourceCsvExporter
             self::write($stream, ['Resource Type', 'Code', 'Name']);
             foreach ($this->store->usersForOrganisation($organisationId) as $teacher) {
                 if (empty($teacher['is_active']) || trim((string) ($teacher['staff_identifier'] ?? '')) === '') continue;
-                self::write($stream, ['Teacher', (string) $teacher['staff_identifier'], (string) $teacher['display_name']]);
+                self::write($stream, ['Teacher', (string) $teacher['staff_identifier'], (string) $teacher['staff_identifier']]);
                 $count++;
             }
             foreach ($this->store->classesForOrganisation($organisationId) as $class) {

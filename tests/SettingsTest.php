@@ -69,7 +69,7 @@ final class SettingsTest
         assertNotContainsValue('name="rooms[]"', $initialSetupView, 'Initial setup still offered room creation.');
         assertContainsValue('You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.', $initialSetupView, 'Initial setup did not explain later settings.');
         $initialSetupComplete = $initialSetup->handle('POST', [
-            'organisation_name' => 'Minimal School', 'display_name' => 'Minimal Admin', 'staff_identifier' => 'MAD',
+            'organisation_name' => 'Minimal School', 'staff_identifier' => 'MAD',
             'operational_role' => 'teacher', 'password' => 'minimal-pass', 'password_confirmation' => 'minimal-pass', 'tenant_slug' => 'minimalschl',
         ]);
         assertContainsValue('https://minimalschl.reqsheet.test/onboarding?token=', $initialSetupComplete, 'Initial setup did not continue to tenant-bound recovery-key onboarding.');
@@ -89,7 +89,7 @@ final class SettingsTest
         assertNotContainsValue('name="start_time"', $templateEditor, 'Template creation still exposes timing controls.');
         assertNotContainsValue('name="effective_from"', $templateEditor, 'Template creation still exposes an effective date.');
         $templateSaved = $templatePage->handle('POST', [
-            'action' => 'save_template', 'template_label' => 'Autumn settings template',
+            'action' => 'save_template', 'csrf_token' => \Reqsheet\Http\CsrfToken::value(), 'template_label' => 'Autumn settings template',
             'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => 6,
         ]);
         assertContainsValue('No active timetable template exists yet.', $templateSaved, 'A template became active without explicit selection.');
@@ -109,10 +109,18 @@ final class SettingsTest
         assertContainsValue('name="standard_period_minutes"', $fullEditor, 'Full timetable editing lost timing controls.');
         assertNotContainsValue('custom_day_start', $fullEditor, 'Timetable editor still exposed custom day timing inputs.');
         assertNotContainsValue('Custom day timings', $fullEditor, 'Timetable editor still exposed custom day timing controls.');
+        $settingsBeforeFailedTemplateSave = $templateSettings->saved;
+        $failedTemplateSave = $templatePage->handle('POST', [
+            'action' => 'save_template', 'csrf_token' => \Reqsheet\Http\CsrfToken::value(),
+            'source_version_id' => 1, 'template_label' => 'Invalid edit',
+            'working_days' => [], 'first_day_of_week' => 1, 'periods_per_day' => 6,
+        ]);
+        assertContainsValue('Select at least one working day.', $failedTemplateSave, 'Invalid timetable edit did not report its field error.');
+        assertSameValue($settingsBeforeFailedTemplateSave, $templateSettings->saved, 'Failed timetable edit partially modified organisation settings.');
 
         $signupStore = new \Reqsheet\Tests\AccountStoreFake();
         $signupAccounts = new \Reqsheet\Account\AccountService($signupStore);
-        $signupAccounts->createFirstOrganisation('Existing School', 'Existing Admin', 'EAD', 'teacher', 'existing-pass', 'existing-pass');
+        $signupAccounts->createFirstOrganisation('Existing School', 'EAD', 'teacher', 'existing-pass', 'existing-pass');
         $signup = new SignupPage($signupAccounts, 'reqsheet.test', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $signupView = $signup->handle('GET', []);
         assertContainsValue('School name', $signupView, 'Signup did not ask for a school name.');
@@ -123,23 +131,23 @@ final class SettingsTest
         assertNotContainsValue('Tenant slug', $signupView, 'Signup exposed internal tenant-slug terminology.');
         assertNotContainsValue('tenant identity', strtolower($signupView), 'Signup exposed internal tenant terminology.');
         assertNotContainsValue('email', strtolower($signupView), 'Signup still collected an email address.');
-        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilotschool', 'display_name' => 'Pilot Admin', 'staff_identifier' => 'PAD', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
+        $created = $signup->handle('POST', ['school_name' => 'Pilot School', 'tenant_slug' => 'pilotschool', 'staff_identifier' => 'PAD', 'operational_role' => 'teacher', 'password' => 'pilot-pass', 'password_confirmation' => 'pilot-pass']);
         assertContainsValue('https://pilotschool.reqsheet.test/onboarding?token=', $created, 'Successful signup did not hand off to the tenant host.');
         $newDomainSignup = new SignupPage($signupAccounts, 'reqsheet.com', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $newDomainPreview = $newDomainSignup->handle('GET', []);
         assertContainsValue('sch4.reqsheet.com', $newDomainPreview, 'Signup did not use the canonical new public domain.');
-        $newDomainCreated = $newDomainSignup->handle('POST', ['school_name' => 'New Domain School', 'tenant_slug' => 'newdomain', 'display_name' => 'New Domain Admin', 'staff_identifier' => 'NDA', 'operational_role' => 'teacher', 'password' => 'new-domain-pass', 'password_confirmation' => 'new-domain-pass']);
+        $newDomainCreated = $newDomainSignup->handle('POST', ['school_name' => 'New Domain School', 'tenant_slug' => 'newdomain', 'staff_identifier' => 'NDA', 'operational_role' => 'teacher', 'password' => 'new-domain-pass', 'password_confirmation' => 'new-domain-pass']);
         assertContainsValue('https://newdomain.reqsheet.com/onboarding?token=', $newDomainCreated, 'Signup from the new domain did not generate a canonical tenant handoff.');
-        assertSameValue(true, (bool) $signupStore->accounts['Pilot Admin']['is_admin'], 'Signup did not create an admin account.');
-        assertSameValue(2, $signupStore->accounts['Pilot Admin']['organisation_id'], 'Public signup did not create a second organisation.');
-        assertSameValue('pilotschool', $signupStore->accounts['Pilot Admin']['tenant_slug'], 'Public signup did not store the tenant slug.');
-        assertSameValue(1, $signupStore->accounts['Existing Admin']['organisation_id'], 'Public signup leaked or changed the existing tenant.');
+        assertSameValue(true, (bool) $signupStore->accounts['PAD']['is_admin'], 'Signup did not create an admin account.');
+        assertSameValue(2, $signupStore->accounts['PAD']['organisation_id'], 'Public signup did not create a second organisation.');
+        assertSameValue('pilotschool', $signupStore->accounts['PAD']['tenant_slug'], 'Public signup did not store the tenant slug.');
+        assertSameValue(1, $signupStore->accounts['EAD']['organisation_id'], 'Public signup leaked or changed the existing tenant.');
         assertSameValue(null, \Reqsheet\Http\SessionAuth::current(), 'Public signup left a generic-host session active during tenant handoff.');
         self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', 'TAD', 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');
         foreach (['www', 'WWW', 'Www'] as $reservedSlug) {
-            self::expectAccountValidation(static fn () => $signupAccounts->createOrganisationAdmin('Reserved School', 'Reserved Admin', 'RSA', 'teacher', 'reserved-pass', 'reserved-pass', $reservedSlug), 'Reserved www school short code was accepted: ' . $reservedSlug);
+            self::expectAccountValidation(static fn () => $signupAccounts->createOrganisationAdmin('Reserved School', 'RSA', 'teacher', 'reserved-pass', 'reserved-pass', $reservedSlug), 'Reserved www school short code was accepted: ' . $reservedSlug);
         }
-        $reservedSignupView = $signup->handle('POST', ['school_name' => 'Reserved School', 'tenant_slug' => 'WWW', 'display_name' => 'Reserved Admin', 'staff_identifier' => 'RSV', 'operational_role' => 'teacher', 'password' => 'reserved-pass', 'password_confirmation' => 'reserved-pass']);
+        $reservedSignupView = $signup->handle('POST', ['school_name' => 'Reserved School', 'tenant_slug' => 'WWW', 'staff_identifier' => 'RSV', 'operational_role' => 'teacher', 'password' => 'reserved-pass', 'password_confirmation' => 'reserved-pass']);
         assertContainsValue('This school short code is reserved. Please choose another.', $reservedSignupView, 'Signup did not display the reserved www error.');
         \Reqsheet\Http\SessionAuth::logout();
         $home = (new HomePage())->render();

@@ -32,7 +32,7 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
 
     public function teachersForOrganisation(int $organisationId): array
     {
-        $s = $this->pdo->prepare("SELECT id, display_name AS name FROM users WHERE organisation_id = :organisation_id AND is_active = TRUE AND (is_teacher = TRUE OR operational_role = 'teacher') ORDER BY display_name");
+        $s = $this->pdo->prepare("SELECT id, staff_identifier AS name FROM users WHERE organisation_id = :organisation_id AND is_active = TRUE AND (is_teacher = TRUE OR operational_role = 'teacher') ORDER BY staff_identifier");
         $s->execute(['organisation_id' => $organisationId]); return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name']], $s->fetchAll());
     }
 
@@ -54,6 +54,24 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
         } catch (\Throwable $e) { if ($this->pdo->inTransaction()) $this->pdo->rollBack(); throw $e; }
     }
 
+    public function setPrepared(int $organisationId, int $userId, int $occurrenceId, bool $prepared): bool
+    {
+        // Keep the permission and tenant checks in the data layer as well as at the
+        // route boundary: this prevents a forged occurrence id being used by a
+        // technician from another organisation.
+        if (!$this->technicianBelongsToOrganisation($userId, $organisationId)) return false;
+        $exists = $this->pdo->prepare('SELECT 1 FROM lesson_occurrences WHERE id = :occurrence_id AND organisation_id = :organisation_id');
+        $exists->execute(['occurrence_id' => $occurrenceId, 'organisation_id' => $organisationId]);
+        if ($exists->fetchColumn() === false) return false;
+        $s = $this->pdo->prepare(
+            'UPDATE lesson_occurrences
+             SET prepared_at = ' . ($prepared ? 'UTC_TIMESTAMP(6)' : 'NULL') . '
+             WHERE id = :occurrence_id AND organisation_id = :organisation_id'
+        );
+        $s->execute(['occurrence_id' => $occurrenceId, 'organisation_id' => $organisationId]);
+        return true;
+    }
+
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array
     {
         $version = $this->version($organisationId, $date);
@@ -67,7 +85,7 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
             foreach ($this->roomsForOrganisation($organisationId) as $room) if (in_array((int) $room['id'], $roomIds, true)) $codes[] = $room['code'];
             $roomSql = $codes === [] ? ' AND 1 = 0' : ' AND o.snapshot_room_code IN (' . implode(',', array_fill(0, count($codes), '?')) . ')';
         } else $codes = [];
-        $sql = 'SELECT o.id, o.lesson_date, o.snapshot_teacher_user_id, u.display_name AS teacher_name, u.staff_identifier AS teacher_initials, o.snapshot_class_code, o.snapshot_room_code, o.snapshot_start_slot_id, o.snapshot_duration_periods, s.sequence_number, s.label AS period_label, r.state, r.requirements_text, r.planning_notes, r.risk_assessment_text FROM lesson_occurrences o JOIN users u ON u.id = o.snapshot_teacher_user_id JOIN timetable_slots s ON s.id = o.snapshot_start_slot_id LEFT JOIN requisitions r ON r.lesson_occurrence_id = o.id WHERE o.organisation_id = ? AND o.lesson_date = ?' . $roomSql . ' ORDER BY s.sequence_number, o.snapshot_room_code, o.id';
+        $sql = 'SELECT o.id, o.lesson_date, o.snapshot_teacher_user_id, u.staff_identifier AS teacher_name, u.staff_identifier AS teacher_initials, o.snapshot_class_code, o.snapshot_room_code, o.snapshot_start_slot_id, o.snapshot_duration_periods, o.prepared_at, s.sequence_number, s.label AS period_label, r.state, r.requirements_text, r.planning_notes, r.risk_assessment_text FROM lesson_occurrences o JOIN users u ON u.id = o.snapshot_teacher_user_id JOIN timetable_slots s ON s.id = o.snapshot_start_slot_id LEFT JOIN requisitions r ON r.lesson_occurrence_id = o.id WHERE o.organisation_id = ? AND o.lesson_date = ?' . $roomSql . ' ORDER BY s.sequence_number, o.snapshot_room_code, o.id';
         $statement = $this->pdo->prepare($sql); $statement->execute(array_merge([$organisationId, $date->format('Y-m-d')], $codes));
         return ['version' => $version, 'slots' => $slots, 'occurrences' => $statement->fetchAll()];
     }

@@ -51,7 +51,6 @@ final class MyAccountPage
     private function render(array $account, ?string $message, bool $error): string
     {
         $notice = $message === null ? '' : '<p class="notice ' . ($error ? 'error' : '') . '">' . $this->e($message) . '</p>';
-        $name = trim((string) ($account['display_name'] ?? '')) ?: 'Unnamed user';
         $code = trim((string) ($account['staff_identifier'] ?? ''));
         $roles = array_values(array_unique(array_map('strval', (array) ($account['roles'] ?? []))));
         if ($roles === [] && ($account['operational_role'] ?? null) !== null) $roles[] = (string) $account['operational_role'];
@@ -63,8 +62,8 @@ final class MyAccountPage
             default => ucfirst(str_replace('_', ' ', $role)),
         }, $roles);
         $status = $this->statusLabel($this->accounts->organisationAccountStatus((int) $account['organisation_id']));
-        $identity = '<dl class="account-identity"><dt>Full/display name</dt><dd>' . $this->e($name) . '</dd><dt>Initials/teacher code</dt><dd>' . ($code === '' ? '<span class="muted">Not entered</span>' : $this->e($code)) . '</dd><dt>Roles</dt><dd>' . ($roleLabels === [] ? '<span class="muted">No roles assigned.</span>' : $this->e(implode(', ', $roleLabels))) . '</dd><dt>School Account Status:</dt><dd>' . $this->e($status) . '</dd></dl>';
-        $form = '<section class="settings-section"><h2>Change password</h2><p>You can change your own password. Name, code and roles are managed by an administrator.</p><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><label>Current password<input type="password" name="current_password" required autocomplete="current-password"></label><label>New password<input type="password" name="new_password" minlength="8" required autocomplete="new-password"></label><label>Confirm new password<input type="password" name="new_password_confirmation" minlength="8" required autocomplete="new-password"></label><button>Change password</button></form></section>';
+        $identity = '<dl class="account-identity"><dt>Staff initials</dt><dd>' . ($code === '' ? '<span class="muted">Not entered</span>' : $this->e($code)) . '</dd><dt>Roles</dt><dd>' . ($roleLabels === [] ? '<span class="muted">No roles assigned.</span>' : $this->e(implode(', ', $roleLabels))) . '</dd><dt>School Account Status:</dt><dd>' . $this->e($status) . '</dd></dl>';
+        $form = '<section class="settings-section"><h2>Change password</h2><p>You can change your own password. Staff initials and roles are managed by an administrator.</p><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><label>Current password<input type="password" name="current_password" required autocomplete="current-password"></label><label>New password<input type="password" name="new_password" minlength="8" required autocomplete="new-password"></label><label>Confirm new password<input type="password" name="new_password_confirmation" minlength="8" required autocomplete="new-password"></label><button>Change password</button></form></section>';
         return '<section class="content-narrow"><h1>My Account</h1>' . $notice . '<section class="settings-section"><h2>Your identity</h2>' . $identity . '</section>' . $form . '</section>';
     }
 

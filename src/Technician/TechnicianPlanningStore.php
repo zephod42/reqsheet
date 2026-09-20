@@ -17,6 +17,8 @@ interface TechnicianPlanningStore
     public function defaultRoomIds(int $organisationId, int $userId): array;
     /** @param list<int> $roomIds */
     public function saveDefaultRoomIds(int $organisationId, int $userId, array $roomIds): void;
+    /** Mark one dated lesson occurrence as prepared (or not prepared). */
+    public function setPrepared(int $organisationId, int $userId, int $occurrenceId, bool $prepared): bool;
     /** @return array{version:?array,slots:list<array<string,mixed>>,occurrences:list<array<string,mixed>>} */
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array;
     /** @return list<array<string,mixed>> */

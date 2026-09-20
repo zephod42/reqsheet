@@ -107,8 +107,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -169,6 +169,15 @@ $recoveryMigration = file_get_contents($migrationDirectory . '/0012_add_recovery
 if ($recoveryMigration === false) throw new RuntimeException('Recovery migration could not be read.');
 foreach (['DROP COLUMN email', 'DROP COLUMN contact_email', 'recovery_key_digest', 'recovery_key_generation', 'account_recovery_flows', 'account_recovery_rate_limits', 'subscription_state', 'subscription_until'] as $expectedRecoveryFragment) {
     if (!str_contains($recoveryMigration, $expectedRecoveryFragment)) throw new RuntimeException('Expected recovery schema fragment is missing: ' . $expectedRecoveryFragment);
+}
+$staffMigration = file_get_contents($migrationDirectory . '/0013_remove_staff_names_and_extend_recovery.sql');
+if ($staffMigration === false) {
+    throw new RuntimeException('Staff-minimisation migration could not be read.');
+}
+foreach (['DROP CHECK users_display_name_not_blank', 'DROP INDEX users_login', 'DROP COLUMN display_name', 'ADD COLUMN prepared_at', 'requested_initials'] as $expectedStaffFragment) {
+    if (!str_contains(strtoupper($staffMigration), strtoupper($expectedStaffFragment))) {
+        throw new RuntimeException('Staff-minimisation migration is missing: ' . $expectedStaffFragment);
+    }
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),

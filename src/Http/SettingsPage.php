@@ -39,6 +39,7 @@ final class SettingsPage
         $message = null;
         $editor = null;
         $targetVersionId = null;
+        $draft = null;
         if ($method === 'POST') {
             $action = (string) ($input['action'] ?? '');
             if ($action === 'edit_template') { $editor = 'warning'; $targetVersionId = (int) ($input['source_version_id'] ?? 0); }
@@ -53,20 +54,21 @@ final class SettingsPage
             }
             elseif ($action === 'save_template') {
                 try {
+                    if (!CsrfToken::valid($input['csrf_token'] ?? null)) throw new TimetableValidationException(['Your request expired. Please try again.']);
                     $source = (int) ($input['source_version_id'] ?? 0);
                     // Creation uses the authenticated organisation's existing
                     // settings and the template service's safe defaults.
                     $current = $this->settings->load($this->organisationId);
-                    if ($source > 0) $this->settings->save($this->organisationId, array_replace($current, $input));
-                    $data = $this->settings->load($this->organisationId);
+                    $data = $source > 0 ? array_replace($current, $input) : $current;
                     $label = trim((string) ($input['template_label'] ?? ''));
                     if ($source === 0) $data = array_replace($data, ['working_days' => $input['working_days'] ?? [], 'first_day_of_week' => $input['first_day_of_week'] ?? 0, 'periods_per_day' => $input['periods_per_day'] ?? 0]);
                     $service = new TimetableTemplateService($this->timetable);
-                    if ($source > 0) { $service->update($this->organisationId, $source, $label, $data); $message = 'Timetable saved.'; }
+                    if ($source > 0) { $service->update($this->organisationId, $source, $label, $data); $this->settings->save($this->organisationId, $data); $message = 'Timetable saved.'; }
                     else { $service->create($this->organisationId, null, $label, null, $data); $message = 'Timetable saved.'; }
                 } catch (SettingsValidationException | \Reqsheet\Timetable\TimetableValidationException $exception) {
                     $message = implode(' ', $exception->errors());
                     $editor = ((int) ($input['source_version_id'] ?? 0)) > 0 ? 'edit' : 'create';
+                    $draft = $input;
                 } catch (\RuntimeException $exception) {
                     $message = $exception instanceof \PDOException ? 'Existing room resources prevent this template change; preserve or manage those resources separately.' : ($exception->getMessage() !== '' ? $exception->getMessage() : 'The timetable template could not be saved.');
                     $editor = 'create';
@@ -74,6 +76,19 @@ final class SettingsPage
             }
         }
         $data = $this->settings->load($this->organisationId);
+        if (is_array($draft)) {
+            $data = array_replace($data, [
+                'working_days' => is_array($draft['working_days'] ?? null) ? $draft['working_days'] : [],
+                'first_day_of_week' => $draft['first_day_of_week'] ?? 0,
+                'periods_per_day' => $draft['periods_per_day'] ?? 0,
+                'school_name' => $draft['school_name'] ?? ($data['school_name'] ?? ''),
+                'start_time' => $draft['start_time'] ?? ($data['start_time'] ?? ''),
+                'standard_period_minutes' => $draft['standard_period_minutes'] ?? ($data['standard_period_minutes'] ?? ''),
+                'separators' => [],
+            ]);
+            $types = (array) ($draft['separator_type'] ?? []); $after = (array) ($draft['separator_after'] ?? []); $duration = (array) ($draft['separator_duration'] ?? []); $labels = (array) ($draft['separator_label'] ?? []);
+            foreach ($types as $index => $type) $data['separators'][] = ['type' => (string) $type, 'after_period' => (int) ($after[$index] ?? 0), 'duration_minutes' => (string) ($duration[$index] ?? ''), 'label' => (string) ($labels[$index] ?? '')];
+        }
         return PageLayout::render('Settings', $this->templatePage($data, $message, $editor, $targetVersionId), $this->user);
     }
 
@@ -144,8 +159,8 @@ final class SettingsPage
             $dayNames = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
             $selectedFirstDay = in_array((int) ($data['first_day_of_week'] ?? 0), $days, true) ? (int) $data['first_day_of_week'] : (int) ($days[0] ?? 1);
             $dayInputs = '';
-            foreach ($dayNames as $number => $name) $dayInputs .= '<label class="check-label"><input type="checkbox" name="working_days[]" value="' . $number . '"' . (in_array($number, $days, true) ? ' checked' : '') . '> ' . $name . '</label>';
-            return '<section class="settings-section"><h2>Create new timetable template</h2><form method="post"><input type="hidden" name="action" value="save_template"><label>Timetable name<input name="template_label" maxlength="255" required></label><fieldset><legend>Days of the week</legend><div class="day-options">' . $dayInputs . '</div><p class="muted">Select at least one day.</p></fieldset><label>First day of the week<select name="first_day_of_week" required>' . $this->dayOptions($dayNames, $selectedFirstDay) . '</select></label><label>Periods per day<input type="number" name="periods_per_day" min="1" max="20" value="' . (int) ($data['periods_per_day'] ?? 6) . '" required></label><div class="form-actions"><button>Create timetable template</button></div></form><form method="post"><input type="hidden" name="action" value="cancel_template"><button class="secondary">Cancel</button></form></section>';
+            foreach ($dayNames as $number => $name) $dayInputs .= '<label class="check-label"><input type="checkbox" name="working_days[]" value="' . $number . '" data-working-day' . (in_array($number, $days, true) ? ' checked' : '') . '> ' . $name . '</label>';
+            return '<section class="settings-section"><h2>Create new timetable template</h2><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="save_template"><label>Timetable name<input name="template_label" maxlength="255" required></label><fieldset><legend>Days of the week (required)</legend><div class="day-options">' . $dayInputs . '</div><p class="muted">Select at least one day.</p></fieldset><label>First day of the week<select name="first_day_of_week" required>' . $this->dayOptions($dayNames, $selectedFirstDay) . '</select></label><label>Periods per day<input type="number" name="periods_per_day" min="1" max="20" value="' . (int) ($data['periods_per_day'] ?? 6) . '" required></label><div class="form-actions"><button>Create timetable template</button></div></form><form method="post"><input type="hidden" name="action" value="cancel_template"><button class="secondary">Cancel</button></form></section>';
         }
         $sourceInput = $source === null ? '' : '<input type="hidden" name="source_version_id" value="' . $source->id . '"><p class="muted">Saving updates this timetable and preserves dated lesson history.</p>';
         if ($source !== null) {
@@ -157,7 +172,7 @@ final class SettingsPage
             $data = array_replace($data, ['working_days' => $sourceDays, 'first_day_of_week' => $source->firstDayOfWeek, 'periods_per_day' => max(1, $sourcePeriods)]);
         }
         $form = $this->form($data, null, false);
-        $replacement = '<form method="post"><input type="hidden" name="action" value="save_template">' . $sourceInput . '<label>Timetable name<input name="template_label" value="' . $this->e($label) . '" maxlength="255" required></label>';
+        $replacement = '<form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="save_template">' . $sourceInput . '<label>Timetable name<input name="template_label" value="' . $this->e($label) . '" maxlength="255" required></label>';
         $count = 1;
         $form = str_replace('<form method="post">', $replacement, $form, $count);
         return '<section class="settings-section"><h2>' . ($mode === 'edit' ? 'Edit timetable template' : 'Create new timetable template') . '</h2>' . $form . '<form method="post"><input type="hidden" name="action" value="cancel_template"><button class="secondary">Cancel</button></form></section>';
@@ -171,7 +186,7 @@ final class SettingsPage
         $notice = $message === null ? '' : '<p class="notice ' . ($message === 'Settings saved.' ? '' : 'error') . '">' . $this->e($message) . '</p>';
         $dayNames = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
         $dayInputs = '';
-        foreach ($dayNames as $number => $name) $dayInputs .= '<label class="check-label"><input type="checkbox" name="working_days[]" value="' . $number . '"' . (in_array($number, $days, true) ? ' checked' : '') . '> ' . $name . '</label>';
+        foreach ($dayNames as $number => $name) $dayInputs .= '<label class="check-label"><input type="checkbox" name="working_days[]" value="' . $number . '" data-working-day' . (in_array($number, $days, true) ? ' checked' : '') . '> ' . $name . '</label>';
         $separatorInputs = '';
         $periodOptions = '';
         for ($i = 1; $i < (int) ($data['periods_per_day'] ?? 6); $i++) $periodOptions .= '<option value="' . $i . '">After period ' . $i . '</option>';
@@ -204,13 +219,13 @@ final class SettingsPage
 
     private function script(): string
     {
-        return "function refreshSeparatorPositions(){var count=parseInt(document.querySelector('[data-period-count]').value,10)||1;document.querySelectorAll('[name=separator_after\\[\\]]').forEach(function(select){var selected=select.value;select.innerHTML='<option value=\"\">Select position</option>';for(var i=1;i<count;i++){var option=document.createElement('option');option.value=i;option.textContent='After period '+i;option.selected=String(i)===selected;select.appendChild(option);}});}document.addEventListener('input',function(event){if(event.target.matches('[data-period-count]'))refreshSeparatorPositions();});document.addEventListener('click',function(event){var target=event.target;if(target.matches('[data-add-separator]')){var t=document.getElementById('separator-template');document.querySelector('[data-separators]').insertAdjacentHTML('beforeend',t.innerHTML);refreshSeparatorPositions();}if(target.matches('[data-remove]')){var parent=target.closest('[data-separators] > div');if(parent)parent.remove();}});";
+        return "function refreshSeparatorPositions(){var count=parseInt(document.querySelector('[data-period-count]').value,10)||1;document.querySelectorAll('[name=separator_after\\[\\]]').forEach(function(select){var selected=select.value;select.innerHTML='<option value=\"\">Select position</option>';for(var i=1;i<count;i++){var option=document.createElement('option');option.value=i;option.textContent='After period '+i;option.selected=String(i)===selected;select.appendChild(option);}});}function validateWorkingDays(){var days=document.querySelectorAll('[data-working-day]');if(!days.length)return;var valid=Array.from(days).some(function(day){return day.checked;});days[0].setCustomValidity(valid?'':'Select at least one working day.');}document.addEventListener('change',function(event){if(event.target.matches('[data-working-day]'))validateWorkingDays();});document.addEventListener('input',function(event){if(event.target.matches('[data-period-count]'))refreshSeparatorPositions();});document.addEventListener('DOMContentLoaded',validateWorkingDays);document.addEventListener('click',function(event){var target=event.target;if(target.matches('[data-add-separator]')){var t=document.getElementById('separator-template');document.querySelector('[data-separators]').insertAdjacentHTML('beforeend',t.innerHTML);refreshSeparatorPositions();}if(target.matches('[data-remove]')){var parent=target.closest('[data-separators] > div');if(parent)parent.remove();}});";
     }
 
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
     private function accountSection(): string
     {
-        return '<section class="settings-section account-management"><h2>Reqsheet account</h2><p>This school’s membership and account with the Reqsheet service.</p><p><a class="button secondary" href="/recovery-key">Manage Organisation Recovery Key</a></p><p class="notice">Membership and payment management will be available here.</p></section>';
+        return '<section class="settings-section account-management"><h2>Reqsheet account</h2><p>This school’s membership and account with the Reqsheet service.</p><h3>Organisation Recovery Key</h3><p>Your Organisation Recovery Key is the only way to recover your school account if all administrators lose access.</p><p>Check periodically that you still have access to the key. If you lose the key and subsequently lose administrator access, you may permanently lose access to your school’s Reqsheet account.</p><p>If you no longer have the key, generate a replacement here while you still have administrator access. If you believe the key may have been compromised, generate a new one immediately; this invalidates all previous recovery keys.</p><p><strong>Keep your recovery key secret. Keep it safe.</strong></p><p><a class="button secondary" href="/recovery-key">Manage Organisation Recovery Key</a></p><p class="notice">Membership and payment management will be available here.</p></section>';
     }
 }

@@ -80,14 +80,13 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
     public function usersForOrganisation(int $organisationId): array
     {
         $statement = $this->prepare(
-            'SELECT id, display_name, staff_identifier, is_active
+            'SELECT id, staff_identifier, is_active
              FROM users WHERE organisation_id = :organisation_id AND (is_teacher = TRUE OR operational_role = \'teacher\')
-             ORDER BY display_name, id',
+             ORDER BY staff_identifier, id',
         );
         $statement->execute(['organisation_id' => $organisationId]);
         return array_map(static fn (array $row): array => [
             'id' => (int) $row['id'],
-            'display_name' => (string) $row['display_name'],
             'staff_identifier' => $row['staff_identifier'] === null ? null : (string) $row['staff_identifier'],
             'is_active' => (bool) $row['is_active'],
         ], $statement->fetchAll());
@@ -132,7 +131,7 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function createTeacher(int $organisationId, string $code, string $displayName): int
+    public function createTeacher(int $organisationId, string $code): int
     {
         if (!$this->pdo->beginTransaction()) throw new \RuntimeException('Unable to begin teacher creation.');
         try {
@@ -142,10 +141,10 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
             $number = $this->prepare('SELECT COALESCE(MAX(teacher_number), 0) + 1 FROM users WHERE organisation_id = :organisation_id');
             $number->execute(['organisation_id' => $organisationId]);
             $statement = $this->prepare(
-                'INSERT INTO users (organisation_id, display_name, staff_identifier, operational_role, is_admin, is_teacher, is_technician, teacher_number, account_state)
-                 VALUES (:organisation_id, :display_name, :code, \'teacher\', FALSE, TRUE, FALSE, :teacher_number, \'awaiting_first_login\')',
+                'INSERT INTO users (organisation_id, staff_identifier, operational_role, is_admin, is_teacher, is_technician, teacher_number, account_state)
+                 VALUES (:organisation_id, :code, \'teacher\', FALSE, TRUE, FALSE, :teacher_number, \'awaiting_first_login\')',
             );
-            $statement->execute(['organisation_id' => $organisationId, 'display_name' => trim($displayName) === '' ? trim($code) : trim($displayName), 'code' => trim($code), 'teacher_number' => (int) $number->fetchColumn()]);
+            $statement->execute(['organisation_id' => $organisationId, 'code' => trim($code), 'teacher_number' => (int) $number->fetchColumn()]);
             $id = (int) $this->pdo->lastInsertId();
             if (!$this->pdo->commit()) throw new \RuntimeException('Unable to complete teacher creation.');
             return $id;
