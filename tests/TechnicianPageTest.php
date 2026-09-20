@@ -65,13 +65,21 @@ final class TechnicianPageTest
         $print = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'all', 'print' => 'week'], []);
         assertSameValue(3, substr_count($print, 'class="technician-sheet"'), 'Selected-week print did not use the configured working days.');
         assertContainsValue('window.print()', $print, 'Selected-week print did not invoke the native print dialog.');
+        assertContainsValue('<h1>Print View</h1>', $print, 'Selected-week print did not identify the read-only print view.');
+        assertContainsValue('Back to Technician View', $print, 'Selected-week print did not provide a return link.');
+        assertContainsValue('href="/technician?date=2026-09-23&rooms=all"', $print, 'Selected-week print did not preserve the selected date and room mode.');
+        assertNotContainsValue('name="action" value="set_prepared"', $print, 'Selected-week print exposed a preparation form.');
+        assertNotContainsValue('Mark as Prepped', $print, 'Selected-week print exposed the interactive preparation action.');
+        assertNotContainsValue('Mark as Not Prepped', $print, 'Selected-week print exposed the interactive un-preparation action.');
         assertContainsValue('Day View · Monday 21 September 2026', $print, 'Selected week was not calculated from the selected date.');
         assertContainsValue('Day View · Thursday 24 September 2026', $print, 'Non-standard working-day print date was incorrect.');
         $css = (string) file_get_contents(__DIR__ . '/../public/assets/app.css');
         assertContainsValue('break-inside: avoid', $css, 'Technician weekly print sheets did not prevent internal pagination splits.');
         assertNotContainsValue('.technician-week-print .technician-sheet { min-height: 100vh', $css, 'Technician weekly print retained the overflow-causing viewport height.');
-        assertContainsValue('.technician-grid th:first-child { width: 1%;', $css, 'Technician period column was not narrowed.');
+        assertContainsValue('.technician-grid th:first-child { width: 7rem; min-width: max-content;', $css, 'Technician period column was not given enough room for configured labels.');
         assertContainsValue('.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }', $css, 'Technician print day heading was not centred.');
+        $customPrint = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'custom', 'room_ids' => ['2'], 'print' => 'week'], []);
+        assertContainsValue('href="/technician?date=2026-09-23&rooms=custom&room_ids[]=2"', $customPrint, 'Custom room selection was not preserved by the print return link.');
         assertContainsValue('21-09-2026 Mon', $page->handle('GET', ['date' => '2026-09-21', 'teacher' => 10], []), 'Secondary technician date format was not UK-style.');
     }
 }

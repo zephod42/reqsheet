@@ -43,7 +43,7 @@ final class TechnicianPage
         $mode = in_array($requestedMode, ['all', 'my', 'custom'], true) ? $requestedMode : 'my';
         $selected = $mode === 'all' ? array_column($rooms, 'id') : ($mode === 'custom' ? array_values(array_intersect(array_map('intval', (array) ($query['room_ids'] ?? [])), array_column($rooms, 'id'))) : array_values(array_intersect($defaults, array_column($rooms, 'id'))));
         if ($mode === 'my' && $selected === []) $selected = array_column($rooms, 'id');
-        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician selected week', $this->weekPrint($date, $selected), $this->user);
+        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected, $mode, (array) ($query['room_ids'] ?? [])), $this->user);
         $data = $this->store->daily($this->organisationId, $date, $selected);
         $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . '&rooms=' . $mode . '&print=week">Print Selected Week</a></div></section>';
         $body .= '<div class="technician-controls"><a class="week-arrow" href="/technician?date=' . $date->modify('-1 day')->format('Y-m-d') . '&rooms=' . $mode . '">‹</a><strong class="technician-date">' . $this->e($date->format('l j F Y')) . '</strong><a class="week-arrow" href="/technician?date=' . $date->modify('+1 day')->format('Y-m-d') . '&rooms=' . $mode . '">›</a><a class="button secondary" href="/technician?date=' . (new DateTimeImmutable('today'))->format('Y-m-d') . '&rooms=' . $mode . '">Today</a></div>';
@@ -63,12 +63,12 @@ final class TechnicianPage
         return $html . '<button class="secondary">Apply display</button></form></section>';
     }
 
-    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences): string
+    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false): string
     {
         $rooms = array_values(array_filter($rooms, static fn (array $room): bool => in_array((int) $room['id'], $selected, true)));
         $byRoom = []; foreach ($occurrences as $occurrence) $byRoom[(string) $occurrence['snapshot_room_code']][] = $occurrence;
         $html = '<section class="technician-sheet"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>Period</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
-        foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $html .= '<td>' . ($separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence))) . '</td>'; } $html .= '</tr>'; }
+        foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $html .= '<td>' . ($separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence, $readOnly))) . '</td>'; } $html .= '</tr>'; }
         return $html . '</tbody></table></div></section>';
     }
 
@@ -98,24 +98,26 @@ final class TechnicianPage
         return $html . '</tbody></table></div>';
     }
 
-    private function cell(array $occurrence): string
+    private function cell(array $occurrence, bool $readOnly = false): string
     {
         $text = trim((string) ($occurrence['requirements_text'] ?? '')); $label = $text === '' ? (($occurrence['state'] ?? '') === 'nothing_required' ? 'Nothing required' : 'Not requisitioned') : $text;
         $prepared = !empty($occurrence['prepared_at']);
         $marker = $prepared ? '<span class="technician-prepped" aria-label="Prepared" title="Prepared">✓</span>' : '<span class="technician-prepped technician-prepped-empty" aria-hidden="true"></span>';
         $csrf = $this->e(CsrfToken::value());
-        $toggle = '<form method="post" class="technician-prep-form"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="action" value="set_prepared"><input type="hidden" name="occurrence_id" value="' . (int) $occurrence['id'] . '"><input type="hidden" name="prepared" value="' . ($prepared ? 'no' : 'yes') . '"><input type="hidden" name="date" value="' . $this->e((string) $occurrence['lesson_date']) . '"><button type="submit" class="secondary">' . ($prepared ? 'Mark as Not Prepped' : 'Mark as Prepped') . '</button></form>';
+        $toggle = $readOnly ? '' : '<form method="post" class="technician-prep-form"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="action" value="set_prepared"><input type="hidden" name="occurrence_id" value="' . (int) $occurrence['id'] . '"><input type="hidden" name="prepared" value="' . ($prepared ? 'no' : 'yes') . '"><input type="hidden" name="date" value="' . $this->e((string) $occurrence['lesson_date']) . '"><button type="submit" class="secondary">' . ($prepared ? 'Mark as Not Prepped' : 'Mark as Prepped') . '</button></form>';
         return '<details class="technician-cell class-tone-' . ClassTone::forCode((string) $occurrence['snapshot_class_code']) . '"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition" title="' . $this->e($label) . '">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p>' . $toggle . '<details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
     }
 
-    private function weekPrint(DateTimeImmutable $date, array $selected): string
+    private function weekPrint(DateTimeImmutable $date, array $selected, string $mode, array $roomIds): string
     {
         $days = method_exists($this->store, 'workingDays') ? $this->store->workingDays($this->organisationId) : [1, 2, 3, 4, 5];
         $first = (int) ($days[0] ?? 1);
         $start = method_exists($this->store, 'workingWeekStart') ? $this->store->workingWeekStart($this->organisationId, $date) : $date->modify('-' . (((int) $date->format('N') - $first + 7) % 7) . ' days');
-        $html = '<main class="technician-week-print">';
+        $backUrl = '/technician?date=' . $this->e($date->format('Y-m-d')) . '&rooms=' . $this->e($mode);
+        if ($mode === 'custom') foreach (array_values(array_unique(array_map('intval', $roomIds))) as $roomId) if ($roomId > 0) $backUrl .= '&room_ids[]=' . $roomId;
+        $html = '<main class="technician-week-print"><header class="page-header technician-print-header"><div><p class="eyebrow">Technician</p><h1>Print View</h1></div><a class="button secondary" href="' . $backUrl . '">Back to Technician View</a></header>';
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
-        foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->grid($dayDate, $rooms, $selected, $data['slots'], $data['occurrences']); }
+        foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->grid($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true); }
         return $html . '</main><script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
     }
 

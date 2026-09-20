@@ -134,10 +134,10 @@ small { font-size: .82rem; }
 .week-grid, .admin-week-grid { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
 .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { border: 1px solid var(--rule); }
 .week-grid thead th, .admin-week-grid thead th { height: 2.5rem; border-bottom: 2px solid var(--rule-strong); padding: .35rem; }
-.week-grid thead th:first-child { width: 1%; }
+.week-grid thead th:first-child { width: 7rem; min-width: max-content; }
 .week-grid thead .day-label { min-width: 9rem; }
 .separator-axis, .separator-cell { background: #f7f7f7; color: var(--muted); font-size: .75rem; }
-.period-label { width: 1%; min-width: max-content; padding: .6rem .4rem; text-align: center; vertical-align: middle; white-space: nowrap; }
+.period-label { width: 7rem; min-width: max-content; padding: .6rem .75rem; text-align: center; vertical-align: middle; white-space: nowrap; }
 .today-heading { background: var(--primary-pale); }
 .day-label { padding: .6rem; text-align: center; vertical-align: middle; white-space: nowrap; font-family: var(--sans); }
 .day-label a { color: inherit; text-decoration: none; }
@@ -290,7 +290,7 @@ dialog .close { float: right; }
 .print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }
 .technician-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .technician-grid th, .technician-grid td { border: 1px solid var(--rule); padding: .35rem; vertical-align: top; }
-.technician-grid th:first-child { width: 1%; min-width: max-content; text-align: center; vertical-align: middle; white-space: nowrap; }
+.technician-grid th:first-child { width: 7rem; min-width: max-content; text-align: center; vertical-align: middle; white-space: nowrap; }
 .technician-grid td { height: 4.2rem; }
 .technician-separator th, .technician-separator td { height: 1.5rem; background: #eee; color: var(--muted); }
 .technician-cell { height: 100%; overflow: hidden; }
