@@ -455,7 +455,7 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
 
     public function findTeacherOrganisation(int $teacherUserId): ?int
     {
-        $statement = $this->prepare("SELECT organisation_id FROM users WHERE id = :id AND (is_teacher = TRUE OR operational_role = 'teacher')");
+        $statement = $this->prepare("SELECT organisation_id FROM users WHERE id = :id AND is_active = TRUE AND (is_teacher = TRUE OR operational_role = 'teacher')");
         $statement->execute(['id' => $teacherUserId]);
         $value = $statement->fetchColumn();
         return $value === false ? null : (int) $value;

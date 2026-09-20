@@ -37,6 +37,7 @@ final class TeacherWeekPageTest
         assertContainsValue('class="separator-cell"', $view, 'Separator cells were not visibly marked as neutral cells.');
         assertContainsValue('>NE</p>', $view, 'Authenticated teacher initials were not rendered.');
         assertContainsValue('13PHY', $view, 'Lesson class was not rendered.');
+        assertContainsValue('class-tone-', $view, 'Teacher lesson did not receive a deterministic class colour.');
         assertContainsValue('LAB-A', $view, 'Lesson room was not rendered.');
         assertContainsValue('Bring goggles', $view, 'Requisitions were not rendered.');
         assertNotContainsValue('Plan the experiment', $view, 'Lesson outline leaked into the normal lesson block.');
@@ -47,6 +48,10 @@ final class TeacherWeekPageTest
         assertContainsValue('/teacher/day?date=2026-09-07', $view, 'Week day headings did not link to the teacher day view.');
         assertContainsValue('today-row', $view, 'Current day was not gently highlighted.');
         assertSameValue(true, $store->ensured, 'Teacher week did not prepare effective recurring assignments for the selected week.');
+        $css = (string) file_get_contents(__DIR__ . '/../public/assets/app.css');
+        assertContainsValue('.period-label { width: 1%;', $css, 'Teacher period column was not narrowed.');
+        assertContainsValue('text-align: center; vertical-align: middle; white-space: nowrap;', $css, 'Teacher period labels were not centred without truncation.');
+        assertContainsValue('.day-label { padding: .6rem; text-align: center; vertical-align: middle;', $css, 'Teacher day headings were not centred.');
 
         $store->firstDay = 3;
         $alternateWeek = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-23'), ['staff_identifier' => 'NEV']);

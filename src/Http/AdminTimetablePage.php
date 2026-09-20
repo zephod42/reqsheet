@@ -17,6 +17,7 @@ use Reqsheet\Timetable\ResourceTimetableStore;
 use Reqsheet\Timetable\TimetableResourceService;
 use Reqsheet\Timetable\TimetableCsvImportDraftStore;
 use Reqsheet\Timetable\TimetableCsvImportResult;
+use Reqsheet\Timetable\ClassTone;
 
 final class AdminTimetablePage
 {
@@ -119,7 +120,8 @@ final class AdminTimetablePage
         $rooms = $store->roomsForOrganisation($this->organisationId);
         $classes = $store->classesForOrganisation($this->organisationId);
         $resource = (int) ($query['resource'] ?? 0);
-        if ($resource < 1) $resource = $view === 'teacher' ? (int) ($users[0]['id'] ?? 0) : ($view === 'room' ? (int) ($rooms[0]['id'] ?? 0) : (int) ($classes[0]['id'] ?? 0));
+        $activeUsers = $this->activeTeacherRows($users);
+        if ($resource < 1) $resource = $view === 'teacher' ? (int) ($activeUsers[0]['id'] ?? 0) : ($view === 'room' ? (int) ($rooms[0]['id'] ?? 0) : (int) ($classes[0]['id'] ?? 0));
         $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable builder</h1></div><div class="form-actions">' . ($version === null ? '' : '<a class="button secondary" href="/admin/timetable/export.csv?version=' . $version->id . '">Export Blank CSV</a>') . '<a class="button secondary" href="/admin/timetable/resources.csv">Export Resource Reference</a><a class="button" href="/admin/people">Manage people</a></div></section>';
         $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
         $body .= $this->resourceToolbar($versions, $version?->id, $view, $resource, $users, $rooms, $classes);
@@ -178,7 +180,7 @@ final class AdminTimetablePage
                     $span = count(TimetableRules::occupiedSequences($daySlots, $slot, $lesson->durationPeriods));
                     $span = max(1, $span);
                     foreach ($daySlots as $candidate) if ($candidate->sequenceNumber !== $sequence && $candidate->sequenceNumber > $sequence && $candidate->sequenceNumber < $sequence + $span) $spanned[$day][$candidate->sequenceNumber] = true;
-                    $html .= '<td rowspan="' . $span . '"><a class="admin-lesson class-tone-' . $this->classTone($lesson->classCode) . '" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>Teacher ' . $this->e($this->teacherCode($lesson->teacherUserId, $users)) . ' · ' . $lesson->durationPeriods . ' period' . ($lesson->durationPeriods === 1 ? '' : 's') . '</small></a></td>';
+                    $html .= '<td rowspan="' . $span . '"><a class="admin-lesson class-tone-' . $this->classTone($lesson->classCode) . '" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>' . $this->e($this->teacherCode($lesson->teacherUserId, $users)) . '</small></a></td>';
                 } else $html .= '<td class="empty-cell"><a class="empty-period" data-cell="' . $day . '-' . $slot->id . '" href="' . $href . '" aria-label="Add lesson on ' . $this->e($this->dayName($day)) . ' ' . $this->e($this->periodLabel($slot)) . '"><span>+</span><small>Add lesson</small></a></td>';
             }
             $html .= '</tr>';
@@ -206,7 +208,7 @@ final class AdminTimetablePage
         $html .= '<p class="lesson-context"><strong>Teacher: ' . $this->e($teacherName) . ' [' . $this->e($teacherCode) . ']</strong> · ' . $this->e($this->dayName($day)) . ' · ' . $this->e($periodLabel) . '</p>';
         $html .= '<input type="hidden" name="action" value="resource_save_lesson"><input type="hidden" name="version" value="' . $version->id . '"><input type="hidden" name="view" value="' . $view . '"><input type="hidden" name="resource" value="' . $resource . '"><input type="hidden" name="day_of_week" value="' . $day . '"><input type="hidden" name="start_slot_id" value="' . $slot . '">' . ($lesson ? '<input type="hidden" name="lesson_id" value="' . $lesson->id . '">' : '');
         $html .= '<input type="hidden" name="' . $fixed . '" value="' . $fixedValue . '"><div class="fixed-resource"><span>' . ($view === 'teacher' ? $this->e($teacherCode) : $this->e(ucfirst($view))) . '</span><strong>' . $this->e($view === 'teacher' ? $fixedLabel : $fixedLabel) . '</strong></div>';
-        if ($view !== 'teacher') $html .= '<label for="teacher_user_id">Teacher' . $this->resourceSelect('teacher_user_id', $teacherValue, $users, 'Add new teacher...') . '</label>';
+        if ($view !== 'teacher') $html .= '<label for="teacher_user_id">Teacher' . $this->resourceSelect('teacher_user_id', $teacherValue, $this->activeTeacherRows($users), 'Add new teacher...') . '</label>';
         if ($view !== 'room') $html .= '<label for="room_id">Room' . $this->resourceSelect('room_id', $roomValue, $rooms, 'Add new room...') . '</label>';
         if ($view !== 'class') $html .= '<label for="class_id">Class code' . $this->resourceSelect('class_id', $classValue, $classes, 'Add new class...') . '</label>';
         if ($this->conjoinedPeriodsAllowed()) {
@@ -240,6 +242,7 @@ final class AdminTimetablePage
 
     private function resourceSelect(string $name, int $selected, array $rows, string $addLabel): string
     {
+        if ($name === 'teacher_user_id') $rows = $this->activeTeacherRows($rows);
         $html = '<select id="' . $name . '" name="' . $name . '"><option value="0">Select...</option>';
         foreach ($rows as $row) { $id = (int) $row['id']; $label = $row['code'] ?? ($row['staff_identifier'] ?? ''); $html .= '<option value="' . $id . '"' . ($id === $selected ? ' selected' : '') . '>' . $this->e((string) $label) . '</option>'; }
         return $html . '<option value="__new__">' . $this->e($addLabel) . '</option></select>';
@@ -248,7 +251,7 @@ final class AdminTimetablePage
     private function resourceName(string $view, int $resource, array $users, array $rooms, array $classes): string
     {
         $rows = $view === 'teacher' ? $users : ($view === 'room' ? $rooms : $classes);
-        foreach ($rows as $row) if ((int) $row['id'] === $resource) return $view === 'teacher' ? (string) ($row['staff_identifier'] ?? '') : (string) ($row['code'] ?? '');
+        foreach ($rows as $row) if ((int) $row['id'] === $resource) return $view === 'teacher' ? (!empty($row['is_active']) ? (string) ($row['staff_identifier'] ?? '') : '???') : (string) ($row['code'] ?? '');
         return '';
     }
 
@@ -273,11 +276,17 @@ final class AdminTimetablePage
 
     private function teacherCode(int $teacherId, array $users): string
     {
-        foreach ($users as $user) if ((int) $user['id'] === $teacherId) return (string) ($user['staff_identifier'] ?? '');
-        return 'Teacher';
+        foreach ($users as $user) if ((int) $user['id'] === $teacherId) return !empty($user['is_active']) ? (string) ($user['staff_identifier'] ?? '') : '???';
+        return '???';
     }
 
-    private function classTone(string $class): int { return abs(crc32($class)) % 6; }
+    private function classTone(string $class): int { return ClassTone::forCode($class); }
+
+    /** @param list<array{id:int,staff_identifier:?string,is_active:bool}> $users @return list<array{id:int,staff_identifier:?string,is_active:bool}> */
+    private function activeTeacherRows(array $users): array
+    {
+        return array_values(array_filter($users, static fn (array $user): bool => !empty($user['is_active'])));
+    }
 
     private function seedVersionStructure(ResourceTimetableStore $store, int $versionId): void
     {
@@ -357,12 +366,13 @@ final class AdminTimetablePage
             default => null,
         };
         $users = $version === null ? [] : $this->store->usersForOrganisation($this->organisationId);
-        $selectedTeacher = (int) ($query['teacher'] ?? $query['staff'] ?? ($users[0]['id'] ?? 0));
-        $selectedTeacher = $this->validTeacher($selectedTeacher, $users) ? $selectedTeacher : (int) ($users[0]['id'] ?? 0);
+        $activeUsers = $this->activeTeacherRows($users);
+        $selectedTeacher = (int) ($query['teacher'] ?? $query['staff'] ?? ($activeUsers[0]['id'] ?? 0));
+        $selectedTeacher = $this->validTeacher($selectedTeacher, $users) ? $selectedTeacher : (int) ($activeUsers[0]['id'] ?? 0);
         $selectedEdit = (int) ($query['edit'] ?? 0);
         $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable editor</h1></div><div class="form-actions">' . ($version === null ? '' : '<a class="button secondary" href="/admin/timetable/export.csv?version=' . $version->id . '">Export Blank CSV</a>') . '<a class="button" href="/admin/people">Manage people</a></div></section>';
         $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
-        $body .= '<form class="toolbar" method="get"><label>Timetable version ' . $this->versionSelect($versions, $version?->id) . '</label><label>Teacher / staff member ' . $this->selectFromRows('teacher', $selectedTeacher, $users) . '</label><button>Show week</button></form>';
+        $body .= '<form class="toolbar" method="get"><label>Timetable version ' . $this->versionSelect($versions, $version?->id) . '</label><label>Teacher / staff member ' . $this->selectFromRows('teacher', $selectedTeacher, $activeUsers) . '</label><button>Show week</button></form>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
         if ($version !== null && $selectedTeacher > 0) {
             $body .= $this->weekGrid($version, $selectedTeacher, $users);
@@ -453,7 +463,7 @@ final class AdminTimetablePage
                 foreach ($lessons as $candidate) if ($candidate->dayOfWeek === $day && $candidate->startSlotId === $slot->id) { $lesson = $candidate; break; }
                 if ($lesson !== null) {
                     $span = min($lesson->durationPeriods, count($sequenceNumbers) - $index);
-                    $html .= '<td colspan="' . $span . '"><a class="admin-lesson" href="' . $this->cellUrl($version->id, $teacher, $lesson->id, $day, $slot->id) . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>' . $lesson->durationPeriods . ' period' . ($lesson->durationPeriods === 1 ? '' : 's') . '</small></a></td>';
+                    $html .= '<td colspan="' . $span . '"><a class="admin-lesson class-tone-' . $this->classTone($lesson->classCode) . '" href="' . $this->cellUrl($version->id, $teacher, $lesson->id, $day, $slot->id) . '"><strong>' . $this->e($lesson->classCode) . '</strong><span>' . $this->e($lesson->roomCode) . '</span><small>' . $this->e($this->teacherCode($lesson->teacherUserId, $users)) . '</small></a></td>';
                     $index += $span - 1;
                 } else {
                     $html .= '<td class="empty-cell"><a class="empty-period" href="' . $this->cellUrl($version->id, $teacher, 0, $day, $slot->id) . '"><span>+</span><small>Add lesson</small></a></td>';
@@ -514,8 +524,8 @@ final class AdminTimetablePage
     private function teacherName(int $teacher, array $users = []): string
     {
         if ($users === []) $users = $this->store->usersForOrganisation($this->organisationId);
-        foreach ($users as $user) if ((int) $user['id'] === $teacher) return (string) ($user['staff_identifier'] ?? '');
-        return 'selected teacher';
+        foreach ($users as $user) if ((int) $user['id'] === $teacher) return !empty($user['is_active']) ? (string) ($user['staff_identifier'] ?? '') : '???';
+        return '???';
     }
 
     private function maxDuration(int $versionId, int $day, int $slotId): int

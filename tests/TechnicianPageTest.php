@@ -45,11 +45,18 @@ final class TechnicianPageTest
         $store->hasActiveTimetable = true;
         $day = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
         assertContainsValue('JSM', $day, 'Technician grid did not show teacher initials.');
+        assertContainsValue('class="technician-cell class-tone-', $day, 'Technician lesson did not receive a deterministic class colour.');
         assertContainsValue('Very long requisition text', $day, 'Technician grid did not show the saved requisition.');
         assertContainsValue('title="Very long requisition text', $day, 'Technician grid did not expose full requisition text for hover.');
         assertContainsValue('ROOM FREE', $day, 'Technician grid did not distinguish a genuinely free room.');
         assertContainsValue('Mark as Prepped', $day, 'Occupied technician lesson did not expose preparation control.');
         assertNotContainsValue('Save My rooms', $day, 'Personal room saving remained exposed.');
+
+        $store->deletedTeacher = true;
+        $deletedDay = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
+        assertContainsValue('???', $deletedDay, 'Deleted teacher lessons were not rendered with the agreed placeholder.');
+        assertNotContainsValue('JSM', $deletedDay, 'Deleted teacher initials leaked into the technician view.');
+        $store->deletedTeacher = false;
 
         $prepared = $page->handle('POST', [], ['date' => '2026-09-21', 'action' => 'set_prepared', 'occurrence_id' => 50, 'prepared' => 'yes', 'csrf_token' => CsrfToken::value()]);
         assertContainsValue('Lesson marked as prepped', $prepared, 'Technician preparation update did not report success.');
@@ -60,6 +67,11 @@ final class TechnicianPageTest
         assertContainsValue('window.print()', $print, 'Selected-week print did not invoke the native print dialog.');
         assertContainsValue('Day View · Monday 21 September 2026', $print, 'Selected week was not calculated from the selected date.');
         assertContainsValue('Day View · Thursday 24 September 2026', $print, 'Non-standard working-day print date was incorrect.');
+        $css = (string) file_get_contents(__DIR__ . '/../public/assets/app.css');
+        assertContainsValue('break-inside: avoid', $css, 'Technician weekly print sheets did not prevent internal pagination splits.');
+        assertNotContainsValue('.technician-week-print .technician-sheet { min-height: 100vh', $css, 'Technician weekly print retained the overflow-causing viewport height.');
+        assertContainsValue('.technician-grid th:first-child { width: 1%;', $css, 'Technician period column was not narrowed.');
+        assertContainsValue('.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }', $css, 'Technician print day heading was not centred.');
         assertContainsValue('21-09-2026 Mon', $page->handle('GET', ['date' => '2026-09-21', 'teacher' => 10], []), 'Secondary technician date format was not UK-style.');
     }
 }
@@ -98,6 +110,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
 {
     public array $rooms = [['id' => 1, 'code' => 'LAB-A'], ['id' => 2, 'code' => 'LAB-B']];
     public bool $hasActiveTimetable = true;
+    public bool $deletedTeacher = false;
     public array $preparationUpdate = [];
     public function technicianBelongsToOrganisation(int $userId, int $organisationId): bool { return $userId === 20 && $organisationId === 1; }
     public function roomsForOrganisation(int $organisationId): array { return $this->rooms; }
@@ -117,7 +130,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
             ],
             'occurrences' => [[
                 'id' => 50, 'lesson_date' => $date->format('Y-m-d'), 'snapshot_teacher_user_id' => 10,
-                'teacher_name' => 'John Smith', 'teacher_initials' => 'JSM', 'snapshot_class_code' => '9A/Sc1',
+                'teacher_name' => $this->deletedTeacher ? '???' : 'John Smith', 'teacher_initials' => $this->deletedTeacher ? '???' : 'JSM', 'snapshot_class_code' => '9A/Sc1',
                 'snapshot_room_code' => 'LAB-A', 'snapshot_start_slot_id' => 1, 'snapshot_duration_periods' => 2,
                 'prepared_at' => null,
                 'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => 'Very long requisition text',

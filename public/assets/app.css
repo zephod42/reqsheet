@@ -26,6 +26,16 @@
     --class-tone-3: #d6b78f;
     --class-tone-4: #b8a5cf;
     --class-tone-5: #d4cc8a;
+    --class-tone-6: #9fcfd1;
+    --class-tone-7: #d3a3c0;
+    --class-border-0: #c28a00;
+    --class-border-1: #1769aa;
+    --class-border-2: #287a3d;
+    --class-border-3: #7042a5;
+    --class-border-4: #c45b12;
+    --class-border-5: #b72b35;
+    --class-border-6: #008c95;
+    --class-border-7: #a62975;
 }
 
 * { box-sizing: border-box; }
@@ -119,12 +129,12 @@ small { font-size: .82rem; }
 .week-grid, .admin-week-grid { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
 .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { border: 1px solid var(--rule); }
 .week-grid thead th, .admin-week-grid thead th { height: 2.5rem; border-bottom: 2px solid var(--rule-strong); padding: .35rem; }
-.week-grid thead th:first-child { width: 7rem; }
+.week-grid thead th:first-child { width: 1%; }
 .week-grid thead .day-label { min-width: 9rem; }
 .separator-axis, .separator-cell { background: #f7f7f7; color: var(--muted); font-size: .75rem; }
-.period-label { padding: .6rem; text-align: left; white-space: nowrap; }
+.period-label { width: 1%; min-width: max-content; padding: .6rem .4rem; text-align: center; vertical-align: middle; white-space: nowrap; }
 .today-heading { background: var(--primary-pale); }
-.day-label { padding: .6rem; text-align: left; white-space: nowrap; font-family: var(--sans); }
+.day-label { padding: .6rem; text-align: center; vertical-align: middle; white-space: nowrap; font-family: var(--sans); }
 .day-label a { color: inherit; text-decoration: none; }
 .day-label a:hover, .day-label a:focus-visible { text-decoration: underline; }
 .today-row .day-label { background: var(--primary-pale); font-weight: 750; }
@@ -159,7 +169,7 @@ small { font-size: .82rem; }
     height: 100%;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid var(--lesson-accent, var(--rule));
+    border: 3px solid var(--class-border, var(--rule));
     border-radius: var(--corner);
     background: color-mix(in srgb, var(--lesson-accent, #fff) 24%, #fff);
     box-shadow: 0 0 0 1px var(--lesson-accent, transparent), 0 2px 5px rgb(0 0 0 / 9%);
@@ -172,12 +182,14 @@ small { font-size: .82rem; }
 .lesson-header > span { flex: 0 0 auto; color: var(--room-code); white-space: nowrap; }
 .lesson-body { overflow: hidden; padding: .45rem; color: var(--ink); font-size: .82rem; line-height: 1.3; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .lesson-body .muted { color: var(--muted); font-family: var(--sans); font-style: italic; }
-.class-tone-0 { --lesson-accent: var(--class-tone-0); }
-.class-tone-1 { --lesson-accent: var(--class-tone-1); }
-.class-tone-2 { --lesson-accent: var(--class-tone-2); }
-.class-tone-3 { --lesson-accent: var(--class-tone-3); }
-.class-tone-4 { --lesson-accent: var(--class-tone-4); }
-.class-tone-5 { --lesson-accent: var(--class-tone-5); }
+.class-tone-0 { --lesson-accent: var(--class-tone-0); --class-border: var(--class-border-0); }
+.class-tone-1 { --lesson-accent: var(--class-tone-1); --class-border: var(--class-border-1); }
+.class-tone-2 { --lesson-accent: var(--class-tone-2); --class-border: var(--class-border-2); }
+.class-tone-3 { --lesson-accent: var(--class-tone-3); --class-border: var(--class-border-3); }
+.class-tone-4 { --lesson-accent: var(--class-tone-4); --class-border: var(--class-border-4); }
+.class-tone-5 { --lesson-accent: var(--class-tone-5); --class-border: var(--class-border-5); }
+.class-tone-6 { --lesson-accent: var(--class-tone-6); --class-border: var(--class-border-6); }
+.class-tone-7 { --lesson-accent: var(--class-tone-7); --class-border: var(--class-border-7); }
 
 dialog { width: min(55rem, calc(100% - 2rem)); max-width: none; max-height: calc(100vh - 3rem); margin: 1.5rem auto; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--paper); box-shadow: 0 10px 35px rgb(0 0 0 / 18%); padding: var(--space-5); }
 dialog::backdrop { background: rgb(0 0 0 / 35%); }
@@ -208,7 +220,7 @@ dialog .close { float: right; }
 .toolbar label { min-width: 13rem; margin: 0; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .7rem; }
 .section-heading h2 { margin: 0; }
-.admin-week-grid thead th:first-child { width: 7rem; font-family: var(--sans); }
+.admin-week-grid thead th:first-child { width: 1%; font-family: var(--sans); }
 .admin-week-grid th, .admin-week-grid td { padding: .35rem; vertical-align: top; }
 .admin-week-grid td { height: 6.4rem; }
 .admin-week-grid .day-label { font-family: var(--sans); font-weight: 750; }
@@ -218,7 +230,7 @@ dialog .close { float: right; }
 .empty-period span { font: 1.5rem/1 var(--sans); }
 .empty-period small { font-family: var(--sans); }
 .empty-period:hover, .empty-period:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; background: var(--primary-pale); color: var(--ink); }
-.admin-lesson { display: flex; min-height: 100%; height: 100%; box-sizing: border-box; flex-direction: column; gap: .2rem; border: 1px solid var(--rule); border-radius: var(--corner); padding: .45rem; color: inherit; background: color-mix(in srgb, var(--lesson-accent, #fff) 24%, #fff); box-shadow: 0 2px 5px rgb(0 0 0 / 9%); text-decoration: none; }
+.admin-lesson { display: flex; min-height: 100%; height: 100%; box-sizing: border-box; flex-direction: column; gap: .2rem; border: 3px solid var(--class-border, var(--rule)); border-radius: var(--corner); padding: .45rem; color: inherit; background: color-mix(in srgb, var(--lesson-accent, #fff) 24%, #fff); box-shadow: 0 2px 5px rgb(0 0 0 / 9%); text-decoration: none; }
 .admin-lesson:hover, .admin-lesson:focus-visible { box-shadow: 0 0 0 2px var(--lesson-accent, var(--ink)), var(--interactive-shadow); }
 .admin-lesson strong { color: var(--class-code); font-size: 1rem; font-weight: 600; }
 .admin-lesson span { color: var(--room-code); font-size: .9rem; }
@@ -255,11 +267,11 @@ dialog .close { float: right; }
 .technician-prepped { color: #176b35; font-size: 1.15rem; line-height: 1; text-align: center; }
 .technician-prepped-empty { display: block; min-width: 1rem; }
 .technician-requisition { display: block; white-space: normal; }
-.technician-cell { font-family: Arial, Helvetica, sans-serif; }
+.technician-cell { font-family: Arial, Helvetica, sans-serif; border: 3px solid var(--class-border, var(--rule)); border-radius: var(--corner); }
 .technician-cell summary { font-size: 12px; line-height: 1.25; }
 .technician-requisition { display: -webkit-box; overflow: hidden; margin-top: .25rem; -webkit-line-clamp: 4; -webkit-box-orient: vertical; text-overflow: ellipsis; }
-.technician-week-print .technician-sheet { break-after: page; }
-@media print { .technician-week-print .technician-sheet { min-height: 100vh; break-after: page; } .technician-week-print .technician-sheet:last-child { break-after: auto; } .site-nav, .page-header, .technician-controls, .technician-room-controls, .technician-secondary { display: none !important; } }
+.technician-week-print .technician-sheet { break-after: page; break-inside: avoid; }
+@media print { .technician-week-print .technician-sheet { min-height: 0; break-after: page; break-inside: avoid; } .technician-week-print .technician-sheet:last-child { break-after: auto; } .site-nav, .page-header, .technician-controls, .technician-room-controls, .technician-secondary { display: none !important; } }
 .assignment-dialog form, .resource-dialog form { max-width: none; margin: 0; }
 .assignment-dialog .lesson-context { margin-top: .9rem; }
 .technician-placeholder { padding-top: var(--space-5); }
@@ -270,10 +282,10 @@ dialog .close { float: right; }
 .technician-room-controls label { margin: 0; }
 .technician-room-controls .check-label { align-items: center; }
 .technician-sheet { font-family: var(--technical); }
-.print-date { margin: 0 0 .7rem; font-size: 1rem; }
+.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }
 .technician-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .technician-grid th, .technician-grid td { border: 1px solid var(--rule); padding: .35rem; vertical-align: top; }
-.technician-grid th:first-child { width: 7rem; text-align: left; }
+.technician-grid th:first-child { width: 1%; min-width: max-content; text-align: center; vertical-align: middle; white-space: nowrap; }
 .technician-grid td { height: 4.2rem; }
 .technician-separator th, .technician-separator td { height: 1.5rem; background: #eee; color: var(--muted); }
 .technician-cell { height: 100%; overflow: hidden; }
@@ -315,7 +327,7 @@ dialog .close { float: right; }
     .technician-sheet { display: block; }
     .technician-grid { font-size: 9pt; }
     .technician-grid th, .technician-grid td { padding: 2mm; }
-    .technician-cell { display: block; }
+    .technician-cell { display: block; border-color: #000 !important; }
     .technician-cell summary { display: block; white-space: normal; }
     .technician-requisition { display: block; overflow: visible; -webkit-line-clamp: unset; }
     .technician-prepped { color: #000 !important; }

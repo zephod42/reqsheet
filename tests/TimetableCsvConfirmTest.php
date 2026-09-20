@@ -90,7 +90,7 @@ final class TimetableCsvConfirmTest
         $room = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 3, 'view' => 'room', 'resource' => 401], []);
         assertContainsValue('C1', $room, 'Imported lesson was absent from the room projection.');
         $class = (new AdminTimetablePage($store, 1, ['allow_double_periods' => true], $admin))->handle('GET', ['version' => 3, 'view' => 'class', 'resource' => 502], []);
-        assertContainsValue('Teacher BBB', $class, 'Imported lesson was absent from the class projection.');
+        assertContainsValue('<small>BBB</small>', $class, 'Imported lesson was absent from the class projection.');
 
         $repeat = $confirmation->handle(['csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'], 'action' => 'import']);
         assertSameValue(422, $repeat->status, 'Consumed draft was accepted a second time.');

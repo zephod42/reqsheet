@@ -20,7 +20,7 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
 
     public function teacherBelongsToOrganisation(int $teacherId, int $organisationId): bool
     {
-        $statement = $this->prepare("SELECT 1 FROM users WHERE id = :teacher_id AND organisation_id = :organisation_id AND (is_teacher = TRUE OR operational_role = 'teacher')");
+        $statement = $this->prepare("SELECT 1 FROM users WHERE id = :teacher_id AND organisation_id = :organisation_id AND is_active = TRUE AND (is_teacher = TRUE OR operational_role = 'teacher')");
         $statement->execute(['teacher_id' => $teacherId, 'organisation_id' => $organisationId]);
         return $statement->fetchColumn() !== false;
     }
