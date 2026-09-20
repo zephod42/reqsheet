@@ -87,10 +87,12 @@ small { font-size: .82rem; }
 .tenant-name { margin: -.8rem 0 var(--space-4); color: var(--muted); font-size: .95rem; font-weight: 650; }
 .content-narrow { max-width: 38rem; }
 .content-wide { max-width: 68rem; }
-.public-landing { min-height: calc(100vh - 3.6rem); display: grid; place-content: center; justify-items: center; padding: clamp(2rem, 10vh, 8rem) 1rem; text-align: center; }
+.public-landing { min-height: calc(100vh - 3.6rem); display: grid; place-content: center; justify-items: center; padding: clamp(2rem, 6vh, 5rem) 1rem; text-align: center; }
 .public-landing h1 { margin: 0; font-size: clamp(3.2rem, 10vw, 7rem); font-weight: 780; letter-spacing: -.07em; line-height: 1; }
 .public-landing-tagline { margin: 1rem 0 2rem; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.35rem); }
 .public-landing-guidance { max-width: 24rem; margin: 1.25rem 0 0; color: var(--muted); font-size: .78rem; }
+.public-landing-warning { max-width: 42rem; margin: 3rem 0 0; border-top: 1px solid var(--rule); padding-top: .8rem; color: var(--muted); font-size: .78rem; letter-spacing: .01em; }
+.public-landing-warning a { font-weight: 700; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .technical, .timetable, .lesson-block, .week-grid, .admin-week-grid { font-family: var(--technical); }
 .notice, .message { border: 1px solid var(--rule); padding: .75rem; margin: var(--space-4) 0; }

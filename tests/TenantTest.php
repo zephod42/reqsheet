@@ -14,14 +14,22 @@ final class TenantTest
     {
         assertSameValue('kings-williams-college', TenantSlug::suggest("King's William's College"), 'School name slug suggestion was not normalized.');
         assertSameValue('kwc', TenantSlug::normalise('KWC'), 'Tenant slug was not normalized to lowercase.');
-        foreach (['bad slug', '-school', 'school-', 'www', 'localhost', str_repeat('a', 64)] as $invalid) {
+        foreach (['bad slug', '-school', 'school-', 'www', 'WWW', 'Www', 'localhost', str_repeat('a', 64)] as $invalid) {
             assertThrows(static fn () => TenantSlug::normalise($invalid), 'Invalid or reserved tenant slug was accepted: ' . $invalid);
+        }
+        try {
+            TenantSlug::normalise('WwW');
+            throw new \RuntimeException('Reserved www tenant slug did not fail.');
+        } catch (\Reqsheet\Account\AccountValidationException $exception) {
+            assertSameValue('This school short code is reserved. Please choose another.', $exception->errors()[0], 'Reserved www error message was incorrect.');
         }
 
         $store = new TenantStoreFake();
         $resolver = new TenantHostResolver($store);
         $root = $resolver->resolve('reqsheet.test', 'reqsheet.test');
         assertSameValue(false, $root->isTenant(), 'Configured root host was treated as a tenant.');
+        $wwwRoot = $resolver->resolve('WWW.reqsheet.test', 'reqsheet.test');
+        assertSameValue(false, $wwwRoot->isTenant(), 'The www public alias was treated as a tenant.');
         $known = $resolver->resolve('kwc.reqsheet.test', 'reqsheet.test');
         assertSameValue(true, $known->isTenant(), 'Known tenant host was not resolved.');
         assertSameValue(1, $known->organisation['id'], 'Known tenant resolved to the wrong organisation.');
@@ -34,6 +42,10 @@ final class TenantTest
         assertSameValue('reqsheet.duckdns.org', TenantHostResolver::baseHostForRequest('kwc.reqsheet.duckdns.org', $allowedBases), 'DuckDNS tenant host was not retained.');
         $newDomain = $resolver->resolve('kwc.reqsheet.com', 'reqsheet.com');
         assertSameValue($known->organisation, $newDomain->organisation, 'The same tenant did not retain its organisation identity across domains.');
+        foreach (['www.reqsheet.com', 'www.reqsheet.duckdns.org'] as $wwwHost) {
+            $wwwBase = str_ends_with($wwwHost, '.reqsheet.com') ? 'reqsheet.com' : 'reqsheet.duckdns.org';
+            assertSameValue(false, $resolver->resolve($wwwHost, $wwwBase)->isTenant(), 'The www alias was treated as a tenant for ' . $wwwBase . '.');
+        }
 
         foreach (['missing.reqsheet.test', 'a.b.reqsheet.test', 'kwc.other.test', 'bad_slug.reqsheet.test'] as $host) {
             assertThrows(static fn () => $resolver->resolve($host, 'reqsheet.test'), 'Invalid or unknown tenant host was accepted: ' . $host);

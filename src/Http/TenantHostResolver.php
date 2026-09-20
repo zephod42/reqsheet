@@ -79,6 +79,8 @@ final class TenantHostResolver
         $suffix = '.' . $baseHost;
         if (!str_ends_with($requestHost, $suffix)) throw new TenantHostException('Host is outside the configured base host.');
         $slug = substr($requestHost, 0, -strlen($suffix));
+        // The conventional www alias belongs to the public base host, not to a school.
+        if ($slug === 'www') return null;
         if ($slug === '' || str_contains($slug, '.') || !TenantSlug::isValid($slug)) throw new TenantHostException('Host is not a valid tenant host.');
         return $slug;
     }

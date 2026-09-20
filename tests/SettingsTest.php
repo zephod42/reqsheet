@@ -135,11 +135,18 @@ final class SettingsTest
         assertSameValue(1, $signupStore->accounts['Existing Admin']['organisation_id'], 'Public signup leaked or changed the existing tenant.');
         assertSameValue(null, \Reqsheet\Http\SessionAuth::current(), 'Public signup left a generic-host session active during tenant handoff.');
         self::expectAccountValidation(static fn () => $signupAccounts->createFirstOrganisation('Third School', 'Third Admin', 'TAD', 'teacher', 'third-pass', 'third-pass'), 'Legacy bootstrap became available after public signup.');
+        foreach (['www', 'WWW', 'Www'] as $reservedSlug) {
+            self::expectAccountValidation(static fn () => $signupAccounts->createOrganisationAdmin('Reserved School', 'Reserved Admin', 'RSA', 'teacher', 'reserved-pass', 'reserved-pass', $reservedSlug, 'reserved@example.test'), 'Reserved www school short code was accepted: ' . $reservedSlug);
+        }
+        $reservedSignupView = $signup->handle('POST', ['school_name' => 'Reserved School', 'contact_email' => 'reserved@example.test', 'tenant_slug' => 'WWW', 'display_name' => 'Reserved Admin', 'staff_identifier' => 'RSV', 'operational_role' => 'teacher', 'password' => 'reserved-pass', 'password_confirmation' => 'reserved-pass']);
+        assertContainsValue('This school short code is reserved. Please choose another.', $reservedSignupView, 'Signup did not display the reserved www error.');
         \Reqsheet\Http\SessionAuth::logout();
         $home = (new HomePage())->render();
         assertContainsValue('Fast. Clean. Simple.', $home, 'Public homepage tagline was not rendered.');
         assertContainsValue('href="/signup"', $home, 'Public homepage signup action was not rendered.');
         assertContainsValue('Already have an account?', $home, 'Public homepage account guidance was not rendered.');
+        assertContainsValue('Reqsheet alpha. Testing phase. Expect the unexpected. Do not rely upon this resource (yet). Feedback appreciated', $home, 'Public homepage alpha warning was not rendered.');
+        assertContainsValue('mailto:feedback@reqsheet.com', $home, 'Public homepage feedback address was not a mailto link.');
         assertNotContainsValue('action="/login"', $home, 'Public homepage still renders the login form.');
         $authenticatedHome = (new HomePage())->render(['id' => 2, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => false, 'roles' => ['teacher']]);
         assertContainsValue('View My Timetable', $authenticatedHome, 'Authenticated homepage lost the application navigation.');
@@ -152,6 +159,7 @@ final class SettingsTest
         assertContainsValue('href="/settings"', $adminNav, 'Admin navigation did not expose Settings.');
         assertContainsValue('My Account', $adminNav, 'Authenticated navigation did not expose My Account.');
         assertContainsValue('View My Timetable', $adminNav, 'Teacher navigation label was not updated.');
+        assertContainsValue('Reqsheet α', $adminNav, 'Shared application branding did not include the alpha marker.');
         assertContainsValue('nav-separator', $adminNav, 'Authenticated navigation did not render its general/application separator.');
         assertNotContainsValue('href="/signup"', $adminNav, 'Sign up remained in authenticated navigation.');
         assertContainsValue('href="/settings"', \Reqsheet\Http\PageLayout::render('About', '<p>About</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]), 'Authenticated informational layout lost Settings.');

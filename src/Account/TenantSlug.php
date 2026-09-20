@@ -28,6 +28,9 @@ final class TenantSlug
     {
         $value = strtolower(trim($value));
         if (!self::isValid($value)) {
+            if ($value === 'www') {
+                throw new AccountValidationException(['This school short code is reserved. Please choose another.']);
+            }
             throw new AccountValidationException(['School short code must use lowercase letters, digits, and hyphens; it must not start or end with a hyphen.']);
         }
         return $value;

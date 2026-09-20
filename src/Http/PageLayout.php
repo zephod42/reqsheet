@@ -21,7 +21,7 @@ final class PageLayout
         $assetVersion = is_file($assetPath) ? (string) filemtime($assetPath) : '1';
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $active = static fn (string $path): string => ($path === '/teacher' ? in_array($currentPath, ['/teacher', '/teacher/week'], true) : $currentPath === $path) ? ' class="active" aria-current="page"' : '';
-        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet.</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
+        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet α</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
         if ($user !== null) {
             $nav .= '<li class="nav-separator" role="separator" aria-hidden="true"></li>';
             $landing = SessionAuth::landingPath($user);
