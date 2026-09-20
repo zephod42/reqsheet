@@ -5,6 +5,7 @@
 /.env.*
 !/.env.example
 !/.env.migrate.example
+!/.env.report.example
 /.env.migrate
 /var/cache/
 /var/log/

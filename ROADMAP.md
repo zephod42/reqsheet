@@ -4,6 +4,7 @@ This is an intentionally small, reviewable roadmap. The near-term priority is ma
 
 Completed foundations:
 
+- Reqsheet Monitor: a read-only, SSH-operated CLI produces a private standalone operational HTML snapshot using a separately configured SELECT-only database identity. It reports aggregate tenant/application state without adding a web route, operator account, scheduler or requisition content.
 - Admin configuration foundation: people, rooms, working days, week start, and ordered timetable structure.
 - Timetable-version/admin editor UI: named, manually activated templates, staff-member default view, and validated timetable editing by staff member, room, or day. The current editor is intentionally skeletal and is protected by the authenticated Admin permission.
 - Documentation/code reconciliation: canonical product behaviour and the committed timetable editor have been checked for consistency in this pass.

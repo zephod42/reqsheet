@@ -59,6 +59,8 @@ MySQL DDL can implicitly commit and is not fully transactional. A failed migrati
 
 The migration identity should have schema-changing privileges scoped only to the Reqsheet database, including `CREATE`, `ALTER`, and `DROP` as future migrations may need to replace or remove objects. The runtime identity should have only application DML privileges and no schema-changing privileges.
 
+Reqsheet Monitor has a further, separately provisioned SELECT-only identity and protected configuration file. It must not use either of the identities above. See `MONITOR.md` for the administrator SQL, `REPORT_DB_*` configuration, SSH generation and StudyPC SCP workflow. No database writes, scheduler, public route or production configuration changes are performed by the monitor itself.
+
 The database enforces keys, foreign keys, required values, date/time ranges, allowed slot kinds, allowed requisition states, and simple organisation-local uniqueness. Service validation must enforce non-overlapping timetable-version date ranges, same-version/day slot relationships, contiguous teaching-only lesson spans, occurrence dates matching recurring lessons, cross-organisation consistency, requisition-state/content consistency, and room/teacher conflict detection. Room conflict comparison trims surrounding whitespace and compares case-insensitively; the stored room code is unchanged.
 
 ## Timetable configuration services

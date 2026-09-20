@@ -25,6 +25,7 @@ require __DIR__ . '/LoginPageTest.php';
 require __DIR__ . '/TenantDataResetterTest.php';
 require __DIR__ . '/TechnicianPageTest.php';
 require __DIR__ . '/RecoveryTest.php';
+require __DIR__ . '/MonitorReportTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -290,5 +291,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\TenantDataResetterTest::run();
 \Reqsheet\Tests\TechnicianPageTest::run();
 \Reqsheet\Tests\RecoveryTest::run();
+\Reqsheet\Tests\MonitorReportTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

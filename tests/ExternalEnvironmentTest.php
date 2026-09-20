@@ -39,5 +39,15 @@ final class ExternalEnvironmentTest
         assertThrows(static fn (): array => ExternalEnvironment::load(['REQSHEET_ENV_FILE' => 'relative.env']), 'Relative environment path was accepted.');
         assertThrows(static fn (): array => ExternalEnvironment::load(['REQSHEET_ENV_FILE' => dirname(__DIR__) . '/.env']), 'Repository environment path was accepted.');
         assertThrows(static fn (): array => ExternalEnvironment::load(['REQSHEET_ENV_FILE' => '/path/that/does/not/exist.env']), 'Missing environment file was accepted.');
+
+        $reportPath = tempnam(sys_get_temp_dir(), 'reqsheet-report-env-');
+        if ($reportPath === false) throw new \RuntimeException('Could not create report environment fixture.');
+        try {
+            file_put_contents($reportPath, "REPORT_DB_USER=monitor\n");
+            $loaded = ExternalEnvironment::loadFromVariable(['REQSHEET_REPORT_ENV_FILE' => $reportPath], 'REQSHEET_REPORT_ENV_FILE');
+            assertSameValue('monitor', $loaded['REPORT_DB_USER'], 'Dedicated report environment was not loaded.');
+        } finally {
+            unlink($reportPath);
+        }
     }
 }

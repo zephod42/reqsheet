@@ -17,12 +17,21 @@ final class ExternalEnvironment
      */
     public static function load(array $environment): array
     {
-        $configuredPath = $environment['REQSHEET_ENV_FILE'] ?? null;
+        return self::loadFromVariable($environment, 'REQSHEET_ENV_FILE');
+    }
+
+    /**
+     * @param array<string, mixed> $environment
+     * @return array<string, mixed>
+     */
+    public static function loadFromVariable(array $environment, string $variable): array
+    {
+        $configuredPath = $environment[$variable] ?? null;
         if ($configuredPath === null) {
             return $environment;
         }
         if (!is_string($configuredPath) || trim($configuredPath) === '' || $configuredPath[0] !== '/') {
-            throw new ConfigurationException('REQSHEET_ENV_FILE must be an absolute path.');
+            throw new ConfigurationException($variable . ' must be an absolute path.');
         }
 
         $path = realpath($configuredPath);
