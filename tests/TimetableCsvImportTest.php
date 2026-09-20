@@ -25,6 +25,7 @@ final class TimetableCsvImportTest
     public static function run(): void
     {
         self::validPreviewsAndGrouping();
+        self::distinctNewClassesAreIndependent();
         self::structuralValidation();
         self::resourceAndConflictValidation();
         self::parserLimitsAndMalformedInput();
@@ -32,6 +33,27 @@ final class TimetableCsvImportTest
         self::httpPreviewSecurity();
         self::draftLifetimeAndIsolation();
         self::resourceReferenceCsv();
+    }
+
+    private static function distinctNewClassesAreIndependent(): void
+    {
+        $store = self::store();
+        $content = file_get_contents(__DIR__ . '/fixtures/timetable-distinct-new-classes.csv');
+        if ($content === false) throw new \RuntimeException('Unable to read the distinct-new-classes regression fixture.');
+
+        $preview = (new TimetableCsvImportPreviewService($store))->preview(
+            1,
+            1,
+            (new TimetableCsvParser())->parse($content),
+            true,
+        );
+
+        assertSameValue(8, $preview->occupiedPeriods, 'Valid simultaneous lessons with distinct new classes were rejected.');
+        assertSameValue(7, count($preview->assignments), 'New-class grouping changed the lesson proposal.');
+        assertSameValue(['NEW-A', 'NEW-B', 'NEW-C', 'NEW-D'], $preview->newClassCodes, 'Distinct missing classes were not proposed independently.');
+        assertSameValue(2, $preview->assignments[0]['duration'], 'A valid new-class multi-period lesson was not grouped.');
+        assertSameValue(1, $preview->assignments[1]['duration'], 'A repeated class was grouped across a separator.');
+        assertSameValue(['NEW-B', 'NEW-D'], [$preview->assignments[2]['class_code'], $preview->assignments[3]['class_code']], 'Consecutive distinct new classes taught by one teacher were merged.');
     }
 
     private static function validPreviewsAndGrouping(): void
@@ -92,6 +114,17 @@ final class TimetableCsvImportTest
         self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, [
             'Monday|P1|R1' => ['C1', 'AAA'], 'Monday|P1|R2' => ['C1', 'BBB'],
         ])), true), 'Class C1 is assigned twice');
+        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, [
+            'Monday|P1|R1' => ['NEW-A', 'AAA'], 'Monday|P1|R2' => ['NEW-A', 'BBB'],
+        ])), true), 'Class NEW-A is assigned twice');
+        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, [
+            'Monday|P1|R1' => ['C1', 'AAA'], 'Monday|P2|R1' => ['C1', 'AAA'],
+            'Monday|P2|R2' => ['C1', 'BBB'],
+        ])), true), 'Class C1 is assigned twice');
+        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::fill($blank, [
+            'Monday|P1|R1' => ['C1', 'AAA'], 'Monday|P2|R1' => ['C1', 'AAA'],
+            'Monday|P2|R2' => ['C2', 'AAA'],
+        ])), true), 'Teacher AAA is assigned twice');
 
         $rows = self::csvRows($blank);
         $rows[] = ['Monday', 'P1', 'ROOM-35', 'IGNORED', 'NOT-A-TEACHER'];

@@ -168,7 +168,7 @@ final class TimetableCsvImportPreviewService
             if (isset($teachers[$teacherKey])) {
                 self::error($errors, sprintf('Teacher %s is assigned twice at %s %s (CSV rows %d and %d).', $cell['teacher']['staff_identifier'], $cell['day'], $cell['period'], $teachers[$teacherKey], $cell['row']));
             } else $teachers[$teacherKey] = $cell['row'];
-            $classKey = (int) $cell['class']['id'] . '/' . $time;
+            $classKey = self::classIdentity((int) $cell['class']['id'], (string) $cell['class']['code']) . '/' . $time;
             if (isset($classes[$classKey])) {
                 self::error($errors, sprintf('Class %s is assigned twice at %s %s (CSV rows %d and %d).', $cell['class']['code'], $cell['day'], $cell['period'], $classes[$classKey], $cell['row']));
             } else $classes[$classKey] = $cell['row'];
@@ -195,7 +195,7 @@ final class TimetableCsvImportPreviewService
                 && $last['day_of_week'] === $slot->dayOfWeek
                 && $last['room_id'] === (int) $cell['room']['id']
                 && $last['teacher_id'] === (int) $cell['teacher']['id']
-                && $last['class_id'] === (int) $cell['class']['id']
+                && self::classIdentity($last['class_id'], $last['class_code']) === self::classIdentity((int) $cell['class']['id'], (string) $cell['class']['code'])
                 && self::adjacent($slotsByDay[$slot->dayOfWeek] ?? [], $last['last_slot'], $slot);
             if ($continues) {
                 $groups[$lastIndex]['periods'][] = (string) $cell['period'];
@@ -247,6 +247,11 @@ final class TimetableCsvImportPreviewService
     private static function key(string $day, string $period, string $room): string
     {
         return (string) json_encode([$day, $period, $room], JSON_THROW_ON_ERROR);
+    }
+
+    private static function classIdentity(int $id, string $code): string
+    {
+        return $id > 0 ? 'id:' . $id : 'new:' . $code;
     }
 
     private static function dayName(int $day): string

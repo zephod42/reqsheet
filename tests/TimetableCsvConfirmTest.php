@@ -27,9 +27,35 @@ final class TimetableCsvConfirmTest
     public static function run(): void
     {
         self::successfulAtomicImport();
+        self::distinctNewClassesSurviveRevalidation();
         self::stateChangesAreRejected();
         self::draftAndRequestProtection();
         self::rollbackOnInsertFailure();
+    }
+
+    private static function distinctNewClassesSurviveRevalidation(): void
+    {
+        $store = self::store();
+        $blank = (new BlankTimetableCsvExporter($store))->export(1, 1)->content;
+        $rows = (new TimetableCsvParser())->parse(self::fill($blank, [
+            'Monday|P1|R1' => ['NEW-A', 'AAA'],
+            'Monday|P1|R2' => ['NEW-B', 'BBB'],
+        ]));
+        $preview = (new TimetableCsvImportPreviewService($store))->preview(1, 1, $rows, true);
+        $result = self::service($store)->import(1, [
+            'version_id' => 1,
+            'proposed_version_name' => $preview->proposedVersionName,
+            'assignments' => $preview->assignments,
+            'occupied_periods' => $preview->occupiedPeriods,
+            'free_slots' => $preview->freeSlots,
+            'structure_identity' => $preview->structureIdentity,
+        ]);
+
+        assertSameValue(2, $result->lessonCount, 'Transaction-time revalidation rejected valid simultaneous new classes.');
+        assertSameValue(['NEW-A', 'NEW-B'], $result->createdClassCodes, 'Confirmed import did not create distinct missing classes.');
+        $imported = array_values(array_filter($store->lessons, static fn (RecurringLesson $lesson): bool => $lesson->timetableVersionId === $result->versionId));
+        assertSameValue(2, count($imported), 'Confirmed import did not retain both simultaneous lessons.');
+        assertSameValue(false, $imported[0]->classId === $imported[1]->classId, 'Confirmed import collapsed distinct new classes into one resource.');
     }
 
     private static function successfulAtomicImport(): void

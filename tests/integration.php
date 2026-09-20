@@ -439,6 +439,26 @@ try {
         integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM lesson_occurrences')->fetchColumn() === $historicalOccurrences, 'CSV import changed historical occurrences.');
         integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM requisitions')->fetchColumn() === $historicalRequisitions, 'CSV import changed historical requisitions.');
 
+        $newClassVersion = $configurationStore->insertVersion($organisationId, 'CSV new-class target', new DateTimeImmutable('2027-01-15'), null, 1);
+        $configurationStore->insertSlot($newClassVersion, 1, 1, 'teaching', 1, 'P1', '09:00', '10:00');
+        $newClassBlank = (new BlankTimetableCsvExporter($configurationStore))->export($organisationId, $newClassVersion);
+        $newClassCompleted = integrationPopulateCsv($newClassBlank->content, [
+            'Monday|P1|CSV-R1' => ['CSV-NEW-A', 'INA'],
+            'Monday|P1|CSV-R2' => ['CSV-NEW-B', 'INB'],
+        ]);
+        $newClassPreview = $previewValidator->preview($organisationId, $newClassVersion, $parser->parse($newClassCompleted), true);
+        $newClassImported = $importer->import($organisationId, [
+            'version_id' => $newClassVersion,
+            'proposed_version_name' => 'CSV new-class target_imported_20260920_143025',
+            'assignments' => $newClassPreview->assignments,
+            'occupied_periods' => $newClassPreview->occupiedPeriods,
+            'free_slots' => $newClassPreview->freeSlots,
+            'structure_identity' => $newClassPreview->structureIdentity,
+        ]);
+        $newClassLessons = $configurationStore->lessonsForVersion($newClassImported->versionId);
+        integrationAssert($newClassImported->lessonCount === 2 && $newClassImported->createdClassCodes === ['CSV-NEW-A', 'CSV-NEW-B'], 'Atomic CSV import did not create both distinct simultaneous classes.');
+        integrationAssert(count($newClassLessons) === 2 && $newClassLessons[0]->classId !== $newClassLessons[1]->classId, 'Atomic CSV import collapsed distinct new classes during transaction-time revalidation.');
+
         $rollbackVersion = $configurationStore->insertVersion($organisationId, 'CSV rollback target', new DateTimeImmutable('2027-02-01'), null, 1);
         $rollbackSlot = $configurationStore->insertSlot($rollbackVersion, 1, 1, 'teaching', 1, 'P1', '09:00', '10:00');
         $configurationStore->beginCsvImport($organisationId, $rollbackVersion);
