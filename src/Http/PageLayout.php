@@ -36,7 +36,12 @@ final class PageLayout
         }
         $nav .= '</ul></nav>';
         $tenant = self::$tenantOrganisation === null ? '' : '<p class="tenant-name">' . self::e(self::$tenantOrganisation['name']) . '</p>';
-        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title><link rel="stylesheet" href="/assets/app.css?v=' . rawurlencode($assetVersion) . '"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . $tenant . $body . '</main></div></body></html>';
+        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title><link rel="stylesheet" href="/assets/app.css?v=' . rawurlencode($assetVersion) . '"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . self::alphaBanner() . $tenant . $body . '</main></div></body></html>';
+    }
+
+    public static function alphaBanner(): string
+    {
+        return '<aside class="alpha-banner" role="note">Reqsheet is currently in alpha testing. Do not rely solely on Reqsheet at this stage. Read more about what this means <a href="/alpha">here</a>.</aside>';
     }
 
     private static function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }

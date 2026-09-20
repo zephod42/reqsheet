@@ -301,10 +301,41 @@ if ($route === ApplicationRoute::ONBOARDING) {
     exit;
 }
 
-if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::DEMO, ApplicationRoute::CONTACT], true)) {
-    $heading = ucfirst($route);
+if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::ALPHA, ApplicationRoute::DEMO, ApplicationRoute::CONTACT], true)) {
+    $heading = $route === ApplicationRoute::ALPHA ? 'Reqsheet α — Alpha testing' : ucfirst($route);
     $content = '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>';
-    if ($route === ApplicationRoute::ABOUT) {
+    if ($route === ApplicationRoute::ALPHA) {
+        PageLayout::setTenantOrganisation(null);
+        $content = <<<'HTML'
+<section class="content-narrow public-copy alpha-page">
+    <h1>Reqsheet α — Alpha testing</h1>
+    <h2>Introduction</h2>
+    <p>Reqsheet is currently in alpha testing. The application is still under active development and has not yet reached the level of stability required for schools to depend upon it as their sole departmental organisation system.</p>
+    <p>We are making Reqsheet available so that teachers and technicians can test it, identify problems and help improve the application.</p>
+    <h2>What does alpha mean for you?</h2>
+    <h3>Features may change without warning.</h3>
+    <p>Features may appear, disappear or change as development continues. Some functionality may not work as expected.</p>
+    <h3>Your information may be lost.</h3>
+    <p>Information stored in Reqsheet's database may be changed or deleted during testing and may not be recoverable.</p>
+    <p>This includes timetables, lesson information, requisitions and preparation records.</p>
+    <h3>Account access may be lost.</h3>
+    <p>Account details, passwords and recovery information may be affected by development changes.</p>
+    <p>You may need to create a new account or set up your school again.</p>
+    <h2>If you are using Reqsheet in your department</h2>
+    <p>Do not rely on Reqsheet as your only source of departmental organisation during alpha testing.</p>
+    <p>If you use it for real departmental planning, maintain an independent record of essential information.</p>
+    <p>Print and securely store your timetables and requisitions regularly.</p>
+    <p>Keep existing departmental arrangements available during alpha testing.</p>
+    <h2>What comes next? Beta testing</h2>
+    <p>We expect to move Reqsheet into beta testing soon.</p>
+    <p>Beta means that the core features are in place and development focuses increasingly on reliability, fixing remaining bugs and improving the experience of using Reqsheet in real departments.</p>
+    <p>Before moving to beta, we intend to establish stronger expectations around stability and data preservation.</p>
+    <p>Beta will not mean that the application is completely free from bugs.</p>
+    <h2>Feedback</h2>
+    <p><a href="mailto:feedback@reqsheet.com">feedback@reqsheet.com</a></p>
+</section>
+HTML;
+    } elseif ($route === ApplicationRoute::ABOUT) {
         $content = <<<'HTML'
 <section class="content-narrow about-page">
     <h1 class="about-wordmark">Reqsheet.</h1>

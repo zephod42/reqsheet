@@ -212,6 +212,20 @@ foreach ([
         throw new RuntimeException('Public page content is missing: ' . $publicFragment);
     }
 }
+$alphaFragments = [
+    "public const ALPHA = 'alpha'",
+    "if (\$path === '/alpha') return self::ALPHA",
+    'Reqsheet α — Alpha testing',
+    'What does alpha mean for you?',
+    'If you are using Reqsheet in your department',
+    'What comes next? Beta testing',
+    'href="mailto:feedback@reqsheet.com"',
+];
+foreach ($alphaFragments as $alphaFragment) {
+    if (!str_contains($publicIndex, $alphaFragment) && !str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Http/ApplicationRoute.php'), $alphaFragment)) {
+        throw new RuntimeException('Alpha page content or routing is missing: ' . $alphaFragment);
+    }
+}
 if (!preg_match('/<div class="donation-placeholder">(.*?)<\/div>/s', $publicIndex, $donationMatch) || str_contains($donationMatch[1], 'href=')) {
     throw new RuntimeException('Donation placeholder unexpectedly contains an active link.');
 }
@@ -223,6 +237,9 @@ foreach (['The prep room wall, reimagined for the 21st century.', '<h1>ABOUT REQ
 $publicCss = file_get_contents(dirname(__DIR__) . '/public/assets/app.css');
 if ($publicCss === false || !str_contains($publicCss, '.about-page { max-width: 44rem; text-align: left;') || !str_contains($publicCss, '.about-wordmark { margin: 0 0 2rem; text-align: center;')) {
     throw new RuntimeException('About page reading-layout styles are missing.');
+}
+if ($publicCss === false || !str_contains($publicCss, '.alpha-banner') || !str_contains($publicCss, '.site-nav, .alpha-banner, .page-header a')) {
+    throw new RuntimeException('Global alpha banner styling or print exclusion is missing.');
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),

@@ -94,12 +94,17 @@ small { font-size: .82rem; }
 .site-nav li a.active, .selected-state { background: var(--primary-pale); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); font-weight: 700; color: var(--ink); }
 .staff-identifier { width: 5rem; max-width: 5rem; text-transform: uppercase; }
 .site-main { width: min(100%, 78rem); padding: var(--space-5) clamp(1rem, 4vw, 4rem); }
+.alpha-banner { margin: 0 0 var(--space-4); border: 1px solid #7d0015; border-radius: var(--corner); background: #b00020; color: #fff; padding: .8rem 1rem; font-weight: 700; line-height: 1.4; }
+.alpha-banner a { color: #fff; font-weight: 800; text-decoration: underline; text-underline-offset: .12em; }
 .tenant-name { margin: -.8rem 0 var(--space-4); color: var(--muted); font-size: .95rem; font-weight: 650; }
 .content-narrow { max-width: 38rem; }
 .content-wide { max-width: 68rem; }
 .public-copy, .about-page { margin: 0 auto; }
 .public-copy h1 { margin-top: 0; }
 .public-copy { line-height: 1.55; }
+.alpha-page h1 { margin-top: 0; }
+.alpha-page h2 { margin: 2.25rem 0 .75rem; }
+.alpha-page h3 { margin: 1.5rem 0 .5rem; font-size: 1.05rem; }
 .demo-page ol { padding-left: 1.5rem; }
 .demo-page li { margin: .75rem 0; padding-left: .25rem; }
 .about-page { max-width: 44rem; text-align: left; font-size: 1.08rem; }
@@ -321,7 +326,7 @@ dialog .close { float: right; }
 @media print {
     :root { --ink: #000; --rule: #000; --rule-strong: #000; }
     body { background: #fff; color: #000; }
-    .site-nav, .page-header a, dialog, .temporary, .button, button { display: none !important; }
+    .site-nav, .alpha-banner, .page-header a, dialog, .temporary, .button, button { display: none !important; }
     .site-shell { display: block; }
     .site-main { width: 100%; padding: 0; }
     .lesson-block, .admin-lesson, .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { background: #fff !important; color: #000 !important; box-shadow: none !important; }

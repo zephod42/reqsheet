@@ -22,6 +22,8 @@ final class LoginPageTest
         assertContainsValue('maxlength="3"', $school, 'Login initials field has no three-character limit.');
         assertContainsValue('class="staff-identifier"', $school, 'Login initials field is not compactly styled.');
         assertContainsValue('href="/account-recovery">Account Recovery', $school, 'School login did not expose tenant account recovery.');
+        assertContainsValue('class="alpha-banner"', $school, 'School login did not render the global alpha banner.');
+        assertContainsValue('href="/alpha">here</a>', $school, 'School login alpha banner did not link to the information page.');
         assertNotContainsValue('Account Recovery', $generic, 'Generic login exposed organisation account recovery.');
         assertContainsValue('/assets/app.css?v=', $school, 'Rendered pages do not version the stylesheet asset.');
     }

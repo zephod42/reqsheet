@@ -10,6 +10,7 @@ final class ApplicationRoute
     public const SIGNUP = 'signup';
     public const SETTINGS = 'settings';
     public const ABOUT = 'about';
+    public const ALPHA = 'alpha';
     public const DEMO = 'demo';
     public const CONTACT = 'contact';
     public const HEALTH = 'health';
@@ -69,6 +70,7 @@ final class ApplicationRoute
         if ($path === '/settings') return self::SETTINGS;
         if ($path === '/account') return self::MY_ACCOUNT;
         if ($path === '/about') return self::ABOUT;
+        if ($path === '/alpha') return self::ALPHA;
         if ($path === '/demo') return self::DEMO;
         if ($path === '/contact') return self::CONTACT;
         if ($method === 'GET' && $path === '/') {

@@ -44,6 +44,7 @@ final class TechnicianPageTest
         assertContainsValue('No active timetable is configured', $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []), 'Technician view did not provide an inactive-timetable state.');
         $store->hasActiveTimetable = true;
         $day = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
+        assertContainsValue('class="alpha-banner"', $day, 'Authenticated technician view did not render the global alpha banner.');
         assertContainsValue('JSM', $day, 'Technician grid did not show teacher initials.');
         assertContainsValue('class="technician-cell class-tone-', $day, 'Technician lesson did not receive a deterministic class colour.');
         assertContainsValue('Very long requisition text', $day, 'Technician grid did not show the saved requisition.');
@@ -65,6 +66,7 @@ final class TechnicianPageTest
         $print = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'all', 'print' => 'week'], []);
         assertSameValue(3, substr_count($print, 'class="technician-sheet"'), 'Selected-week print did not use the configured working days.');
         assertContainsValue('window.print()', $print, 'Selected-week print did not invoke the native print dialog.');
+        assertContainsValue('class="alpha-banner"', $print, 'Technician print page did not retain the global alpha banner in the screen document.');
         assertContainsValue('<h1>Print View</h1>', $print, 'Selected-week print did not identify the read-only print view.');
         assertContainsValue('Back to Technician View', $print, 'Selected-week print did not provide a return link.');
         assertContainsValue('href="/technician?date=2026-09-23&rooms=all"', $print, 'Selected-week print did not preserve the selected date and room mode.');
@@ -78,6 +80,7 @@ final class TechnicianPageTest
         assertNotContainsValue('.technician-week-print .technician-sheet { min-height: 100vh', $css, 'Technician weekly print retained the overflow-causing viewport height.');
         assertContainsValue('.technician-grid th:first-child { width: 7rem; min-width: max-content;', $css, 'Technician period column was not given enough room for configured labels.');
         assertContainsValue('.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }', $css, 'Technician print day heading was not centred.');
+        assertContainsValue('.site-nav, .alpha-banner, .page-header a, dialog', $css, 'Alpha banner was not excluded from print output.');
         $customPrint = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'custom', 'room_ids' => ['2'], 'print' => 'week'], []);
         assertContainsValue('href="/technician?date=2026-09-23&rooms=custom&room_ids[]=2"', $customPrint, 'Custom room selection was not preserved by the print return link.');
         assertContainsValue('21-09-2026 Mon', $page->handle('GET', ['date' => '2026-09-21', 'teacher' => 10], []), 'Secondary technician date format was not UK-style.');

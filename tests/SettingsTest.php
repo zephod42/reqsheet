@@ -66,6 +66,7 @@ final class SettingsTest
         $initialSetupAccounts = new \Reqsheet\Account\AccountService(new \Reqsheet\Tests\AccountStoreFake());
         $initialSetup = new SetupPage($initialSetupAccounts, 'reqsheet.test', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $initialSetupView = $initialSetup->handle('GET', []);
+        assertContainsValue('class="alpha-banner"', $initialSetupView, 'First-run setup did not render the global alpha banner.');
         assertNotContainsValue('name="rooms[]"', $initialSetupView, 'Initial setup still offered room creation.');
         assertContainsValue('You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.', $initialSetupView, 'Initial setup did not explain later settings.');
         $initialSetupComplete = $initialSetup->handle('POST', [
@@ -169,6 +170,8 @@ final class SettingsTest
         assertContainsValue('My Account', $adminNav, 'Authenticated navigation did not expose My Account.');
         assertContainsValue('View My Timetable', $adminNav, 'Teacher navigation label was not updated.');
         assertContainsValue('Reqsheet α', $adminNav, 'Shared application branding did not include the alpha marker.');
+        assertContainsValue('class="alpha-banner"', $adminNav, 'Authenticated layout did not render the global alpha banner.');
+        assertContainsValue('href="/alpha">here</a>', $adminNav, 'Authenticated alpha banner did not link to the information page.');
         assertContainsValue('nav-separator', $adminNav, 'Authenticated navigation did not render its general/application separator.');
         assertNotContainsValue('href="/signup"', $adminNav, 'Sign up remained in authenticated navigation.');
         assertContainsValue('href="/settings"', \Reqsheet\Http\PageLayout::render('About', '<p>About</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]), 'Authenticated informational layout lost Settings.');
