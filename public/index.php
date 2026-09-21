@@ -22,6 +22,7 @@ use Reqsheet\Http\ApplicationRoute;
 use Reqsheet\Http\TeacherAccess;
 use Reqsheet\Http\TeacherWeekPage;
 use Reqsheet\Http\TeacherDayPage;
+use Reqsheet\Http\TeacherClassPage;
 use Reqsheet\Http\AdminPeoplePage;
 use Reqsheet\Http\LoginPage;
 use Reqsheet\Http\MyAccountPage;
@@ -550,7 +551,7 @@ if ($route === ApplicationRoute::SETTINGS) {
     exit;
 }
 
-if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_DAY, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES], true)) {
+if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_DAY, ApplicationRoute::TEACHER_CLASS, ApplicationRoute::TECHNICIAN, ApplicationRoute::ADMIN_PEOPLE, ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES], true)) {
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -576,7 +577,7 @@ if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, A
     }
 }
 
-if (in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_DAY], true)) {
+if (in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_DAY, ApplicationRoute::TEACHER_CLASS], true)) {
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -602,9 +603,12 @@ if (in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_
             new PdoTeacherPlanningStore((new Database($config))->connection()),
             TeacherAccess::firstDayOfWeek($environment),
         );
+        $today = new \DateTimeImmutable('today');
         $page = $route === ApplicationRoute::TEACHER_DAY
-            ? new TeacherDayPage($planning, $user['organisation_id'], $user['id'], new \DateTimeImmutable('today'), $user)
-            : new TeacherWeekPage($planning, $user['organisation_id'], $user['id'], new \DateTimeImmutable('today'), $user);
+            ? new TeacherDayPage($planning, $user['organisation_id'], $user['id'], $today, $user)
+            : ($route === ApplicationRoute::TEACHER_CLASS
+                ? new TeacherClassPage($planning, $user['organisation_id'], $user['id'], $today, $user)
+                : new TeacherWeekPage($planning, $user['organisation_id'], $user['id'], $today, $user));
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
     } catch (\Throwable $exception) {

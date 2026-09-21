@@ -25,6 +25,20 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
         return $statement->fetchColumn() !== false;
     }
 
+    public function classesForTeacher(int $organisationId, int $teacherId): array
+    {
+        $statement = $this->prepare(
+            'SELECT DISTINCT c.id, c.class_code
+             FROM recurring_lessons rl
+             JOIN timetable_versions tv ON tv.id = rl.timetable_version_id AND tv.organisation_id = :organisation_id
+             JOIN organisation_classes c ON c.id = rl.class_id AND c.organisation_id = :class_organisation_id
+             WHERE rl.teacher_user_id = :teacher_id
+             ORDER BY c.class_code, c.id',
+        );
+        $statement->execute(['organisation_id' => $organisationId, 'class_organisation_id' => $organisationId, 'teacher_id' => $teacherId]);
+        return array_map(static fn (array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['class_code']], $statement->fetchAll());
+    }
+
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion
     {
         $statement = $this->prepare(
@@ -72,6 +86,15 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
         }
     }
 
+    public function ensureOccurrencesForRange(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void
+    {
+        $generator = new TimetableOccurrenceGenerator(new PdoTimetableGenerationStore($this->pdo));
+        for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
+            $version = $this->effectiveVersion($organisationId, $date);
+            if ($version !== null) $generator->generate($organisationId, $version->id, $date->format('Y-m-d'), $date->format('Y-m-d'));
+        }
+    }
+
     public function slotsForVersion(int $versionId): array
     {
         $statement = $this->prepare(
@@ -103,6 +126,23 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
             'organisation_id' => $organisationId,
             'teacher_id' => $teacherId,
             'lesson_date' => $date->format('Y-m-d'),
+        ]);
+        return $statement->fetchAll();
+    }
+
+    public function occurrencesForTeacherClass(int $organisationId, int $teacherId, int $classId, DateTimeImmutable $start, DateTimeImmutable $end, int $limit, bool $descending = false): array
+    {
+        $limit = max(1, min(21, $limit));
+        $order = $descending ? 'DESC' : 'ASC';
+        $statement = $this->occurrenceQuery(
+            'o.organisation_id = :organisation_id AND o.snapshot_teacher_user_id = :teacher_id
+             AND rl.class_id = :class_id AND o.lesson_date BETWEEN :start_date AND :end_date',
+            'o.lesson_date ' . $order . ', s.sequence_number ' . $order . ', o.id ' . $order,
+            $limit,
+        );
+        $statement->execute([
+            'organisation_id' => $organisationId, 'teacher_id' => $teacherId, 'class_id' => $classId,
+            'start_date' => $start->format('Y-m-d'), 'end_date' => $end->format('Y-m-d'),
         ]);
         return $statement->fetchAll();
     }
@@ -140,19 +180,22 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
         ]);
     }
 
-    private function occurrenceQuery(string $condition): PDOStatement
+    private function occurrenceQuery(string $condition, string $order = 'o.lesson_date, s.sequence_number, o.id', ?int $limit = null): PDOStatement
     {
+        $limitSql = $limit === null ? '' : ' LIMIT ' . max(1, min(21, $limit));
         return $this->prepare(
             'SELECT o.id, o.lesson_date, o.timetable_version_id, o.snapshot_teacher_user_id,
+                    rl.class_id,
                     o.snapshot_class_code, o.snapshot_room_code, o.snapshot_start_slot_id,
                     o.snapshot_duration_periods, s.day_of_week, s.teaching_period_number,
                     s.label AS slot_label, r.state, r.requirements_text, r.planning_notes,
                     r.risk_assessment_text
              FROM lesson_occurrences o
+             JOIN recurring_lessons rl ON rl.id = o.recurring_lesson_id
              JOIN timetable_slots s ON s.id = o.snapshot_start_slot_id
              LEFT JOIN requisitions r ON r.lesson_occurrence_id = o.id
              WHERE ' . $condition . '
-             ORDER BY o.lesson_date, s.sequence_number, o.id',
+             ORDER BY ' . $order . $limitSql,
         );
     }
 

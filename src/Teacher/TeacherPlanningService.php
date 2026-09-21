@@ -50,12 +50,53 @@ final class TeacherPlanningService
         return new TeacherWeek($start, $start->add(new DateInterval('P6D')), $days);
     }
 
+    /** @return list<array{id:int,code:string}> */
+    public function classes(int $organisationId, int $teacherId): array
+    {
+        $this->assertTeacher($organisationId, $teacherId);
+        return $this->store->classesForTeacher($organisationId, $teacherId);
+    }
+
+    /** @return array{classes:list<array{id:int,code:string}>,selected:?array{id:int,code:string},previous:list<array<string,mixed>>,upcoming:list<array<string,mixed>>} */
+    public function loadClass(int $organisationId, int $teacherId, int $classId, DateTimeImmutable $today): array
+    {
+        $this->assertTeacher($organisationId, $teacherId);
+        $classes = $this->store->classesForTeacher($organisationId, $teacherId);
+        $selected = null;
+        foreach ($classes as $class) if ($class['id'] === $classId) { $selected = $class; break; }
+        if ($selected === null) throw new TimetableValidationException(['Class is not available for this teacher.']);
+
+        // The window is deliberately bounded. Occurrences are the existing dated
+        // snapshots; generation only makes the established timetable model
+        // available for this finite view window.
+        $pastStart = $today->sub(new DateInterval('P365D'));
+        $futureEnd = $today->add(new DateInterval('P365D'));
+        $this->store->ensureOccurrencesForRange($organisationId, $pastStart, $futureEnd);
+        $previous = $this->store->occurrencesForTeacherClass($organisationId, $teacherId, $classId, $pastStart, $today->sub(new DateInterval('P1D')), 3, true);
+        $upcoming = $this->store->occurrencesForTeacherClass($organisationId, $teacherId, $classId, $today, $futureEnd, 21);
+        usort($previous, self::occurrenceOrder(...));
+        usort($upcoming, self::occurrenceOrder(...));
+        return ['classes' => $classes, 'selected' => $selected, 'previous' => $previous, 'upcoming' => $upcoming];
+    }
+
     /** @return array<string, mixed> */
     public function occurrenceForEdit(int $organisationId, int $teacherId, int $occurrenceId): array
     {
         $occurrence = $this->store->findOccurrenceForTeacher($organisationId, $teacherId, $occurrenceId);
         if ($occurrence === null) throw new TimetableValidationException(['Lesson occurrence was not found.']);
         return $occurrence;
+    }
+
+    private function assertTeacher(int $organisationId, int $teacherId): void
+    {
+        if (!$this->store->teacherBelongsToOrganisation($teacherId, $organisationId)) throw new TimetableValidationException(['Teacher does not belong to the requested organisation.']);
+    }
+
+    /** @param array<string,mixed> $left @param array<string,mixed> $right */
+    private static function occurrenceOrder(array $left, array $right): int
+    {
+        return [((string) $left['lesson_date']), ((int) ($left['teaching_period_number'] ?? 0)), ((int) $left['id'])]
+            <=> [((string) $right['lesson_date']), ((int) ($right['teaching_period_number'] ?? 0)), ((int) $right['id'])];
     }
 
     public function save(

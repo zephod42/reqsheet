@@ -27,7 +27,7 @@ final class PageLayout
             $landing = SessionAuth::landingPath($user);
             $landingLabel = $landing === '/technician' ? 'Technician' : ($landing === '/teacher' ? 'View My Timetable' : 'Settings');
             $nav .= '<li class="nav-divider"><a' . $active($landing) . ' href="' . $landing . '">' . $landingLabel . '</a></li>';
-            if (SessionAuth::hasRole($user, 'teacher')) $nav .= '<li><a' . $active('/teacher/day') . ' href="/teacher/day">Day View</a></li>';
+            if (SessionAuth::hasRole($user, 'teacher')) $nav .= '<li class="nav-subitem"><a' . $active('/teacher/day') . ' href="/teacher/day">Day View</a></li><li class="nav-subitem"><a' . $active('/teacher/class') . ' href="/teacher/class">Class View</a></li>';
             $admin = SessionAuth::isAdmin($user);
             $adminLink = fn (string $path, string $label): string => $admin ? '<a' . $active($path) . ' href="' . $path . '">' . $label . '</a>' : '<span class="nav-disabled" aria-disabled="true" title="Administrators only">' . $label . '</span>';
             $nav .= '<li>' . $adminLink('/settings', 'Settings') . '</li><li>' . $adminLink('/admin/people', 'People') . '</li><li>' . $adminLink('/admin/timetable', 'Timetable') . '</li>';

@@ -92,6 +92,7 @@ small { font-size: .82rem; }
 .site-nav li a:hover, .site-nav li a:focus-visible { background: var(--secondary-pale); }
 .site-nav .nav-disabled { display: block; border-radius: var(--corner); padding: .38rem .5rem; color: var(--muted); cursor: not-allowed; }
 .site-nav li a.active, .selected-state { background: var(--primary-pale); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); font-weight: 700; color: var(--ink); }
+.site-nav li.nav-subitem { padding-left: .65rem; font-size: .92rem; }
 .staff-identifier { width: 5rem; max-width: 5rem; text-transform: uppercase; }
 .site-main { width: min(100%, 78rem); padding: var(--space-5) clamp(1rem, 4vw, 4rem); }
 .alpha-banner { margin: 0 0 var(--space-4); border: 1px solid #7d0015; border-radius: var(--corner); background: #b00020; color: #fff; padding: .8rem 1rem; font-weight: 700; line-height: 1.4; }

@@ -21,6 +21,7 @@ final class ApplicationRoute
     public const ADMIN_TIMETABLE_RESOURCES = 'admin_timetable_resources';
     public const TEACHER_WEEK = 'teacher_week';
     public const TEACHER_DAY = 'teacher_day';
+    public const TEACHER_CLASS = 'teacher_class';
     public const SETUP = 'setup';
     public const LOGIN = 'login';
     public const LOGOUT = 'logout';
@@ -57,6 +58,9 @@ final class ApplicationRoute
         }
         if ($path === '/teacher/day') {
             return self::TEACHER_DAY;
+        }
+        if ($path === '/teacher/class') {
+            return self::TEACHER_CLASS;
         }
         if ($path === '/setup') return self::SETUP;
         if ($path === '/login') return self::LOGIN;

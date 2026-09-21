@@ -46,6 +46,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Next week', $view, 'Next-week navigation was not rendered.');
         assertContainsValue('This week', $view, 'This-week control was not rendered.');
         assertContainsValue('/teacher/day?date=2026-09-07', $view, 'Week day headings did not link to the teacher day view.');
+        assertContainsValue('/teacher/class', \Reqsheet\Http\PageLayout::render('Teacher', '<p>Teacher</p>', ['id' => 10, 'organisation_id' => 1, 'roles' => ['teacher']]), 'Teacher navigation did not expose Class View.');
         assertContainsValue('today-row', $view, 'Current day was not gently highlighted.');
         assertSameValue(true, $store->ensured, 'Teacher week did not prepare effective recurring assignments for the selected week.');
         $css = (string) file_get_contents(__DIR__ . '/../public/assets/app.css');
@@ -117,6 +118,32 @@ final class TeacherWeekPageTest
         $emptyDay = $dayPage->handle('GET', ['date' => '2026-09-08']);
         assertContainsValue('No lessons are scheduled for this date.', $emptyDay, 'Day view did not render its empty state.');
 
+        $classPage = new \Reqsheet\Http\TeacherClassPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-09'), ['staff_identifier' => 'NEV', 'roles' => ['teacher']]);
+        $class = $classPage->handle('GET', ['class_id' => 301]);
+        assertContainsValue('Class View', $class, 'Class View did not render.');
+        assertContainsValue('option value="301" selected', $class, 'Class View did not select the authorised class.');
+        assertContainsValue('Plan the experiment', $class, 'Class View did not show the dated lesson planning data.');
+        $boundedStore = new TeacherStore();
+        for ($offset = 1; $offset <= 4; $offset++) {
+            $row = $boundedStore->occurrences[500];
+            $row['id'] = 600 + $offset; $row['lesson_date'] = '2026-08-' . str_pad((string) $offset, 2, '0', STR_PAD_LEFT);
+            $boundedStore->occurrences[$row['id']] = $row;
+        }
+        for ($offset = 0; $offset < 22; $offset++) {
+            $row = $boundedStore->occurrences[500];
+            $row['id'] = 700 + $offset; $row['lesson_date'] = (new DateTimeImmutable('2026-09-09'))->modify('+' . $offset . ' days')->format('Y-m-d');
+            $boundedStore->occurrences[$row['id']] = $row;
+        }
+        $bounded = (new TeacherPlanningService($boundedStore))->loadClass(1, 10, 301, new DateTimeImmutable('2026-09-09'));
+        assertSameValue(3, count($bounded['previous']), 'Class View did not bound previous lessons to the three most recent.');
+        assertSameValue(21, count($bounded['upcoming']), 'Class View did not bound upcoming lessons to the nearest plus twenty subsequent lessons.');
+        $invalidClass = $classPage->handle('GET', ['class_id' => 999]);
+        assertContainsValue('Class is not available for this teacher.', $invalidClass, 'Unauthorised class identifier was not rejected.');
+        assertNotContainsValue('Plan the experiment', $invalidClass, 'Unauthorised class data leaked into Class View.');
+        $store->noClasses = true;
+        assertContainsValue('No classes are currently assigned to you.', $classPage->handle('GET', []), 'Class View did not render its no-class empty state.');
+        $store->noClasses = false;
+
         $foreign = new TeacherWeekPage(new TeacherPlanningService($store), 2, 10, new DateTimeImmutable('2026-09-09'));
         assertContainsValue('Teacher does not belong to the requested organisation.', $foreign->handle('GET', [], []), 'Foreign organisation was not rejected.');
     }
@@ -136,6 +163,7 @@ final class TeacherStore implements TeacherPlanningStore
 {
         public array $occurrences = [500 => [
         'id' => 500, 'lesson_date' => '2026-09-07', 'timetable_version_id' => 1, 'snapshot_teacher_user_id' => 10,
+        'class_id' => 301,
         'snapshot_class_code' => '13PHY', 'snapshot_room_code' => 'LAB-A', 'snapshot_start_slot_id' => 101,
         'snapshot_duration_periods' => 2, 'day_of_week' => 1, 'teaching_period_number' => 1, 'slot_label' => 'Period One',
         'state' => 'not_completed', 'requirements_text' => 'Bring goggles', 'planning_notes' => 'Plan the experiment',
@@ -145,6 +173,7 @@ final class TeacherStore implements TeacherPlanningStore
     /** @var list<TimetableSlot> */
         public array $slots = [];
     public bool $ensured = false;
+    public bool $noClasses = false;
     public int $firstDay = 1;
 
     public function __construct()
@@ -161,11 +190,14 @@ final class TeacherStore implements TeacherPlanningStore
     }
 
     public function teacherBelongsToOrganisation(int $teacherId, int $organisationId): bool { return $teacherId === 10 && $organisationId === 1; }
+    public function classesForTeacher(int $organisationId, int $teacherId): array { return !$this->noClasses && $organisationId === 1 && $teacherId === 10 ? [['id' => 301, 'code' => '13PHY']] : []; }
     public function activeFirstDayOfWeek(int $organisationId): int { return $this->firstDay; }
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion { return $organisationId === 1 && $date >= $this->version->effectiveFrom ? $this->version : null; }
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
+    public function ensureOccurrencesForRange(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
     public function slotsForVersion(int $versionId): array { return $this->slots; }
     public function occurrencesForTeacherDate(int $organisationId, int $teacherId, DateTimeImmutable $date): array { return array_values(array_filter($this->occurrences, static fn (array $o): bool => $o['lesson_date'] === $date->format('Y-m-d'))); }
+    public function occurrencesForTeacherClass(int $organisationId, int $teacherId, int $classId, DateTimeImmutable $start, DateTimeImmutable $end, int $limit, bool $descending = false): array { $rows = array_values(array_filter($this->occurrences, static fn (array $o): bool => (int) ($o['class_id'] ?? 0) === $classId && $o['lesson_date'] >= $start->format('Y-m-d') && $o['lesson_date'] <= $end->format('Y-m-d'))); usort($rows, static fn (array $a, array $b): int => [$a['lesson_date'], $a['teaching_period_number'], $a['id']] <=> [$b['lesson_date'], $b['teaching_period_number'], $b['id']]); if ($descending) $rows = array_reverse($rows); return array_slice($rows, 0, $limit); }
     public function findOccurrenceForTeacher(int $organisationId, int $teacherId, int $occurrenceId): ?array { return $this->occurrences[$occurrenceId] ?? null; }
     public function savePlanning(int $occurrenceId, string $state, string $lessonOutline, string $requisitions, string $riskAssessment): void { $this->occurrences[$occurrenceId]['state'] = $state; $this->occurrences[$occurrenceId]['planning_notes'] = $lessonOutline; $this->occurrences[$occurrenceId]['requirements_text'] = $requisitions; $this->occurrences[$occurrenceId]['risk_assessment_text'] = $riskAssessment; }
 }
