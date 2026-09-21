@@ -72,8 +72,11 @@ final class TeacherPlanningService
         $pastStart = $today->sub(new DateInterval('P365D'));
         $futureEnd = $today->add(new DateInterval('P365D'));
         $this->store->ensureOccurrencesForRange($organisationId, $pastStart, $futureEnd);
-        $previous = $this->store->occurrencesForTeacherClass($organisationId, $teacherId, $classId, $pastStart, $today->sub(new DateInterval('P1D')), 3, true);
-        $upcoming = $this->store->occurrencesForTeacherClass($organisationId, $teacherId, $classId, $today, $futureEnd, 21);
+        // Retrieval remains bounded by the result limits; the wide date bounds
+        // allow already-existing historical snapshots outside the generation
+        // window to remain visible.
+        $previous = $this->store->occurrencesForTeacherClass($organisationId, $teacherId, $classId, new DateTimeImmutable('1000-01-01'), $today->sub(new DateInterval('P1D')), 3, true);
+        $upcoming = $this->store->occurrencesForTeacherClass($organisationId, $teacherId, $classId, $today, new DateTimeImmutable('9999-12-31'), 21);
         usort($previous, self::occurrenceOrder(...));
         usort($upcoming, self::occurrenceOrder(...));
         return ['classes' => $classes, 'selected' => $selected, 'previous' => $previous, 'upcoming' => $upcoming];
