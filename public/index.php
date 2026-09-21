@@ -378,6 +378,11 @@ HTML;
                         <p><button type="button" class="secondary" data-copy-donation="nuttyhandle26@walletofsatoshi.com">Copy Lightning Address</button> <span class="donation-copy-status" role="status" aria-live="polite"></span></p>
                         <p class="muted">This QR contains the Lightning Address itself. Wallet support for scanning a plain Lightning Address may vary.</p>
                     </article>
+                    <article class="donation-method">
+                        <h5>Patreon</h5>
+                        <p>Support the ongoing development of Reqsheet through Patreon.</p>
+                        <p><a class="button" href="https://patreon.com/Reqsheet?utm_medium=unknown&amp;utm_source=join_link&amp;utm_campaign=creatorshare_creator&amp;utm_content=copyLink" target="_blank" rel="noopener noreferrer">Support us on Patreon</a></p>
+                    </article>
                 </div>
                 <script>(function(){document.querySelectorAll('[data-copy-donation]').forEach(function(button){button.addEventListener('click',function(){var status=button.parentElement.querySelector('.donation-copy-status'),value=button.dataset.copyDonation;function done(){status.textContent='Copied';}if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(value).then(done).catch(function(){fallback();});}else{fallback();}function fallback(){var field=document.createElement('textarea');field.value=value;field.setAttribute('readonly','');field.style.position='fixed';field.style.opacity='0';document.body.appendChild(field);field.select();try{document.execCommand('copy');done();}finally{field.remove();}}});});})();</script>
             </section>

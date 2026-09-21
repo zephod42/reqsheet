@@ -219,6 +219,8 @@ foreach ([
     'nuttyhandle26@walletofsatoshi.com',
     'Copy Address',
     'Copy Lightning Address',
+    'Support us on Patreon',
+    'https://patreon.com/Reqsheet?utm_medium=unknown&amp;utm_source=join_link&amp;utm_campaign=creatorshare_creator&amp;utm_content=copyLink',
     'Ultimately, Reqsheet is intended to operate as a software-as-a-service (SaaS) business.',
     'potentially in the region of £20, €20 or $20 per school',
     'at least 60 days after that notice',
@@ -243,6 +245,9 @@ foreach ($alphaFragments as $alphaFragment) {
 }
 if (!preg_match('/<section class="donation-section".*?<\/section>/s', $publicIndex, $donationMatch) || str_contains($donationMatch[0], 'private') || str_contains($donationMatch[0], 'seed')) {
     throw new RuntimeException('Donation section is missing or contains private wallet information.');
+}
+if (!str_contains($donationMatch[0], 'target="_blank" rel="noopener noreferrer"') || !str_contains($donationMatch[0], 'Support us on Patreon')) {
+    throw new RuntimeException('Patreon donation link is missing safe external-link attributes.');
 }
 foreach (['public/assets/bitcoin-donation.svg', 'public/assets/lightning-donation.svg'] as $donationAsset) {
     if (!is_file(dirname(__DIR__) . '/' . $donationAsset) || filesize(dirname(__DIR__) . '/' . $donationAsset) < 100) {
