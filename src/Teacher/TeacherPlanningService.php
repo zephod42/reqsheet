@@ -71,7 +71,7 @@ final class TeacherPlanningService
         // available for this finite view window.
         $pastStart = $today->sub(new DateInterval('P365D'));
         $futureEnd = $today->add(new DateInterval('P365D'));
-        $this->store->ensureOccurrencesForRange($organisationId, $pastStart, $futureEnd);
+        $this->store->ensureOccurrencesForRange($organisationId, $pastStart, $futureEnd, $teacherId, $classId);
         // Retrieval remains bounded by the result limits; the wide date bounds
         // allow already-existing historical snapshots outside the generation
         // window to remain visible.

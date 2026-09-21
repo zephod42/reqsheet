@@ -15,12 +15,16 @@ final class TimetableOccurrenceGenerator
 
     /**
      * Generate occurrences for an inclusive calendar-date range.
+     *
+     * @param list<int>|null $lessonIds Optional materialisation scope. The
+     * complete version is still validated before this filter is applied.
      */
     public function generate(
         int $organisationId,
         int $versionId,
         string $startDate,
         string $endDate,
+        ?array $lessonIds = null,
     ): GenerationResult {
         $requestedStart = self::parseDate($startDate, 'start date');
         $requestedEnd = self::parseDate($endDate, 'end date');
@@ -58,6 +62,10 @@ final class TimetableOccurrenceGenerator
         if ($errors !== []) {
             sort($errors);
             throw new TimetableValidationException(array_values(array_unique($errors)));
+        }
+        if ($lessonIds !== null) {
+            $included = array_fill_keys(array_map('intval', $lessonIds), true);
+            $validated = array_intersect_key($validated, $included);
         }
 
         $this->store->begin();

@@ -137,11 +137,20 @@ final class TeacherWeekPageTest
         $bounded = (new TeacherPlanningService($boundedStore))->loadClass(1, 10, 301, new DateTimeImmutable('2026-09-09'));
         assertSameValue(3, count($bounded['previous']), 'Class View did not bound previous lessons to the three most recent.');
         assertSameValue(21, count($bounded['upcoming']), 'Class View did not bound upcoming lessons to the nearest plus twenty subsequent lessons.');
+        assertSameValue([1, 10, 301], $boundedStore->lastRangeScope, 'Class View occurrence generation was not scoped to its organisation, teacher, and class.');
+        $boundedStore->classes[] = ['id' => 302, 'code' => '12CHEM'];
+        $boundedStore->classes[] = ['id' => 303, 'code' => '11BIO'];
+        $severalClassesPage = new \Reqsheet\Http\TeacherClassPage(new TeacherPlanningService($boundedStore), 1, 10, new DateTimeImmutable('2026-09-09'));
+        $severalClasses = $severalClassesPage->handle('GET', ['class_id' => 301]);
+        assertContainsValue('12CHEM', $severalClasses, 'Class View did not list a teacher\'s second assigned class.');
+        assertContainsValue('11BIO', $severalClasses, 'Class View did not list a teacher\'s third assigned class.');
         $invalidClass = $classPage->handle('GET', ['class_id' => 999]);
         assertContainsValue('Class is not available for this teacher.', $invalidClass, 'Unauthorised class identifier was not rejected.');
         assertNotContainsValue('Plan the experiment', $invalidClass, 'Unauthorised class data leaked into Class View.');
         $store->noClasses = true;
+        $store->ensured = false;
         assertContainsValue('No classes are currently assigned to you.', $classPage->handle('GET', []), 'Class View did not render its no-class empty state.');
+        assertSameValue(false, $store->ensured, 'The no-class empty state unnecessarily generated occurrences.');
         $store->noClasses = false;
 
         $foreign = new TeacherWeekPage(new TeacherPlanningService($store), 2, 10, new DateTimeImmutable('2026-09-09'));
@@ -175,6 +184,10 @@ final class TeacherStore implements TeacherPlanningStore
     public bool $ensured = false;
     public bool $noClasses = false;
     public int $firstDay = 1;
+    /** @var list<array{id:int,code:string}> */
+    public array $classes = [['id' => 301, 'code' => '13PHY']];
+    /** @var array{int,int,int}|null */
+    public ?array $lastRangeScope = null;
 
     public function __construct()
     {
@@ -190,11 +203,11 @@ final class TeacherStore implements TeacherPlanningStore
     }
 
     public function teacherBelongsToOrganisation(int $teacherId, int $organisationId): bool { return $teacherId === 10 && $organisationId === 1; }
-    public function classesForTeacher(int $organisationId, int $teacherId): array { return !$this->noClasses && $organisationId === 1 && $teacherId === 10 ? [['id' => 301, 'code' => '13PHY']] : []; }
+    public function classesForTeacher(int $organisationId, int $teacherId): array { return !$this->noClasses && $organisationId === 1 && $teacherId === 10 ? $this->classes : []; }
     public function activeFirstDayOfWeek(int $organisationId): int { return $this->firstDay; }
     public function effectiveVersion(int $organisationId, DateTimeImmutable $date): ?TimetableVersion { return $organisationId === 1 && $date >= $this->version->effectiveFrom ? $this->version : null; }
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
-    public function ensureOccurrencesForRange(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
+    public function ensureOccurrencesForRange(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end, ?int $teacherId = null, ?int $classId = null): void { $this->ensured = true; $this->lastRangeScope = [$organisationId, (int) $teacherId, (int) $classId]; }
     public function slotsForVersion(int $versionId): array { return $this->slots; }
     public function occurrencesForTeacherDate(int $organisationId, int $teacherId, DateTimeImmutable $date): array { return array_values(array_filter($this->occurrences, static fn (array $o): bool => $o['lesson_date'] === $date->format('Y-m-d'))); }
     public function occurrencesForTeacherClass(int $organisationId, int $teacherId, int $classId, DateTimeImmutable $start, DateTimeImmutable $end, int $limit, bool $descending = false): array { $rows = array_values(array_filter($this->occurrences, static fn (array $o): bool => (int) ($o['class_id'] ?? 0) === $classId && $o['lesson_date'] >= $start->format('Y-m-d') && $o['lesson_date'] <= $end->format('Y-m-d'))); usort($rows, static fn (array $a, array $b): int => [$a['lesson_date'], $a['teaching_period_number'], $a['id']] <=> [$b['lesson_date'], $b['teaching_period_number'], $b['id']]); if ($descending) $rows = array_reverse($rows); return array_slice($rows, 0, $limit); }

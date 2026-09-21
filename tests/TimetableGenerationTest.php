@@ -25,6 +25,7 @@ final class TimetableGenerationTest
         self::generatesWithinDatesAndWeekdays();
         self::handlesOpenEndedVersions();
         self::isIdempotentAndPreservesExistingSnapshots();
+        self::boundsFilteredGenerationAndTeacherLookups();
         self::handlesEmptyAndInvalidRanges();
     }
 
@@ -155,6 +156,32 @@ final class TimetableGenerationTest
         self::expectValidation(self::generator(self::lesson(1, 1, 101, 1)), 'not-a-date', '2026-09-07');
     }
 
+    private static function boundsFilteredGenerationAndTeacherLookups(): void
+    {
+        $store = new InMemoryTimetableStore();
+        $store->version = new TimetableVersion(10, 1, null, self::date('2026-09-01'), null);
+        for ($period = 1; $period <= 20; $period++) {
+            $slotId = 1000 + $period;
+            $store->slots[] = new TimetableSlot($slotId, 10, 1, $period, 'teaching', $period);
+            for ($teacherOffset = 1; $teacherOffset <= 30; $teacherOffset++) {
+                $teacherId = 500 + $teacherOffset;
+                $lessonId = (($period - 1) * 30) + $teacherOffset;
+                $store->teacherOrganisations[$teacherId] = 1;
+                $store->lessons[] = self::lesson($lessonId, 1, $slotId, 1, $teacherId, 'LAB-' . $lessonId, 'CLASS-' . $lessonId);
+            }
+        }
+        $generator = new TimetableOccurrenceGenerator($store);
+        $first = $generator->generate(1, 10, '2026-09-07', '2026-09-13', [1]);
+        \assertSameValue(1, $first->generated, 'Filtered generation materialised unrelated recurring lessons.');
+        \assertSameValue(30, array_sum($store->teacherOrganisationLookups), 'Substantial timetable validation did not bound membership lookups by distinct teacher.');
+        \assertSameValue(1, $store->teacherOrganisationLookups[501] ?? 0, 'Validation repeated an identical teacher-organisation lookup.');
+        \assertSameValue(['2026-09-07/1'], array_keys($store->occurrences), 'Filtered generation created an unexpected occurrence.');
+
+        $second = $generator->generate(1, 10, '2026-09-07', '2026-09-13', [1]);
+        \assertSameValue(0, $second->generated, 'Repeated filtered generation created a duplicate occurrence.');
+        \assertSameValue(1, $second->skippedExisting, 'Repeated filtered generation did not reuse the existing occurrence.');
+    }
+
     private static function generator(array|RecurringLesson $lessons, array $extraSlots = []): TimetableOccurrenceGenerator
     {
         return new TimetableOccurrenceGenerator(self::store($lessons, $extraSlots));
@@ -229,6 +256,8 @@ final class InMemoryTimetableStore implements TimetableGenerationStore
     public array $lessons = [];
     /** @var array<int, int> */
     public array $teacherOrganisations = [501 => 1, 502 => 2, 503 => 1];
+    /** @var array<int, int> */
+    public array $teacherOrganisationLookups = [];
     /** @var array<string, array<string, mixed>> */
     public array $occurrences = [];
     private ?array $transactionSnapshot = null;
@@ -245,6 +274,7 @@ final class InMemoryTimetableStore implements TimetableGenerationStore
 
     public function findTeacherOrganisation(int $teacherUserId): ?int
     {
+        $this->teacherOrganisationLookups[$teacherUserId] = ($this->teacherOrganisationLookups[$teacherUserId] ?? 0) + 1;
         return $this->teacherOrganisations[$teacherUserId] ?? null;
     }
 

@@ -22,9 +22,16 @@ final class TimetableRules
         [$slotsById, $slotsByDay] = self::indexSlots($slots);
         $validated = [];
         $errors = [];
+        $teacherOrganisations = [];
+        $cachedTeacherOrganisation = static function (int $teacherId) use ($teacherOrganisation, &$teacherOrganisations): ?int {
+            if (!array_key_exists($teacherId, $teacherOrganisations)) {
+                $teacherOrganisations[$teacherId] = $teacherOrganisation($teacherId);
+            }
+            return $teacherOrganisations[$teacherId];
+        };
 
         foreach ($lessons as $lesson) {
-            $lessonErrors = self::validateLesson($lesson, $version, $organisationId, $slotsById, $slotsByDay, $teacherOrganisation);
+            $lessonErrors = self::validateLesson($lesson, $version, $organisationId, $slotsById, $slotsByDay, $cachedTeacherOrganisation);
             if ($lessonErrors !== []) {
                 $errors = [...$errors, ...$lessonErrors];
                 continue;

@@ -21,7 +21,13 @@ interface TeacherPlanningStore
 
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void;
 
-    public function ensureOccurrencesForRange(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void;
+    public function ensureOccurrencesForRange(
+        int $organisationId,
+        DateTimeImmutable $start,
+        DateTimeImmutable $end,
+        ?int $teacherId = null,
+        ?int $classId = null,
+    ): void;
 
     /** @return list<TimetableSlot> */
     public function slotsForVersion(int $versionId): array;

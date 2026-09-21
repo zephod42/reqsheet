@@ -77,22 +77,99 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
 
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void
     {
+        $this->ensureOccurrencesForRange($organisationId, $start, $end);
+    }
+
+    public function ensureOccurrencesForRange(
+        int $organisationId,
+        DateTimeImmutable $start,
+        DateTimeImmutable $end,
+        ?int $teacherId = null,
+        ?int $classId = null,
+    ): void {
+        if (($teacherId === null) !== ($classId === null)) {
+            throw new \InvalidArgumentException('Teacher and class filters must be supplied together.');
+        }
+
         $generator = new TimetableOccurrenceGenerator(new PdoTimetableGenerationStore($this->pdo));
-        $date = $start;
-        while ($date <= $end) {
-            $version = $this->effectiveVersion($organisationId, $date);
-            if ($version !== null) $generator->generate($organisationId, $version->id, $date->format('Y-m-d'), $date->format('Y-m-d'));
-            $date = $date->modify('+1 day');
+        $lessonIdsByVersion = $teacherId === null ? null : $this->lessonIdsForTeacherClass($organisationId, $teacherId, $classId);
+        foreach ($this->effectiveVersionRanges($organisationId, $start, $end) as $range) {
+            $lessonIds = $lessonIdsByVersion === null ? null : ($lessonIdsByVersion[$range['version_id']] ?? []);
+            if ($lessonIds === []) continue;
+            $generator->generate(
+                $organisationId,
+                $range['version_id'],
+                $range['start']->format('Y-m-d'),
+                $range['end']->format('Y-m-d'),
+                $lessonIds,
+            );
         }
     }
 
-    public function ensureOccurrencesForRange(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void
+    /** @return array<int, list<int>> */
+    private function lessonIdsForTeacherClass(int $organisationId, int $teacherId, int $classId): array
     {
-        $generator = new TimetableOccurrenceGenerator(new PdoTimetableGenerationStore($this->pdo));
-        for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
-            $version = $this->effectiveVersion($organisationId, $date);
-            if ($version !== null) $generator->generate($organisationId, $version->id, $date->format('Y-m-d'), $date->format('Y-m-d'));
+        $statement = $this->prepare(
+            'SELECT rl.id, rl.timetable_version_id
+             FROM recurring_lessons rl
+             JOIN timetable_versions tv ON tv.id = rl.timetable_version_id AND tv.organisation_id = :organisation_id
+             JOIN organisation_classes c ON c.id = rl.class_id AND c.organisation_id = :class_organisation_id
+             WHERE rl.teacher_user_id = :teacher_id AND rl.class_id = :class_id',
+        );
+        $statement->execute([
+            'organisation_id' => $organisationId,
+            'class_organisation_id' => $organisationId,
+            'teacher_id' => $teacherId,
+            'class_id' => $classId,
+        ]);
+        $ids = [];
+        foreach ($statement->fetchAll() as $row) {
+            $ids[(int) $row['timetable_version_id']][] = (int) $row['id'];
         }
+        return $ids;
+    }
+
+    /** @return list<array{version_id:int,start:DateTimeImmutable,end:DateTimeImmutable}> */
+    private function effectiveVersionRanges(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        $statement = $this->prepare(
+            'SELECT tv.id, tv.effective_from, tv.effective_to
+             FROM timetable_versions tv
+             JOIN organisations o ON o.id = tv.organisation_id AND o.active_timetable_version_id IS NOT NULL
+             WHERE tv.organisation_id = :organisation_id
+               AND tv.effective_from <= :end_date
+               AND (tv.effective_to IS NULL OR tv.effective_to > :start_date)
+             ORDER BY tv.effective_from DESC, tv.id DESC',
+        );
+        $statement->execute([
+            'organisation_id' => $organisationId,
+            'start_date' => $start->format('Y-m-d'),
+            'end_date' => $end->format('Y-m-d'),
+        ]);
+        $versions = array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'from' => self::date((string) $row['effective_from']),
+            'to' => $row['effective_to'] === null ? null : self::date((string) $row['effective_to']),
+        ], $statement->fetchAll());
+
+        $ranges = [];
+        for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
+            $versionId = null;
+            foreach ($versions as $version) {
+                if ($version['from'] <= $date && ($version['to'] === null || $version['to'] > $date)) {
+                    $versionId = $version['id'];
+                    break;
+                }
+            }
+            if ($versionId === null) continue;
+            $last = array_key_last($ranges);
+            if ($last !== null && $ranges[$last]['version_id'] === $versionId && $ranges[$last]['end']->modify('+1 day') == $date) {
+                $ranges[$last]['end'] = $date;
+            } else {
+                $ranges[] = ['version_id' => $versionId, 'start' => $date, 'end' => $date];
+            }
+        }
+        return $ranges;
     }
 
     public function slotsForVersion(int $versionId): array
