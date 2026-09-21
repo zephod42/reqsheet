@@ -45,8 +45,9 @@ final class TechnicianPage
         if ($mode === 'my' && $selected === []) $selected = array_column($rooms, 'id');
         if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected, $mode, (array) ($query['room_ids'] ?? [])), $this->user);
         $data = $this->store->daily($this->organisationId, $date, $selected);
-        $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . '&rooms=' . $mode . '&print=week">Print Selected Week</a></div></section>';
-        $body .= '<div class="technician-controls"><a class="week-arrow" href="/technician?date=' . $date->modify('-1 day')->format('Y-m-d') . '&rooms=' . $mode . '">‹</a><strong class="technician-date">' . $this->e($date->format('l j F Y')) . '</strong><a class="week-arrow" href="/technician?date=' . $date->modify('+1 day')->format('Y-m-d') . '&rooms=' . $mode . '">›</a><a class="button secondary" href="/technician?date=' . (new DateTimeImmutable('today'))->format('Y-m-d') . '&rooms=' . $mode . '">Today</a></div>';
+        $roomQuery = $this->roomQuery($mode, $selected);
+        $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . $roomQuery . '&print=week">Print Selected Week</a></div></section>';
+        $body .= '<div class="technician-controls"><a class="week-arrow" href="/technician?date=' . $date->modify('-1 day')->format('Y-m-d') . $roomQuery . '">‹</a><strong class="technician-date">' . $this->e($date->format('l j F Y')) . '</strong><a class="week-arrow" href="/technician?date=' . $date->modify('+1 day')->format('Y-m-d') . $roomQuery . '">›</a><a class="button secondary" href="/technician?date=' . (new DateTimeImmutable('today'))->format('Y-m-d') . $roomQuery . '">Today</a></div>';
         $body .= $message === null ? '' : '<p class="notice">' . $this->e($message) . '</p>';
         if ($rooms === []) $body .= '<p class="notice">No rooms have been configured for this school yet. Add rooms in the timetable settings to use the technician grid.</p>';
         elseif (($data['version'] ?? null) === null) $body .= '<p class="notice">No active timetable is configured for this school yet.</p>';
@@ -119,6 +120,13 @@ final class TechnicianPage
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
         foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->grid($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true); }
         return $html . '</main><script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
+    }
+
+    private function roomQuery(string $mode, array $selected): string
+    {
+        $query = '&rooms=' . rawurlencode($mode);
+        if ($mode === 'custom') foreach (array_values(array_unique(array_map('intval', $selected))) as $roomId) if ($roomId > 0) $query .= '&room_ids[]=' . $roomId;
+        return $query;
     }
 
     private function date(string $value): DateTimeImmutable { if ($value === 'today' || $value === '') return new DateTimeImmutable('today'); $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value); return $date !== false && $date->format('Y-m-d') === $value ? $date : new DateTimeImmutable('today'); }

@@ -78,11 +78,25 @@ final class TechnicianPageTest
         $css = (string) file_get_contents(__DIR__ . '/../public/assets/app.css');
         assertContainsValue('break-inside: avoid', $css, 'Technician weekly print sheets did not prevent internal pagination splits.');
         assertNotContainsValue('.technician-week-print .technician-sheet { min-height: 100vh', $css, 'Technician weekly print retained the overflow-causing viewport height.');
-        assertContainsValue('.technician-grid th:first-child { width: 7rem; min-width: max-content;', $css, 'Technician period column was not given enough room for configured labels.');
+        assertContainsValue('.technician-grid th:first-child { width: 6rem; min-width: max-content;', $css, 'Technician period column was not modestly narrowed.');
+        assertContainsValue('.technician-cell-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .35rem; font-size: .9em; }', $css, 'Technician class and teacher labels were not compacted consistently.');
         assertContainsValue('.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }', $css, 'Technician print day heading was not centred.');
         assertContainsValue('.site-nav, .alpha-banner, .page-header a, dialog', $css, 'Alpha banner was not excluded from print output.');
+        $store->dailyCalls = [];
+        $customDay = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'custom', 'room_ids' => ['2']], []);
+        assertContainsValue('href="/technician?date=2026-09-23&rooms=custom&room_ids[]=2&print=week"', $customDay, 'Custom room selection was not passed from Day View to Week Print.');
+        assertSameValue([2], $store->dailyCalls[array_key_last($store->dailyCalls)], 'Day View did not pass the single custom room to its query.');
+        assertNotContainsValue('LAB-A</th>', $customDay, 'An unselected room appeared in the custom Day View.');
+        $store->dailyCalls = [];
         $customPrint = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'custom', 'room_ids' => ['2'], 'print' => 'week'], []);
         assertContainsValue('href="/technician?date=2026-09-23&rooms=custom&room_ids[]=2"', $customPrint, 'Custom room selection was not preserved by the print return link.');
+        assertSameValue([[2], [2], [2]], $store->dailyCalls, 'Week Print did not apply the single custom room to every printed day.');
+        assertContainsValue('LAB-B</th>', $customPrint, 'The selected room was missing from the custom Week Print.');
+        assertNotContainsValue('LAB-A</th>', $customPrint, 'An unselected room appeared in the custom Week Print.');
+        $store->dailyCalls = [];
+        $multiPrint = $page->handle('GET', ['date' => '2026-09-23', 'rooms' => 'custom', 'room_ids' => ['2', '1'], 'print' => 'week'], []);
+        assertSameValue([[2, 1], [2, 1], [2, 1]], $store->dailyCalls, 'Multiple custom rooms were not applied to every printed day in the requested order.');
+        assertContainsValue('LAB-A</th><th>LAB-B</th>', $multiPrint, 'Custom Week Print did not retain the existing room order.');
         assertContainsValue('21-09-2026 Mon', $page->handle('GET', ['date' => '2026-09-21', 'teacher' => 10], []), 'Secondary technician date format was not UK-style.');
     }
 }
@@ -123,6 +137,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
     public bool $hasActiveTimetable = true;
     public bool $deletedTeacher = false;
     public array $preparationUpdate = [];
+    public array $dailyCalls = [];
     public function technicianBelongsToOrganisation(int $userId, int $organisationId): bool { return $userId === 20 && $organisationId === 1; }
     public function roomsForOrganisation(int $organisationId): array { return $this->rooms; }
     public function teachersForOrganisation(int $organisationId): array { return [['id' => 10, 'name' => 'John Smith']]; }
@@ -133,6 +148,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
     public function workingWeekStart(int $organisationId, DateTimeImmutable $date): DateTimeImmutable { return new DateTimeImmutable('2026-09-21'); }
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array
     {
+        $this->dailyCalls[] = $roomIds;
         return [
             'version' => $this->hasActiveTimetable ? ['id' => 1] : null,
             'slots' => [
@@ -145,6 +161,12 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
                 'snapshot_room_code' => 'LAB-A', 'snapshot_start_slot_id' => 1, 'snapshot_duration_periods' => 2,
                 'prepared_at' => null,
                 'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => 'Very long requisition text',
+                'planning_notes' => null, 'risk_assessment_text' => null,
+            ], [
+                'id' => 51, 'lesson_date' => $date->format('Y-m-d'), 'snapshot_teacher_user_id' => 10,
+                'teacher_name' => $this->deletedTeacher ? '???' : 'John Smith', 'teacher_initials' => $this->deletedTeacher ? '???' : 'JSM', 'snapshot_class_code' => '10B/Sc1',
+                'snapshot_room_code' => 'LAB-B', 'snapshot_start_slot_id' => 1, 'snapshot_duration_periods' => 1,
+                'prepared_at' => null, 'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => 'LAB-B requisition',
                 'planning_notes' => null, 'risk_assessment_text' => null,
             ]],
         ];

@@ -281,7 +281,7 @@ dialog .close { float: right; }
 .fixed-resource span { color: var(--muted); font-size: .82rem; }
 .assignment-dialog, .resource-dialog { position: fixed; top: 50%; left: calc(10.5rem + 1rem); right: 1rem; width: auto; max-width: 38rem; max-height: calc(100vh - 3rem); margin: 0 auto; transform: translateY(-50%); }
 .room-free { display: grid; min-height: 4rem; place-items: center; color: var(--muted); font-size: .75rem; letter-spacing: .04em; }
-.technician-cell-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .35rem; }
+.technician-cell-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .35rem; font-size: .9em; }
 .technician-cell-heading > :last-child { text-align: right; }
 .technician-cell-heading span { font-weight: 700; }
 .technician-prepped { color: #176b35; font-size: 1.15rem; line-height: 1; text-align: center; }
@@ -305,7 +305,7 @@ dialog .close { float: right; }
 .print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }
 .technician-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .technician-grid th, .technician-grid td { border: 1px solid var(--rule); padding: .35rem; vertical-align: top; }
-.technician-grid th:first-child { width: 7rem; min-width: max-content; text-align: center; vertical-align: middle; white-space: nowrap; }
+.technician-grid th:first-child { width: 6rem; min-width: max-content; text-align: center; vertical-align: middle; white-space: nowrap; }
 .technician-grid td { height: 4.2rem; }
 .technician-separator th, .technician-separator td { height: 1.5rem; background: #eee; color: var(--muted); }
 .technician-cell { height: 100%; overflow: hidden; }
