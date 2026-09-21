@@ -7,6 +7,7 @@ namespace Reqsheet\Tests;
 use DateTimeImmutable;
 use Reqsheet\Http\AdminAccess;
 use Reqsheet\Http\AdminTimetablePage;
+use Reqsheet\Http\CsrfToken;
 use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\TimetableVersion;
 use Reqsheet\Timetable\RecurringLesson;
@@ -68,6 +69,7 @@ final class AdminTimetablePageTest
         assertContains('Conjoined periods are disabled', $blockedSpan, 'Disabled conjoined-period mode permitted a span.');
 
         self::resourceBuilder();
+        self::roomLifecycle();
     }
 
     private static function resourceBuilder(): void
@@ -157,6 +159,45 @@ final class AdminTimetablePageTest
         $missingRooms = $page->handle('GET', ['version' => 1, 'csv_error' => 'no_rooms'], []);
         assertContains('Add at least one room before exporting', $missingRooms, 'Missing-room CSV export guidance was not rendered.');
     }
+
+    private static function roomLifecycle(): void
+    {
+        $store = new ResourceConfigurationStore();
+        $store->versions[1] = new TimetableVersion(1, 1, 'Room lifecycle', new DateTimeImmutable('2026-09-01'), null);
+        $store->rooms = [['id' => 401, 'code' => 'UNUSED'], ['id' => 402, 'code' => 'USED']];
+        $store->classes = [['id' => 501, 'code' => 'C1']];
+        $store->slots = [new TimetableSlot(101, 1, 1, 1, 'teaching', 1, 'P1')];
+        $admin = ['id' => 80, 'organisation_id' => 1, 'roles' => ['administrator'], 'is_admin' => true];
+        $page = new AdminTimetablePage($store, 1, ['working_days' => [1], 'first_day_of_week' => 1], $admin);
+        $csrf = CsrfToken::value();
+        $archived = $page->handle('POST', ['version' => 1], ['action' => 'archive_room', 'room_id' => 401, 'version' => 1, 'csrf_token' => $csrf]);
+        assertContains('Room UNUSED archived.', $archived, 'Active room could not be archived.');
+        $normal = $page->handle('GET', ['version' => 1], []);
+        assertNotContains('value="401"', $normal, 'Archived room remained in normal room selectors.');
+        assertNotContains('>UNUSED<', $normal, 'Archived room remained in the normal room-management list.');
+        $shown = $page->handle('GET', ['version' => 1, 'show_archived' => '1'], []);
+        assertContains('UNUSED', $shown, 'Show Archived did not display the archived room.');
+        assertContains('Restore', $shown, 'Archived room did not expose Restore.');
+        $restored = $page->handle('POST', ['version' => 1], ['action' => 'restore_room', 'room_id' => 401, 'version' => 1, 'csrf_token' => $csrf, 'show_archived' => '1']);
+        assertContains('Room UNUSED restored.', $restored, 'Archived room could not be restored.');
+        assertSameValue(false, $store->rooms[0]['archived'] ?? true, 'Restore did not preserve the room record state.');
+        $store->lessons[] = new RecurringLesson(99, 1, 10, 1, 101, 1, 'C1', 'USED', 501, 402);
+        $page->handle('POST', ['version' => 1], ['action' => 'archive_room', 'room_id' => 402, 'version' => 1, 'csrf_token' => $csrf]);
+        $editor = $page->handle('GET', ['version' => 1, 'view' => 'teacher', 'resource' => 10, 'edit' => 99], []);
+        assertContains('value="402" selected', $editor, 'Editing a lesson silently removed its archived room assignment.');
+        $newArchived = $page->handle('POST', [], ['action' => 'resource_save_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 10, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 1, 'class_id' => 501, 'room_id' => 402]);
+        assertContains('Room is archived', $newArchived, 'A new lesson could be assigned to an archived room.');
+        $updatedExisting = $page->handle('POST', [], ['action' => 'resource_save_lesson', 'version' => 1, 'view' => 'teacher', 'resource' => 10, 'lesson_id' => 99, 'teacher_user_id' => 10, 'day_of_week' => 1, 'start_slot_id' => 101, 'duration_periods' => 1, 'class_id' => 501, 'room_id' => 402]);
+        assertContains('Lesson updated.', $updatedExisting, 'An existing lesson could not retain its archived room.');
+        $blocked = $page->handle('POST', ['version' => 1], ['action' => 'delete_room', 'room_id' => 402, 'version' => 1, 'csrf_token' => $csrf, 'confirm_delete' => '1']);
+        assertContains('cannot be deleted because it is referenced', $blocked, 'Referenced room was permanently deleted.');
+        assertSameValue(true, in_array(402, array_column($store->rooms, 'id'), true), 'Referenced room disappeared from the store.');
+        $deleted = $page->handle('POST', ['version' => 1], ['action' => 'delete_room', 'room_id' => 401, 'version' => 1, 'csrf_token' => $csrf, 'confirm_delete' => '1']);
+        assertContains('Room UNUSED deleted permanently.', $deleted, 'Never-used room could not be permanently deleted.');
+        assertSameValue(false, in_array(401, array_column($store->rooms, 'id'), true), 'Never-used room was not deleted.');
+        $csrfBlocked = $page->handle('POST', ['version' => 1], ['action' => 'archive_room', 'room_id' => 402, 'version' => 1, 'csrf_token' => 'invalid']);
+        assertContains('form expired', strtolower($csrfBlocked), 'Room lifecycle action accepted invalid CSRF.');
+    }
 }
 
 class ResourceConfigurationStore extends ConfigurationStore implements ResourceTimetableStore
@@ -168,13 +209,18 @@ class ResourceConfigurationStore extends ConfigurationStore implements ResourceT
     public int $lessonReads = 0;
 
     public function usersForOrganisation(int $organisationId): array { return array_values(array_filter($this->users, static fn (array $user): bool => !isset($user['organisation_id']) || (int) $user['organisation_id'] === $organisationId)); }
-    public function roomsForOrganisation(int $organisationId): array { return array_values(array_filter($this->rooms, static fn (array $room): bool => !isset($room['organisation_id']) || (int) $room['organisation_id'] === $organisationId)); }
+    public function roomsForOrganisation(int $organisationId, bool $includeArchived = false): array { return array_values(array_filter($this->rooms, static fn (array $room): bool => (!isset($room['organisation_id']) || (int) $room['organisation_id'] === $organisationId) && ($includeArchived || empty($room['archived'])))); }
     public function classesForOrganisation(int $organisationId): array { return array_values(array_filter($this->classes, static fn (array $class): bool => !isset($class['organisation_id']) || (int) $class['organisation_id'] === $organisationId)); }
     public function lessonsForVersion(int $versionId): array { $this->lessonReads++; return parent::lessonsForVersion($versionId); }
-    public function createRoom(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->rooms[] = ['id' => $id, 'code' => trim($code)]; return $id; }
+    public function createRoom(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->rooms[] = ['id' => $id, 'code' => trim($code), 'archived' => false]; return $id; }
+    public function archiveRoom(int $organisationId, int $roomId): void { foreach ($this->rooms as &$room) if ((int) $room['id'] === $roomId) $room['archived'] = true; unset($room); }
+    public function restoreRoom(int $organisationId, int $roomId): void { foreach ($this->rooms as &$room) if ((int) $room['id'] === $roomId) $room['archived'] = false; unset($room); }
+    public function deleteRoomPermanently(int $organisationId, int $roomId): bool { foreach ($this->rooms as $index => $room) if ((int) $room['id'] === $roomId && !$this->roomHasReferences($organisationId, $roomId)) { array_splice($this->rooms, $index, 1); return true; } return false; }
+    public function roomHasReferences(int $organisationId, int $roomId): bool { return count(array_filter($this->lessons, static fn (RecurringLesson $lesson): bool => $lesson->roomId === $roomId)) > 0; }
     public function createClass(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->classes[] = ['id' => $id, 'code' => trim($code)]; return $id; }
     public function createTeacher(int $organisationId, string $code): int { $id = $this->nextResourceId(); $this->users[] = ['id' => $id, 'staff_identifier' => $code, 'is_active' => true]; $this->teachers[$id] = $organisationId; return $id; }
     public function roomBelongsToOrganisation(int $roomId, int $organisationId): bool { return $this->roomCode($roomId) !== null; }
+    public function roomIsActive(int $roomId, int $organisationId): bool { foreach ($this->rooms as $room) if ((int) $room['id'] === $roomId) return empty($room['archived']); return false; }
     public function classBelongsToOrganisation(int $classId, int $organisationId): bool { return $this->classCode($classId) !== null; }
     public function roomCode(int $roomId): ?string { foreach ($this->rooms as $room) if ($room['id'] === $roomId) return $room['code']; return null; }
     public function classCode(int $classId): ?string { foreach ($this->classes as $class) if ($class['id'] === $classId) return $class['code']; return null; }

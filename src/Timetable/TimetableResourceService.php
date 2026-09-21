@@ -14,7 +14,7 @@ final class TimetableResourceService
 
     public function createRoom(int $organisationId, string $code): int
     {
-        return $this->create($organisationId, $code, $this->store->roomsForOrganisation($organisationId), 'room', $this->store->createRoom(...));
+        return $this->create($organisationId, $code, $this->store->roomsForOrganisation($organisationId, true), 'room', $this->store->createRoom(...));
     }
 
     public function createClass(int $organisationId, string $code): int

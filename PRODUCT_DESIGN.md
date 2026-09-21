@@ -143,6 +143,7 @@ The same screen also offers optional settings:
 
 Settings shows the current active timetable template as a compact read-only summary by default. `Create new timetable template` requires only a unique timetable name, working days, first day of the week, and periods per day. `Edit timetable` exposes the detailed configuration controls; activation is an explicit administrator action and exactly one organisation template may be active. Timetable templates do not require administrator-managed effective dates; legacy internal dates remain only for historical compatibility. The assignment builder does not create timetable templates or versions. Admins can manage rooms/labs by adding, renaming, reordering, and deactivating/archiving them.
 - Manage people by creating staff accounts identified solely by organisation-scoped three-letter initials. Admin is an optional additional permission.
+- Manage organisation rooms with active/archive/restore lifecycle controls. Archived rooms remain visible in historical lessons but are excluded from new assignments; permanent deletion is available only for rooms with no timetable or lesson references.
 
 The first pilot may create an account with no password until its first login, when the user sets one. This must be represented explicitly as awaiting-first-login, not inferred from a blank password, and is a consciously temporary security weakness requiring review before broader production deployment.
 

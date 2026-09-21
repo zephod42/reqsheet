@@ -42,8 +42,8 @@ final class TimetableCsvImportDraftStore
         return $draft;
     }
 
-    /** @param list<string> $errors @param list<string> $missingRooms @param list<string> $missingTeachers */
-    public function saveValidationFailure(int $organisationId, int $versionId, int $userId, string $csvContent, array $errors, array $missingRooms = [], array $missingTeachers = [], ?int $now = null): array
+    /** @param list<string> $errors @param list<string> $missingRooms @param list<string> $missingTeachers @param list<string> $archivedRooms */
+    public function saveValidationFailure(int $organisationId, int $versionId, int $userId, string $csvContent, array $errors, array $missingRooms = [], array $missingTeachers = [], array $archivedRooms = [], ?int $now = null): array
     {
         SessionAuth::start();
         $now ??= time();
@@ -56,6 +56,7 @@ final class TimetableCsvImportDraftStore
             'errors' => array_values($errors),
             'missing_rooms' => array_values($missingRooms),
             'missing_teachers' => array_values($missingTeachers),
+            'archived_rooms' => array_values($archivedRooms),
             'created_at' => $now,
             'expires_at' => $now + self::LIFETIME_SECONDS,
         ];

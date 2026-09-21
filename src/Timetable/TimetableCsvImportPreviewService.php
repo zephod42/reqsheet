@@ -15,7 +15,10 @@ final class TimetableCsvImportPreviewService
         if ($version === null || $version->organisationId !== $organisationId) {
             throw new TimetableCsvImportException(['The selected timetable is not available for this organisation.']);
         }
-        $rooms = $this->store->roomsForOrganisation($organisationId);
+        $allRooms = $this->store->roomsForOrganisation($organisationId, true);
+        $rooms = array_values(array_filter($allRooms, static fn (array $room): bool => empty($room['archived'])));
+        $archivedRoomsByCode = [];
+        foreach ($allRooms as $room) if (!empty($room['archived'])) $archivedRoomsByCode[(string) $room['code']][] = $room;
         if ($rooms === [] && $rows === []) throw new TimetableCsvImportException(['Add at least one room before importing a timetable CSV.']);
         $slots = $this->store->slotsForVersion($versionId);
         $teaching = array_values(array_filter($slots, static fn (TimetableSlot $slot): bool => $slot->isTeaching()));
@@ -58,7 +61,12 @@ final class TimetableCsvImportPreviewService
         $recognisedRows = 0;
         $newClassCodes = [];
         $missingTeachers = [];
+        $archivedRooms = [];
         foreach ($rows as $row) {
+            if (isset($archivedRoomsByCode[$row['room']])) {
+                $archivedRooms[$row['room']] = ($archivedRooms[$row['room']] ?? 0) + 1;
+                continue;
+            }
             if (!isset($roomsByCode[$row['room']])) {
                 $skippedRooms[$row['room']] = ($skippedRooms[$row['room']] ?? 0) + 1;
                 continue;
@@ -113,6 +121,9 @@ final class TimetableCsvImportPreviewService
         foreach (array_keys($skippedRooms) as $roomCode) {
             self::error($errors, 'Room ' . $roomCode . ' does not exist within the selected timetable template. Add it and validate the CSV again.');
         }
+        foreach (array_keys($archivedRooms) as $roomCode) {
+            self::error($errors, 'Room ' . $roomCode . ' is archived. Restore it and validate the CSV again.');
+        }
         if ($recognisedRows !== count($expected)) {
             self::error($errors, sprintf('The CSV contains %d retained data rows; %d are required for this timetable structure.', $recognisedRows, count($expected)));
         }
@@ -127,7 +138,9 @@ final class TimetableCsvImportPreviewService
             sort($missingRoomCodes);
             $missingTeacherCodes = array_keys($missingTeachers);
             sort($missingTeacherCodes);
-            throw new TimetableCsvImportException($errors, $missingRoomCodes, $missingTeacherCodes);
+            $archivedRoomCodes = array_keys($archivedRooms);
+            sort($archivedRoomCodes);
+            throw new TimetableCsvImportException($errors, $missingRoomCodes, $missingTeacherCodes, $archivedRoomCodes);
         }
 
         self::validateConflicts($occupied, $errors);

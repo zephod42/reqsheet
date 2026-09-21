@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Reqsheet\Http;
 
+use Reqsheet\Http\CsrfToken;
 use Reqsheet\Timetable\RecurringLesson;
 use Reqsheet\Timetable\RecurringLessonService;
 use Reqsheet\Timetable\TimetableConfigurationStore;
@@ -52,7 +53,22 @@ final class AdminTimetablePage
         if ($method === 'POST') {
             try {
                 $action = (string) ($input['action'] ?? '');
-                if ($action === 'create_resource') {
+                if (in_array($action, ['archive_room', 'restore_room', 'delete_room'], true)) {
+                    if (!SessionAuth::isAdmin($this->user) || !CsrfToken::valid($input['csrf_token'] ?? null)) throw new TimetableValidationException(['The form expired. Refresh the timetable builder and try again.']);
+                    $roomId = (int) ($input['room_id'] ?? 0);
+                    $rooms = $store->roomsForOrganisation($this->organisationId, true);
+                    $room = null;
+                    foreach ($rooms as $candidate) if ((int) $candidate['id'] === $roomId) { $room = $candidate; break; }
+                    if ($room === null) throw new TimetableValidationException(['Room is not available for this organisation.']);
+                    if ($action === 'archive_room') { $store->archiveRoom($this->organisationId, $roomId); $message = 'Room ' . $room['code'] . ' archived.'; }
+                    elseif ($action === 'restore_room') { $store->restoreRoom($this->organisationId, $roomId); $message = 'Room ' . $room['code'] . ' restored.'; }
+                    else {
+                        if (($input['confirm_delete'] ?? '') !== '1') throw new TimetableValidationException(['Confirm permanent deletion of room ' . $room['code'] . '.']);
+                        if (!$store->deleteRoomPermanently($this->organisationId, $roomId)) throw new TimetableValidationException(['Room ' . $room['code'] . ' cannot be deleted because it is referenced by timetable or lesson history. Archive it instead.']);
+                        $message = 'Room ' . $room['code'] . ' deleted permanently.';
+                    }
+                    $query = array_replace($query, ['version' => (int) ($input['version'] ?? 0), 'view' => 'room', 'show_archived' => (string) ($input['show_archived'] ?? '')]);
+                } elseif ($action === 'create_resource') {
                     $resource = new TimetableResourceService($store);
                     $type = (string) ($input['resource_type'] ?? '');
                     $id = match ($type) {
@@ -118,6 +134,7 @@ final class AdminTimetablePage
         $view = in_array($requestedView, ['teacher', 'room', 'class'], true) ? $requestedView : 'teacher';
         $users = $store->usersForOrganisation($this->organisationId);
         $rooms = $store->roomsForOrganisation($this->organisationId);
+        $allRooms = $store->roomsForOrganisation($this->organisationId, true);
         $classes = $store->classesForOrganisation($this->organisationId);
         $resource = (int) ($query['resource'] ?? 0);
         $activeUsers = $this->activeTeacherRows($users);
@@ -125,12 +142,13 @@ final class AdminTimetablePage
         $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable</p><h1>Timetable builder</h1></div><div class="form-actions">' . ($version === null ? '' : '<a class="button secondary" href="/admin/timetable/export.csv?version=' . $version->id . '">Export Blank CSV</a>') . '<a class="button secondary" href="/admin/timetable/resources.csv">Export Resource Reference</a><a class="button" href="/admin/people">Manage people</a></div></section>';
         $body .= '<p class="context">' . ($version === null ? 'Create a timetable version to begin.' : $this->versionContext($version)) . '</p>';
         $body .= $this->resourceToolbar($versions, $version?->id, $view, $resource, $users, $rooms, $classes);
+        $body .= $this->roomManagement($version?->id, $allRooms, $query);
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
         if ($version !== null) $body .= $this->importPanel($store, $version);
         if (!empty($query['create'])) $body .= $this->resourceCreationForm($version?->id, $view, $resource, (string) $query['create'], $query);
         elseif ($version !== null && $resource > 0) {
             $body .= $this->resourceGrid($store, $version, $view, $resource, $users);
-            if ((int) ($query['edit'] ?? 0) > 0 || ((int) ($query['day'] ?? 0) > 0 && (int) ($query['start_slot'] ?? 0) > 0)) $body .= $this->resourceLessonEditor($store, $version, $view, $resource, (int) ($query['edit'] ?? 0), $query, $users, $rooms, $classes);
+            if ((int) ($query['edit'] ?? 0) > 0 || ((int) ($query['day'] ?? 0) > 0 && (int) ($query['start_slot'] ?? 0) > 0)) $body .= $this->resourceLessonEditor($store, $version, $view, $resource, (int) ($query['edit'] ?? 0), $query, $users, $allRooms, $classes);
         } elseif ($version !== null) $body .= '<p class="notice">Add a teacher, room, or class to begin.</p>';
         return PageLayout::render('Admin timetable', $body, $this->user);
     }
@@ -147,6 +165,35 @@ final class AdminTimetablePage
         return $html . '<option value="__new__">Add new class...</option></select></label><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&view=class&create=class">Add class code</a></form></section>';
     }
 
+    /** @param list<array{id:int,code:string,archived?:bool}> $rooms */
+    private function roomManagement(?int $version, array $rooms, array $query): string
+    {
+        if ($version === null) return '';
+        $showArchived = (string) ($query['show_archived'] ?? '') === '1';
+        $visible = array_values(array_filter($rooms, static fn (array $room): bool => $showArchived || empty($room['archived'])));
+        $html = '<section class="editor-section room-management"><div class="section-heading"><div><p class="eyebrow">Room management</p><h2>' . ($showArchived ? 'Rooms' : 'Active rooms') . '</h2></div><a class="button secondary" href="/admin/timetable?version=' . (int) $version . '&show_archived=' . ($showArchived ? '0' : '1') . '">' . ($showArchived ? 'Hide Archived' : 'Show Archived') . '</a></div>';
+        if ($visible === []) return $html . '<p class="muted">No ' . ($showArchived ? '' : 'active ') . 'rooms.</p></section>';
+        foreach ($visible as $room) {
+            $code = (string) $room['code']; $archived = !empty($room['archived']);
+            $html .= '<div class="form-actions"><strong>' . $this->e($code) . '</strong>' . ($archived ? '<span class="muted">Archived</span>' : '') . '<form method="post" onsubmit="' . $this->confirmSubmit(($archived ? 'Restore room ' : 'Archive room ') . $code . '?') . '"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="' . ($archived ? 'restore_room' : 'archive_room') . '"><input type="hidden" name="room_id" value="' . (int) $room['id'] . '"><input type="hidden" name="version" value="' . (int) $version . '"><input type="hidden" name="show_archived" value="1"><button class="secondary">' . ($archived ? 'Restore' : 'Archive') . '</button></form>';
+            if (!$this->storeRoomHasReferences($rooms, (int) $room['id'])) $html .= '<form method="post" onsubmit="' . $this->confirmSubmit('Delete room ' . $code . ' permanently? This cannot be undone.') . '"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="delete_room"><input type="hidden" name="confirm_delete" value="1"><input type="hidden" name="room_id" value="' . (int) $room['id'] . '"><input type="hidden" name="version" value="' . (int) $version . '"><input type="hidden" name="show_archived" value="' . ($showArchived ? '1' : '') . '"><button class="danger">Delete Permanently</button></form>';
+            $html .= '</div>';
+        }
+        return $html . '</section>';
+    }
+
+    /** @param list<array{id:int,code:string,archived?:bool}> $rooms */
+    private function storeRoomHasReferences(array $rooms, int $roomId): bool
+    {
+        if ($this->store instanceof ResourceTimetableStore) return $this->store->roomHasReferences($this->organisationId, $roomId);
+        return false;
+    }
+
+    private function confirmSubmit(string $message): string
+    {
+        return $this->e('return confirm(' . json_encode($message, JSON_THROW_ON_ERROR) . ')');
+    }
+
     private function resourceCreationForm(?int $version, string $view, int $resource, string $type, array $query = []): string
     {
         return '<dialog class="resource-dialog" open><form method="post"><a class="close" href="/admin/timetable?version=' . (int) $version . '&view=' . $this->e((string) ($query['return_view'] ?? $view)) . '&resource=' . (int) ($query['return_resource'] ?? $resource) . '&day=' . (int) ($query['return_day'] ?? 0) . '&start_slot=' . (int) ($query['return_start_slot'] ?? 0) . '">Cancel</a><p class="eyebrow">Add resource</p><h2>' . $this->e($type === 'teacher' ? 'Teacher' : ($type === 'class' ? 'Class code' : 'Room')) . '</h2><input type="hidden" name="action" value="create_resource"><input type="hidden" name="resource_type" value="' . $this->e($type) . '"><input type="hidden" name="version" value="' . (int) $version . '"><input type="hidden" name="return_view" value="' . $this->e((string) ($query['return_view'] ?? $view)) . '"><input type="hidden" name="return_resource" value="' . (int) ($query['return_resource'] ?? $resource) . '"><input type="hidden" name="return_day" value="' . (int) ($query['return_day'] ?? 0) . '"><input type="hidden" name="return_start_slot" value="' . (int) ($query['return_start_slot'] ?? 0) . '"><label>' . ($type === 'teacher' ? 'Staff initials' : ($type === 'class' ? 'Class code' : 'Room code')) . '<input name="code" required autofocus></label><div class="form-actions"><button>Add</button></div></form></dialog><script>document.addEventListener("DOMContentLoaded",function(){var dialog=document.querySelector(".resource-dialog");if(!dialog)return;if(typeof dialog.showModal==="function"){dialog.close();dialog.showModal();}var field=dialog.querySelector("[autofocus]");if(field)field.focus();});</script>';
@@ -160,7 +207,7 @@ final class AdminTimetablePage
         foreach ($slots as $slot) $rows[$slot->sequenceNumber] = $slot->sequenceNumber;
         ksort($rows);
         $lessons = $store->lessonsForVersion($version->id);
-        $label = $this->resourceName($view, $resource, $users, $store->roomsForOrganisation($this->organisationId), $store->classesForOrganisation($this->organisationId));
+        $label = $this->resourceName($view, $resource, $users, $store->roomsForOrganisation($this->organisationId, true), $store->classesForOrganisation($this->organisationId));
         $html = '<section class="editor-section admin-resource-grid"><div class="section-heading"><div><p class="eyebrow">' . $this->e(ucfirst($view)) . ' timetable</p><h2>' . $this->e($label) . '</h2></div><p class="muted">Click an empty period to assign a lesson.</p></div><div class="timetable-scroll"><table><caption class="visually-hidden">Timetable grid</caption><thead><tr><th>Period</th>';
         foreach ($days as $day) $html .= '<th>' . $this->e($this->dayName($day)) . '</th>';
         $html .= '</tr></thead><tbody>';
@@ -243,6 +290,7 @@ final class AdminTimetablePage
     private function resourceSelect(string $name, int $selected, array $rows, string $addLabel): string
     {
         if ($name === 'teacher_user_id') $rows = $this->activeTeacherRows($rows);
+        if ($name === 'room_id') $rows = array_values(array_filter($rows, static fn (array $row): bool => empty($row['archived']) || (int) ($row['id'] ?? 0) === $selected));
         $html = '<select id="' . $name . '" name="' . $name . '"><option value="0">Select...</option>';
         foreach ($rows as $row) { $id = (int) $row['id']; $label = $row['code'] ?? ($row['staff_identifier'] ?? ''); $html .= '<option value="' . $id . '"' . ($id === $selected ? ' selected' : '') . '>' . $this->e((string) $label) . '</option>'; }
         return $html . '<option value="__new__">' . $this->e($addLabel) . '</option></select>';

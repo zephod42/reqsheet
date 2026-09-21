@@ -120,7 +120,7 @@ final class RecurringLessonService
         if ($this->store->occurrenceCountForLesson($lessonId) > 0) throw new TimetableValidationException(['This lesson cannot be changed after historical occurrences have been generated.']);
         $version = $this->store->findVersion($existing->timetableVersionId);
         if ($version === null) throw new TimetableValidationException(['Timetable version does not exist.']);
-        $errors = $this->resourceErrors($store, $version->organisationId, $classId, $roomId);
+        $errors = $this->resourceErrors($store, $version->organisationId, $classId, $roomId, $existing->roomId === $roomId);
         $classCode = $store->classCode($classId) ?? '';
         $roomCode = $store->roomCode($roomId) ?? '';
         if ($errors !== []) throw new TimetableValidationException($errors);
@@ -135,11 +135,12 @@ final class RecurringLessonService
         return $this->store;
     }
 
-    private function resourceErrors(ResourceTimetableStore $store, int $organisationId, int $classId, int $roomId): array
+    private function resourceErrors(ResourceTimetableStore $store, int $organisationId, int $classId, int $roomId, bool $allowArchivedRoom = false): array
     {
         $errors = [];
         if (!$store->classBelongsToOrganisation($classId, $organisationId)) $errors[] = 'Class is not available for this organisation.';
         if (!$store->roomBelongsToOrganisation($roomId, $organisationId)) $errors[] = 'Room is not available for this organisation.';
+        elseif (!$allowArchivedRoom && !$store->roomIsActive($roomId, $organisationId)) $errors[] = 'Room is archived. Restore it before assigning new lessons.';
         return $errors;
     }
 

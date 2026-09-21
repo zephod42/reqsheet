@@ -54,8 +54,8 @@ final class AdminTimetableCsvImport
             return new AdminTimetableCsvImportResponse(200, $this->preview($preview, (string) $draft['id']));
         } catch (TimetableCsvImportException $exception) {
             if ($csvContent !== '') {
-                $draft = $this->drafts->saveValidationFailure($this->organisationId, $versionId, (int) $this->user['id'], $csvContent, $exception->errors(), $exception->missingRooms(), $exception->missingTeachers());
-                return new AdminTimetableCsvImportResponse(422, $this->errors($versionId, $exception->errors(), $exception->missingRooms(), $exception->missingTeachers(), false, (string) $draft['id']));
+                $draft = $this->drafts->saveValidationFailure($this->organisationId, $versionId, (int) $this->user['id'], $csvContent, $exception->errors(), $exception->missingRooms(), $exception->missingTeachers(), $exception->archivedRooms());
+                return new AdminTimetableCsvImportResponse(422, $this->errors($versionId, $exception->errors(), $exception->missingRooms(), $exception->missingTeachers(), false, (string) $draft['id'], $exception->archivedRooms()));
             }
             $this->drafts->discard();
             return new AdminTimetableCsvImportResponse(422, $this->errors($versionId, $exception->errors()));
@@ -73,8 +73,8 @@ final class AdminTimetableCsvImport
             $fresh = $this->drafts->save($preview, (int) $this->user['id'], $draft['csv_content']);
             return new AdminTimetableCsvImportResponse(200, $this->preview($preview, (string) $fresh['id']));
         } catch (TimetableCsvImportException $exception) {
-            $fresh = $this->drafts->saveValidationFailure($this->organisationId, $versionId, (int) $this->user['id'], $draft['csv_content'], $exception->errors(), $exception->missingRooms(), $exception->missingTeachers());
-            return new AdminTimetableCsvImportResponse(422, $this->errors($versionId, $exception->errors(), $exception->missingRooms(), $exception->missingTeachers(), false, (string) $fresh['id']));
+            $fresh = $this->drafts->saveValidationFailure($this->organisationId, $versionId, (int) $this->user['id'], $draft['csv_content'], $exception->errors(), $exception->missingRooms(), $exception->missingTeachers(), $exception->archivedRooms());
+            return new AdminTimetableCsvImportResponse(422, $this->errors($versionId, $exception->errors(), $exception->missingRooms(), $exception->missingTeachers(), false, (string) $fresh['id'], $exception->archivedRooms()));
         }
     }
 
@@ -89,7 +89,8 @@ final class AdminTimetableCsvImport
         if ($version === null || $version->organisationId !== $this->organisationId) return $this->jsonResourceResponse(422, 'The selected timetable is not available for this organisation.');
         $type = (string) ($input['resource_type'] ?? '');
         $code = trim((string) ($input['code'] ?? ''));
-        $allowedCodes = $type === 'room' ? ($draft['missing_rooms'] ?? []) : ($type === 'teacher' ? ($draft['missing_teachers'] ?? []) : []);
+        $operation = (string) ($input['operation'] ?? 'create');
+        $allowedCodes = $type === 'room' && $operation === 'restore' ? ($draft['archived_rooms'] ?? []) : ($type === 'room' ? ($draft['missing_rooms'] ?? []) : ($type === 'teacher' ? ($draft['missing_teachers'] ?? []) : []));
         if (!in_array($code, array_map('strval', is_array($allowedCodes) ? $allowedCodes : []), true)) {
             return $this->jsonResourceResponse(422, 'That resource is not part of this validation result. Validate the retained CSV again.');
         }
@@ -105,6 +106,13 @@ final class AdminTimetableCsvImport
             } elseif ($type === 'teacher') {
                 $service->createTeacher($this->organisationId, $code);
                 $message = 'Teacher ' . $code . ' is ready. They can set a password on first login.';
+            } elseif ($type === 'room' && $operation === 'restore') {
+                $room = null;
+                foreach ($this->resources->roomsForOrganisation($this->organisationId, true) as $candidate) if (strcasecmp((string) $candidate['code'], $code) === 0) { $room = $candidate; break; }
+                if ($room === null) throw new \Reqsheet\Timetable\TimetableValidationException(['That room is not available for this organisation.']);
+                $this->resources->restoreRoom($this->organisationId, (int) $room['id']);
+                $message = 'Room ' . $code . ' restored.';
+                return $this->jsonResourceResponse(200, $message, true, $type, $code, '✓ Restored');
             } elseif ($type === 'room') {
                 try { $service->createRoom($this->organisationId, $code); }
                 catch (\Reqsheet\Timetable\TimetableValidationException | \PDOException $exception) { if (!$this->roomExists($code)) throw $exception; }
@@ -112,16 +120,16 @@ final class AdminTimetableCsvImport
             } else {
                 throw new \Reqsheet\Timetable\TimetableValidationException(['Resource type is invalid.']);
             }
-            return $this->jsonResourceResponse(200, $message, true, $type, $code);
+            return $this->jsonResourceResponse(200, $message, true, $type, $code, '✓ Added');
         } catch (AccountValidationException | \Reqsheet\Timetable\TimetableValidationException | \PDOException $exception) {
             $message = $exception instanceof AccountValidationException || $exception instanceof \Reqsheet\Timetable\TimetableValidationException ? implode(' ', $exception->errors()) : 'That resource already exists or could not be saved.';
             return $this->jsonResourceResponse(422, $message);
         }
     }
 
-    private function jsonResourceResponse(int $status, string $message, bool $success = false, string $type = '', string $code = ''): AdminTimetableCsvImportResponse
+    private function jsonResourceResponse(int $status, string $message, bool $success = false, string $type = '', string $code = '', string $confirmation = ''): AdminTimetableCsvImportResponse
     {
-        return new AdminTimetableCsvImportResponse($status, json_encode(['success' => $success, 'message' => $message, 'type' => $type, 'code' => $code], JSON_THROW_ON_ERROR), null, true);
+        return new AdminTimetableCsvImportResponse($status, json_encode(['success' => $success, 'message' => $message, 'type' => $type, 'code' => $code, 'confirmation' => $confirmation], JSON_THROW_ON_ERROR), null, true);
     }
 
     private function roomExists(string $code): bool
@@ -166,13 +174,14 @@ final class AdminTimetableCsvImport
     }
 
     /** @param list<string> $errors */
-    private function errors(int $versionId, array $errors, array $missingRooms = [], array $missingTeachers = [], bool $resourceCreated = false, string $draftId = ''): string
+    private function errors(int $versionId, array $errors, array $missingRooms = [], array $missingTeachers = [], bool $resourceCreated = false, string $draftId = '', array $archivedRooms = []): string
     {
         $body = '<section class="page-header"><div><p class="eyebrow">Admin / Timetable / CSV import</p><h1>CSV needs attention</h1></div><a class="button secondary" href="/admin/timetable?version=' . $versionId . '">Back to timetable</a></section>';
         $body .= '<section class="editor-section" data-import-draft="' . $this->e($draftId) . '"><p>' . ($draftId !== '' ? 'The uploaded CSV is retained for 15 minutes. Resolve the items below, then validate it again.' : 'Correct the CSV and upload it again.') . ' Nothing has been saved.</p>' . ($resourceCreated ? '<p class="notice">Resource created successfully. Validate the same CSV again when ready.</p>' : '') . '<ul class="validation-errors">';
         foreach ($errors as $error) {
             $actions = '';
             foreach (array_values(array_unique($missingRooms)) as $code) if (str_contains($error, 'Room ' . $code . ' does not exist')) $actions .= $this->resourceButton($versionId, 'room', (string) $code, 'Add Room ' . (string) $code, $draftId);
+            foreach (array_values(array_unique($archivedRooms)) as $code) if (str_contains($error, 'Room ' . $code . ' is archived')) $actions .= $this->resourceButton($versionId, 'room', (string) $code, 'Restore Room ' . (string) $code, $draftId, 'restore');
             if (str_contains($error, 'following teachers do not exist')) foreach (array_values(array_unique($missingTeachers)) as $code) $actions .= $this->resourceButton($versionId, 'teacher', (string) $code, 'Add Teacher ' . (string) $code, $draftId);
             $body .= '<li>' . $this->e($error) . ($actions === '' ? '' : ' <span class="contextual-resource-actions">' . $actions . '</span>') . '</li>';
         }
@@ -180,9 +189,9 @@ final class AdminTimetableCsvImport
         return PageLayout::render('Timetable CSV validation', $body, $this->user);
     }
 
-    private function resourceButton(int $versionId, string $type, string $code, string $label, string $draftId): string
+    private function resourceButton(int $versionId, string $type, string $code, string $label, string $draftId, string $operation = 'create'): string
     {
-        return '<form method="post" action="/admin/timetable/import" data-resource-form><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="version" value="' . $versionId . '"><input type="hidden" name="draft_id" value="' . $this->e($draftId) . '"><input type="hidden" name="action" value="create_missing_resource"><input type="hidden" name="resource_type" value="' . $this->e($type) . '"><input type="hidden" name="code" value="' . $this->e($code) . '"><button type="submit" class="secondary">' . $this->e($label) . '</button><span class="resource-error" role="alert"></span></form>';
+        return '<form method="post" action="/admin/timetable/import" data-resource-form><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="version" value="' . $versionId . '"><input type="hidden" name="draft_id" value="' . $this->e($draftId) . '"><input type="hidden" name="action" value="create_missing_resource"><input type="hidden" name="resource_type" value="' . $this->e($type) . '"><input type="hidden" name="operation" value="' . $this->e($operation) . '"><input type="hidden" name="code" value="' . $this->e($code) . '"><button type="submit" class="secondary">' . $this->e($label) . '</button><span class="resource-error" role="alert"></span></form>';
     }
 
     private function validateAgainForm(int $versionId, string $draftId): string
@@ -192,7 +201,7 @@ final class AdminTimetableCsvImport
 
     private static function resourceScript(): string
     {
-        return 'document.querySelectorAll("[data-resource-form]").forEach(function(form){form.addEventListener("submit",function(event){event.preventDefault();var button=form.querySelector("button"),error=form.querySelector(".resource-error"),endpoint=form.getAttribute("action");button.disabled=true;error.textContent="";fetch(endpoint,{method:"POST",body:new FormData(form),headers:{"Accept":"application/json"}}).then(function(response){return response.json().then(function(data){return {ok:response.ok,data:data};});}).then(function(result){if(result.ok&&result.data.success){var done=document.createElement("span");done.className="resource-added";done.setAttribute("role","status");done.textContent="✓ Added";button.replaceWith(done);}else{error.textContent=result.data.message||"Could not add this resource.";button.disabled=false;}}).catch(function(){error.textContent="Could not add this resource. Try again.";button.disabled=false;});});});';
+        return 'document.querySelectorAll("[data-resource-form]").forEach(function(form){form.addEventListener("submit",function(event){event.preventDefault();var button=form.querySelector("button"),error=form.querySelector(".resource-error"),endpoint=form.getAttribute("action");button.disabled=true;error.textContent="";fetch(endpoint,{method:"POST",body:new FormData(form),headers:{"Accept":"application/json"}}).then(function(response){return response.json().then(function(data){return {ok:response.ok,data:data};});}).then(function(result){if(result.ok&&result.data.success){var done=document.createElement("span");done.className="resource-added";done.setAttribute("role","status");done.textContent=result.data.confirmation||"✓ Added";button.replaceWith(done);}else{error.textContent=result.data.message||"Could not add this resource.";button.disabled=false;}}).catch(function(){error.textContent="Could not add this resource. Try again.";button.disabled=false;});});});';
     }
 
     public static function uploadForm(int $versionId): string

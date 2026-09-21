@@ -33,6 +33,7 @@ final class TimetableCsvImportTest
         self::emptyTimetableAndTenantBoundaries();
         self::httpPreviewSecurity();
         self::inlineResourceResolution();
+        self::archivedRoomResolution();
         self::draftLifetimeAndIsolation();
         self::resourceReferenceCsv();
     }
@@ -285,6 +286,38 @@ final class TimetableCsvImportTest
             return;
         }
         throw new \RuntimeException('Resource reference accepted unauthorised access.');
+    }
+
+    private static function archivedRoomResolution(): void
+    {
+        $store = self::store();
+        $store->rooms[] = ['id' => 403, 'code' => 'R3', 'organisation_id' => 1, 'archived' => true];
+        $blank = (new BlankTimetableCsvExporter($store))->export(1, 1)->content;
+        $rows = self::csvRows($blank);
+        $originalRows = $rows; $addedSlots = [];
+        foreach ($originalRows as $row) if (($row[0] ?? '') !== 'Day' && !isset($addedSlots[$row[0] . '|' . $row[1]])) { $rows[] = [$row[0], $row[1], 'R3', '', '']; $addedSlots[$row[0] . '|' . $row[1]] = true; }
+        $csv = self::writeRows($rows);
+        $drafts = new TimetableCsvImportDraftStore(); $drafts->discard();
+        $admin = ['id' => 80, 'organisation_id' => 1, 'roles' => ['administrator'], 'is_admin' => true];
+        $action = new AdminTimetableCsvImport(new TimetableCsvParser(), new TimetableCsvImportPreviewService($store), $drafts, 1, $admin, true, $store);
+        $response = $action->handle(['version' => 1, 'csrf_token' => CsrfToken::value()], ['csv_file' => self::upload($csv)]);
+        assertSameValue(422, $response->status, 'Archived room did not block CSV validation.');
+        assertContainsValue('Room R3 is archived.', $response->html, 'Archived room did not have a distinct validation finding.');
+        assertContainsValue('Restore Room R3', $response->html, 'Archived room did not expose inline restoration.');
+        $draft = $_SESSION['timetable_csv_import_draft'] ?? [];
+        assertSameValue(['R3'], $draft['archived_rooms'] ?? null, 'Archived room was not retained in the validation draft.');
+        $restored = $action->handle(['version' => 1, 'csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'] ?? '', 'action' => 'create_missing_resource', 'resource_type' => 'room', 'operation' => 'restore', 'code' => 'R3'], []);
+        assertSameValue(200, $restored->status, 'Inline archived-room restoration failed.');
+        $payload = json_decode($restored->html, true, 512, JSON_THROW_ON_ERROR);
+        assertSameValue(true, $payload['success'] ?? false, 'Inline archived-room restoration returned failure.');
+        assertSameValue('✓ Restored', $payload['confirmation'] ?? null, 'Inline restoration returned the wrong confirmation.');
+        $restoredRoom = array_values(array_filter($store->rooms, static fn (array $room): bool => (int) $room['id'] === 403))[0] ?? [];
+        assertSameValue(false, $restoredRoom['archived'] ?? true, 'Inline restoration did not reactivate the original room.');
+        assertSameValue(403, $restoredRoom['id'] ?? 0, 'Inline restoration did not preserve the room ID.');
+        $again = $action->handle(['version' => 1, 'csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'] ?? '', 'action' => 'validate_again'], []);
+        assertSameValue(200, $again->status, 'Validate Again did not reuse the retained CSV after restoration: ' . strip_tags($again->html));
+        assertContainsValue('Import Timetable', $again->html, 'Restored room was not recognised by revalidation.');
+        assertSameValue(1, count(array_filter($store->rooms, static fn (array $room): bool => $room['code'] === 'R3')), 'Restoration created a duplicate room.');
     }
 
     private static function store(): ResourceConfigurationStore

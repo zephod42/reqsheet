@@ -109,8 +109,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -145,6 +145,10 @@ foreach (['organisation_settings', 'organisation_rooms', 'allow_double_periods']
 $dateFormatMigration = file_get_contents($migrationDirectory . '/0014_add_date_format.sql');
 if ($dateFormatMigration === false || !str_contains($dateFormatMigration, "date_format VARCHAR(10) NOT NULL DEFAULT 'DD/MM/YYYY'")) {
     throw new RuntimeException('Date format migration is missing the agreed default.');
+}
+$roomLifecycleMigration = file_get_contents($migrationDirectory . '/0015_add_room_archiving.sql');
+if ($roomLifecycleMigration === false || !str_contains($roomLifecycleMigration, 'archived_at')) {
+    throw new RuntimeException('Room lifecycle migration is missing archived_at.');
 }
 $tenantMigration = file_get_contents($migrationDirectory . '/0005_add_tenant_slugs.sql');
 if ($tenantMigration === false) throw new RuntimeException('Tenant migration could not be read.');

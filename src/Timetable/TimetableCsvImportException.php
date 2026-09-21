@@ -6,8 +6,8 @@ namespace Reqsheet\Timetable;
 
 final class TimetableCsvImportException extends \RuntimeException
 {
-    /** @param list<string> $errors @param list<string> $missingRooms @param list<string> $missingTeachers */
-    public function __construct(private readonly array $errors, private readonly array $missingRooms = [], private readonly array $missingTeachers = [])
+    /** @param list<string> $errors @param list<string> $missingRooms @param list<string> $missingTeachers @param list<string> $archivedRooms */
+    public function __construct(private readonly array $errors, private readonly array $missingRooms = [], private readonly array $missingTeachers = [], private readonly array $archivedRooms = [])
     {
         parent::__construct($errors[0] ?? 'The timetable CSV could not be validated.');
     }
@@ -23,4 +23,7 @@ final class TimetableCsvImportException extends \RuntimeException
 
     /** @return list<string> */
     public function missingTeachers(): array { return $this->missingTeachers; }
+
+    /** @return list<string> */
+    public function archivedRooms(): array { return $this->archivedRooms; }
 }

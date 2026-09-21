@@ -103,11 +103,11 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
         return array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN));
     }
 
-    public function roomsForOrganisation(int $organisationId): array
+    public function roomsForOrganisation(int $organisationId, bool $includeArchived = false): array
     {
-        $statement = $this->prepare('SELECT id, room_code FROM organisation_rooms WHERE organisation_id = :organisation_id ORDER BY room_code, id');
+        $statement = $this->prepare('SELECT id, room_code, archived_at FROM organisation_rooms WHERE organisation_id = :organisation_id' . ($includeArchived ? '' : ' AND archived_at IS NULL') . ' ORDER BY room_code, id');
         $statement->execute(['organisation_id' => $organisationId]);
-        return array_map(static fn (array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['room_code']], $statement->fetchAll());
+        return array_map(static fn (array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['room_code'], 'archived' => $row['archived_at'] !== null], $statement->fetchAll());
     }
 
     public function classesForOrganisation(int $organisationId): array
@@ -122,6 +122,57 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
         $statement = $this->prepare('INSERT INTO organisation_rooms (organisation_id, room_code) VALUES (:organisation_id, :code)');
         $statement->execute(['organisation_id' => $organisationId, 'code' => trim($code)]);
         return (int) $this->pdo->lastInsertId();
+    }
+
+    public function archiveRoom(int $organisationId, int $roomId): void
+    {
+        $statement = $this->prepare('UPDATE organisation_rooms SET archived_at = COALESCE(archived_at, CURRENT_TIMESTAMP(6)) WHERE id = :room_id AND organisation_id = :organisation_id');
+        $statement->execute(['room_id' => $roomId, 'organisation_id' => $organisationId]);
+        if ($statement->rowCount() < 1 && !$this->roomExistsForOrganisation($organisationId, $roomId)) throw new TimetableValidationException(['Room is not available for this organisation.']);
+    }
+
+    public function restoreRoom(int $organisationId, int $roomId): void
+    {
+        $statement = $this->prepare('UPDATE organisation_rooms SET archived_at = NULL WHERE id = :room_id AND organisation_id = :organisation_id');
+        $statement->execute(['room_id' => $roomId, 'organisation_id' => $organisationId]);
+        if ($statement->rowCount() < 1 && !$this->roomExistsForOrganisation($organisationId, $roomId)) throw new TimetableValidationException(['Room is not available for this organisation.']);
+    }
+
+    public function deleteRoomPermanently(int $organisationId, int $roomId): bool
+    {
+        $statement = $this->prepare(
+            'DELETE FROM organisation_rooms
+             WHERE id = :room_id AND organisation_id = :organisation_id
+               AND NOT EXISTS (SELECT 1 FROM recurring_lessons rl WHERE rl.room_id = organisation_rooms.id)
+               AND NOT EXISTS (SELECT 1 FROM lesson_occurrences lo WHERE lo.organisation_id = organisation_rooms.organisation_id AND lo.snapshot_room_code = organisation_rooms.room_code)
+               AND NOT EXISTS (SELECT 1 FROM technician_room_preferences trp WHERE trp.organisation_id = organisation_rooms.organisation_id AND trp.room_id = organisation_rooms.id)',
+        );
+        $statement->execute(['room_id' => $roomId, 'organisation_id' => $organisationId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function roomHasReferences(int $organisationId, int $roomId): bool
+    {
+        $statement = $this->prepare(
+            'SELECT EXISTS (
+                SELECT 1 FROM organisation_rooms r
+                WHERE r.id = :room_id AND r.organisation_id = :organisation_id
+                  AND (
+                    EXISTS (SELECT 1 FROM recurring_lessons rl WHERE rl.room_id = r.id)
+                    OR EXISTS (SELECT 1 FROM lesson_occurrences lo WHERE lo.organisation_id = r.organisation_id AND lo.snapshot_room_code = r.room_code)
+                    OR EXISTS (SELECT 1 FROM technician_room_preferences trp WHERE trp.organisation_id = r.organisation_id AND trp.room_id = r.id)
+                  )
+            )',
+        );
+        $statement->execute(['room_id' => $roomId, 'organisation_id' => $organisationId]);
+        return (int) $statement->fetchColumn() === 1;
+    }
+
+    private function roomExistsForOrganisation(int $organisationId, int $roomId): bool
+    {
+        $statement = $this->prepare('SELECT 1 FROM organisation_rooms WHERE id = :room_id AND organisation_id = :organisation_id');
+        $statement->execute(['room_id' => $roomId, 'organisation_id' => $organisationId]);
+        return $statement->fetchColumn() !== false;
     }
 
     public function createClass(int $organisationId, string $code): int
@@ -157,6 +208,13 @@ final class PdoTimetableConfigurationStore implements ResourceTimetableStore, Ed
     public function roomBelongsToOrganisation(int $roomId, int $organisationId): bool
     {
         return $this->resourceBelongs('organisation_rooms', $roomId, $organisationId);
+    }
+
+    public function roomIsActive(int $roomId, int $organisationId): bool
+    {
+        $statement = $this->prepare('SELECT 1 FROM organisation_rooms WHERE id = :room_id AND organisation_id = :organisation_id AND archived_at IS NULL');
+        $statement->execute(['room_id' => $roomId, 'organisation_id' => $organisationId]);
+        return $statement->fetchColumn() !== false;
     }
 
     public function classBelongsToOrganisation(int $classId, int $organisationId): bool
