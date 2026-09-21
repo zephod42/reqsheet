@@ -22,8 +22,11 @@ final class FictionalGeneratorTest
         assertSameValue(false, str_contains($command, '--force'), 'Fictional generator contains a safety bypass.');
         assertSameValue(false, str_contains($command, '--ignore-safety'), 'Fictional generator contains a safety bypass.');
         $source = (string) file_get_contents(dirname(__DIR__) . '/src/Fictional/FictionalSchoolGenerator.php');
-        foreach (['pumba', 'reqsheet_dev', '/etc/reqsheet/reqsheet-fictional-generator.json', '/var/lib/reqsheet/reqsheet-fictional-schools.json', 'tenant_slug = :slug', 'manifest'] as $fragment) {
+        foreach (['pumba', 'reqsheet_dev', '/etc/reqsheet/reqsheet-fictional-generator.json', '/var/lib/reqsheet/fictional-schools', '/manifest.json', 'tenant_slug = :slug', 'manifest'] as $fragment) {
             assertSameValue(true, str_contains($source, $fragment), 'Fictional generator safeguard is missing: ' . $fragment);
+        }
+        foreach (['7B1.1', 'CP10a', 'Y8 Chemical Reactions', 'L4 Chemical Reactions', 'Nothing required'] as $fragment) {
+            assertSameValue(true, str_contains($source, $fragment), 'Realistic fictional lesson content is missing: ' . $fragment);
         }
         assertSameValue('2026-09-21', FictionalSchoolGenerator::referenceDate(), 'Fictional reference date changed unexpectedly.');
     }
