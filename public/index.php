@@ -768,7 +768,7 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE_IMPORT) {
             new AccountService(new PdoAccountStore($database->connection())),
         ))->handle($_POST, $_FILES);
         http_response_code($response->status);
-        header('Content-Type: text/html; charset=UTF-8');
+        header($response->json ? 'Content-Type: application/json; charset=UTF-8' : 'Content-Type: text/html; charset=UTF-8');
         echo $response->html;
     } catch (\Throwable $exception) {
         $logRequestFailure('timetable-csv-import-preview', $exception);

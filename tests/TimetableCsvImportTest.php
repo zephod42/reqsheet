@@ -31,6 +31,7 @@ final class TimetableCsvImportTest
         self::parserLimitsAndMalformedInput();
         self::emptyTimetableAndTenantBoundaries();
         self::httpPreviewSecurity();
+        self::inlineResourceResolution();
         self::draftLifetimeAndIsolation();
         self::resourceReferenceCsv();
     }
@@ -192,6 +193,43 @@ final class TimetableCsvImportTest
         $second = $drafts->save($preview, 80, 1002);
         assertSameValue(null, $drafts->load((string) $first['id'], 1, 80, 1003), 'Superseded draft remained reusable.');
         assertSameValue(null, $drafts->load((string) $second['id'], 1, 80, 1902), 'Expired draft remained available.');
+    }
+
+    private static function inlineResourceResolution(): void
+    {
+        $store = self::store();
+        $blank = (new BlankTimetableCsvExporter($store))->export(1, 1)->content;
+        $rows = self::csvRows($blank);
+        foreach ($rows as $row) {
+            if (($row[0] ?? '') === 'Day' || ($row[1] ?? '') === 'Break' || ($row[2] ?? '') !== 'R1') continue;
+            $rows[] = [$row[0], $row[1], 'R3', $row[0] === 'Monday' && $row[1] === 'P1' ? 'C1' : '', $row[0] === 'Monday' && $row[1] === 'P1' ? 'AAA' : ''];
+        }
+        $drafts = new TimetableCsvImportDraftStore(); $drafts->discard();
+        $admin = ['id' => 80, 'organisation_id' => 1, 'roles' => ['administrator'], 'is_admin' => true];
+        $action = new AdminTimetableCsvImport(new TimetableCsvParser(), new TimetableCsvImportPreviewService($store), $drafts, 1, $admin, true, $store);
+        $csv = self::writeRows($rows);
+        $response = $action->handle(['version' => 1, 'csrf_token' => CsrfToken::value()], ['csv_file' => self::upload($csv)]);
+        assertSameValue(422, $response->status, 'A missing room did not block validation.');
+        assertContainsValue('retained for 15 minutes', $response->html, 'The failed validation did not retain the CSV.');
+        assertContainsValue('Validate Again', $response->html, 'Failed validation omitted Validate Again.');
+        $draft = $_SESSION['timetable_csv_import_draft'] ?? [];
+        assertSameValue($csv, $draft['csv_content'] ?? null, 'The exact uploaded CSV was not retained.');
+        $created = $action->handle([
+            'version' => 1, 'csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'] ?? '',
+            'action' => 'create_missing_resource', 'resource_type' => 'room', 'code' => 'R3',
+        ], []);
+        assertSameValue(200, $created->status, 'Inline room creation did not return success.');
+        assertSameValue(true, $created->json, 'Inline room creation did not return JSON.');
+        assertContainsValue('"success":true', $created->html, 'Inline room creation response was not successful.');
+        $duplicate = $action->handle([
+            'version' => 1, 'csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'] ?? '',
+            'action' => 'create_missing_resource', 'resource_type' => 'room', 'code' => 'R3',
+        ], []);
+        assertSameValue(200, $duplicate->status, 'Concurrent/idempotent room creation was not treated as success.');
+        $again = $action->handle(['version' => 1, 'csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'] ?? '', 'action' => 'validate_again'], []);
+        assertSameValue(200, $again->status, 'Validate Again did not reuse the retained CSV.');
+        assertContainsValue('Import Timetable', $again->html, 'Revalidation did not reach the existing confirmation flow.');
+        assertSameValue(0, count($store->lessons), 'Resource resolution partially imported lessons.');
     }
 
     private static function resourceReferenceCsv(): void

@@ -215,6 +215,12 @@ dialog .close { float: right; }
 .check-label input { width: auto; margin: 0; }
 
 .form-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.contextual-resource-actions { display: inline-flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+.contextual-resource-actions form { display: inline-flex; align-items: center; gap: .4rem; }
+.contextual-resource-actions button { margin: 0; }
+.resource-added { color: #176b3a; font-weight: 700; white-space: nowrap; }
+.resource-error { color: #8c1d2c; font-size: .9rem; }
+.validate-again-form { margin-top: 1.25rem; }
 .people-table-toolbar { display: flex; justify-content: flex-end; margin: var(--space-3) 0 var(--space-2); }
 .people-table-wrap { overflow-x: auto; border: 1px solid var(--rule); }
 .people-table { width: 100%; min-width: 40rem; border-collapse: collapse; }

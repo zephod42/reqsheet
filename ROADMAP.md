@@ -60,6 +60,11 @@ Canonical timetable CSV milestone 3 completed 2026-09-19:
 - Every recurring assignment is inserted atomically or the complete operation rolls back; the version lock serialises competing imports, while completed/cancelled drafts cannot be reused.
 - Import leaves manual activation, dated occurrences and requisitions unchanged and returns successful administrators to the populated timetable builder.
 
+Canonical timetable CSV inline resource resolution completed 2026-09-21:
+
+- Missing rooms and teachers can be created from validation results without leaving the page; the exact upload is retained in the authenticated, tenant-bound session draft for 15 minutes and **Validate Again** reruns the existing server-side validator against current resources.
+- Resource actions use the existing room and People/account services, CSRF and administrator checks, idempotent handling for concurrent creation, and the ordinary teacher awaiting-first-login lifecycle. Successful controls become accessible added confirmations without changing other validation results.
+
 Canonical timetable CSV revised destination workflow completed 2026-09-20:
 
 - A confirmed CSV import clones the selected source timetable's complete structure into a new automatically named timetable, creates missing classes atomically, inserts retained assignments, and activates the new timetable immediately.

@@ -48,7 +48,9 @@ Identical Class and Teacher values form one multi-period lesson only when they a
 
 Successful validation produces an escaped, read-only preview showing the source timetable, automatically proposed `<source>_imported_YYYYMMDD_HHMMSS` name, the immediate-activation destination, lesson and occupied/free counts, proposed new classes, skipped-room warnings, resources, and multi-period spans. It performs no inserts or updates. A separate **Export Resource Reference** download provides only eligible teacher codes/names, class codes, and room codes using `Resource Type,Code,Name`; it excludes passwords, account state, recovery data, and session information.
 
-The preview's canonical proposed assignments are stored in the current administrator session for 15 minutes with a random draft ID, organisation ID, user ID, version ID, structure digest, and expiry. Only one current draft is retained, so a later valid preview supersedes it. Uploaded file bytes are not stored. The draft is tenant/user-bound and is deliberately non-authoritative.
+The preview's canonical proposed assignments are stored in the current administrator session for 15 minutes with a random draft ID, organisation ID, user ID, version ID, structure digest, and expiry. Only one current draft is retained, so a later preview supersedes it. The exact uploaded CSV bytes are retained in that same session draft for the same 15-minute period when validation reports missing resources, allowing those resources to be created inline and the CSV to be revalidated without another upload. The draft is tenant/user-bound and is deliberately non-authoritative; expiry removes it from the session.
+
+When validation reports an unrecognised room or teacher, each contextual Add button sends a CSRF-protected request for that draft without navigating away. The server uses the normal room service or People account service, and returns a JSON confirmation only after the resource is committed. The browser replaces only the successful button with an accessible green `✓ Added` status; failed requests remain retryable. Duplicate references are rendered once, and concurrent requests treat an already-created matching resource as an idempotent success. **Validate Again** reparses the retained original CSV against current tenant resources and returns either the normal confirmation preview or updated validation errors.
 
 ## Milestone 3: confirmed atomic import
 
@@ -81,5 +83,5 @@ Preview text is HTML-escaped, and spreadsheet formula-like values remain inert s
 ## Operational notes and remaining risks
 
 - Confirm the 2 MiB and 20,000-row limits against the largest pilot timetable before broad deployment.
-- Server-side session drafts are intentionally temporary. A durable/shared preview store would need a migration only if Reqsheet later moves to multiple web nodes or requires previews to survive session loss; that is not required now.
+- Server-side session drafts and retained CSV bytes are intentionally temporary. A durable/shared preview store would need a migration only if Reqsheet later moves to multiple web nodes or requires previews to survive session loss; that is not required now.
 - Import intentionally creates recurring assignments only. Existing occurrence-generation procedures remain responsible for producing future dated occurrences when appropriate.

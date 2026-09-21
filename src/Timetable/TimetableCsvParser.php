@@ -13,6 +13,11 @@ final class TimetableCsvParser
     /** @param array<string, mixed> $upload @return list<array{row:int,day:string,period:string,room:string,class:string,teacher:string}> */
     public function parseUpload(array $upload): array
     {
+        return $this->parse($this->uploadContent($upload));
+    }
+
+    public function uploadContent(array $upload): string
+    {
         $error = (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($error !== UPLOAD_ERR_OK) {
             $message = match ($error) {
@@ -41,7 +46,7 @@ final class TimetableCsvParser
             fclose($stream);
         }
         if ($content === false) throw new TimetableCsvImportException(['The CSV upload could not be read. Please try again.']);
-        return $this->parse($content);
+        return $content;
     }
 
     /** @return list<array{row:int,day:string,period:string,room:string,class:string,teacher:string}> */

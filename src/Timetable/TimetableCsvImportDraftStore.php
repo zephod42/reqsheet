@@ -13,9 +13,13 @@ final class TimetableCsvImportDraftStore
     public const LIFETIME_SECONDS = 900;
 
     /** @return array<string, mixed> */
-    public function save(TimetableCsvImportPreview $preview, int $userId, ?int $now = null): array
+    public function save(TimetableCsvImportPreview $preview, int $userId, string|int $csvContent = '', ?int $now = null): array
     {
         SessionAuth::start();
+        if (is_int($csvContent)) {
+            $now = $csvContent;
+            $csvContent = '';
+        }
         $now ??= time();
         $draft = [
             'id' => bin2hex(random_bytes(16)),
@@ -30,6 +34,28 @@ final class TimetableCsvImportDraftStore
             'structure_identity' => $preview->structureIdentity,
             'skipped_rooms' => $preview->skippedRooms,
             'new_class_codes' => $preview->newClassCodes,
+            'created_at' => $now,
+            'expires_at' => $now + self::LIFETIME_SECONDS,
+            'csv_content' => $csvContent,
+        ];
+        $_SESSION[self::SESSION_KEY] = $draft;
+        return $draft;
+    }
+
+    /** @param list<string> $errors @param list<string> $missingRooms @param list<string> $missingTeachers */
+    public function saveValidationFailure(int $organisationId, int $versionId, int $userId, string $csvContent, array $errors, array $missingRooms = [], array $missingTeachers = [], ?int $now = null): array
+    {
+        SessionAuth::start();
+        $now ??= time();
+        $draft = [
+            'id' => bin2hex(random_bytes(16)),
+            'organisation_id' => $organisationId,
+            'user_id' => $userId,
+            'version_id' => $versionId,
+            'csv_content' => $csvContent,
+            'errors' => array_values($errors),
+            'missing_rooms' => array_values($missingRooms),
+            'missing_teachers' => array_values($missingTeachers),
             'created_at' => $now,
             'expires_at' => $now + self::LIFETIME_SECONDS,
         ];
