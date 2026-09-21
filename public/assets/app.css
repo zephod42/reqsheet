@@ -286,10 +286,14 @@ dialog .close { float: right; }
 .technician-cell-heading span { font-weight: 700; }
 .technician-prepped { color: #176b35; font-size: 1.15rem; line-height: 1; text-align: center; }
 .technician-prepped-empty { display: block; min-width: 1rem; }
-.technician-requisition { display: block; white-space: normal; }
+.technician-requisition { display: -webkit-box; overflow: hidden; margin-top: .25rem; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-line-clamp: 4; -webkit-box-orient: vertical; text-overflow: ellipsis; }
 .technician-cell { font-family: Arial, Helvetica, sans-serif; border: 3px solid var(--class-border, var(--rule)); border-radius: var(--corner); }
 .technician-cell summary { font-size: 12px; line-height: 1.25; }
-.technician-requisition { display: -webkit-box; overflow: hidden; margin-top: .25rem; -webkit-line-clamp: 4; -webkit-box-orient: vertical; text-overflow: ellipsis; }
+.technician-cell { overflow: visible; }
+.technician-requisition-control { position: relative; display: block; margin-top: .25rem; cursor: pointer; outline-offset: 2px; }
+.technician-requisition-control:focus-visible { outline: 2px solid var(--ink); }
+.technician-requisition-popout { position: absolute; z-index: 10; top: calc(100% + .3rem); left: 0; width: min(28rem, calc(100vw - 2rem)); max-height: min(70vh, 24rem); box-sizing: border-box; overflow: auto; padding: .65rem; border: 1px solid var(--rule-strong); border-radius: var(--corner); background: #fff; color: var(--ink); box-shadow: var(--interactive-shadow); white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0; pointer-events: none; }
+.technician-requisition-control:hover .technician-requisition-popout, .technician-requisition-control:focus-within .technician-requisition-popout, .technician-requisition-control.is-open .technician-requisition-popout { opacity: 1; pointer-events: auto; }
 .technician-week-print .technician-sheet { break-after: page; break-inside: avoid; }
 @media print { .technician-week-print .technician-sheet { min-height: 0; break-after: page; break-inside: avoid; } .technician-week-print .technician-sheet:last-child { break-after: auto; } .site-nav, .page-header, .technician-controls, .technician-room-controls, .technician-secondary { display: none !important; } }
 .assignment-dialog form, .resource-dialog form { max-width: none; margin: 0; }
@@ -353,7 +357,7 @@ dialog .close { float: right; }
     .lesson-block, .admin-lesson { border-color: #000 !important; }
     .lesson-header strong, .lesson-header > span { color: #000 !important; }
     @page { size: A4 landscape; margin: 8mm; }
-    .technician-controls, .technician-room-controls, .technician-secondary, .technician-sheet .technician-detail, .technician-cell summary::marker { display: none !important; }
+    .technician-controls, .technician-room-controls, .technician-secondary, .technician-sheet .technician-detail, .technician-requisition-popout, .technician-cell summary::marker { display: none !important; }
     .technician-sheet { display: block; }
     .technician-week-print .technician-sheet { break-after: page; break-inside: avoid; page-break-after: always; }
     .technician-week-print .technician-sheet:last-of-type { break-after: auto; page-break-after: auto; }
@@ -374,13 +378,16 @@ dialog .close { float: right; }
     .technician-sheet[data-print-layout="default"] .technician-cell summary,
     .technician-sheet[data-print-layout="horizontal"] .technician-cell summary { box-sizing: border-box; height: 100%; max-height: 100%; overflow: hidden; }
     .technician-sheet[data-print-layout="default"] .technician-requisition,
-    .technician-sheet[data-print-layout="horizontal"] .technician-requisition { display: block; overflow: hidden; -webkit-line-clamp: unset; }
+    .technician-sheet[data-print-layout="horizontal"] .technician-requisition { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 4; -webkit-box-orient: vertical; text-overflow: ellipsis; }
     .technician-sheet[data-print-layout="vertical"] .technician-grid td, .technician-sheet[data-print-layout="vertical"] .technician-cell,
     .technician-sheet[data-print-layout="vertical-horizontal"] .technician-grid td, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-cell { height: auto; overflow: visible; }
     .technician-grid { font-size: 9pt; }
     .technician-grid th, .technician-grid td { padding: 1.5mm; }
     .technician-cell { display: block; border-color: #000 !important; }
     .technician-cell summary { display: block; white-space: normal; }
-    .technician-requisition { display: block; overflow: visible; -webkit-line-clamp: unset; }
+    .technician-sheet[data-print-layout="vertical"] .technician-requisition,
+    .technician-sheet[data-print-layout="vertical-horizontal"] .technician-requisition { display: block; overflow: visible; -webkit-line-clamp: unset; -webkit-box-orient: initial; }
+    .technician-sheet[data-print-layout="default"] .technician-requisition-control,
+    .technician-sheet[data-print-layout="horizontal"] .technician-requisition-control { max-height: 100%; overflow: hidden; }
     .technician-prepped { color: #000 !important; }
 }

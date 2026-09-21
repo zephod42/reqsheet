@@ -54,6 +54,14 @@ final class TechnicianPageTest
         assertContainsValue('class="technician-cell class-tone-', $day, 'Technician lesson did not receive a deterministic class colour.');
         assertContainsValue('Very long requisition text', $day, 'Technician grid did not show the saved requisition.');
         assertContainsValue('title="Very long requisition text', $day, 'Technician grid did not expose full requisition text for hover.');
+        assertContainsValue('class="technician-requisition-control" tabindex="0" role="button"', $day, 'Long requisition preview was not keyboard accessible.');
+        assertContainsValue('class="technician-requisition-popout"', $day, 'Technician timetable did not render a full requisition popout.');
+        assertContainsValue("Line two\nLine three\nLine four\nLine five", $day, 'Full requisition line breaks were not preserved in the popout.');
+        if (!preg_match('/class="technician-requisition-popout"[^>]*>(.*?)<\/span>/s', $day, $popoutMatch)) throw new RuntimeException('Technician requisition popout markup could not be located.');
+        assertNotContainsValue('Lesson outline:', $popoutMatch[1], 'Requisition popout included lesson outline metadata.');
+        assertNotContainsValue('Risk assessment:', $popoutMatch[1], 'Requisition popout included risk-assessment metadata.');
+        assertContainsValue('aria-expanded="false"', $day, 'Technician requisition preview did not expose its collapsed state.');
+        assertContainsValue('event.key==="Enter"||event.key===" "', $day, 'Technician requisition preview did not provide keyboard activation.');
         assertContainsValue('<th>P</th>', $day, 'Technician grid did not use the compact period heading.');
         assertNotContainsValue('<th>Period</th>', $day, 'Technician grid retained the long period heading.');
         assertContainsValue('ROOM FREE', $day, 'Technician grid did not distinguish a genuinely free room.');
@@ -102,6 +110,8 @@ final class TechnicianPageTest
         assertContainsValue('height: var(--technician-print-teaching-height);', $css, 'Non-vertical print rows were not assigned a strict teaching-period height.');
         assertContainsValue('max-height: 100%; overflow: hidden;', $css, 'Non-vertical print cell content was not clipped inside its cell.');
         assertContainsValue('[data-print-layout="vertical"] .technician-grid td', $css, 'Vertical print mode no longer has its expandable-row rule.');
+        assertContainsValue('-webkit-line-clamp: 4;', $css, 'Compact technician print requisitions were not limited to four lines.');
+        assertContainsValue('.technician-requisition-popout, .technician-cell summary::marker { display: none !important; }', $css, 'Full requisition popouts were not excluded from print output.');
         $store->dailyCalls = [];
         $customDay = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['2']], []);
         assertNotContainsValue('All rooms', $customDay, 'Technician room selection still exposed an all/custom mode selector.');
@@ -147,6 +157,7 @@ final class TechnicianPageTest
         assertContainsValue('Vertical extension selected', $page->handle('GET', ['date' => '2026-09-23', 'printer_vertical' => '1'], []), 'Vertical printer mode was not reported in the interface.');
         $combined = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['1', '2', '3', '4', '5', '6', '7'], 'printer_vertical' => '1', 'printer_horizontal' => '1', 'print' => 'week'], []);
         assertSameValue(6, substr_count($combined, 'data-print-layout="vertical-horizontal"'), 'Combined Week Print did not produce two room groups per working day.');
+        assertContainsValue('data-print-layout="vertical"', $page->handle('GET', ['date' => '2026-09-23', 'printer_vertical' => '1'], []), 'Vertical print mode did not render its dedicated layout.');
         assertContainsValue('Both extensions selected', $page->handle('GET', ['date' => '2026-09-23', 'printer_vertical' => '1', 'printer_horizontal' => '1'], []), 'Combined printer mode was not reported in the interface.');
         assertContainsValue('localStorage.setItem(key,JSON.stringify({vertical:vertical.checked,horizontal:horizontal.checked}))', $day, 'Printer preferences were not saved in browser storage.');
         for ($periodCount = 6; $periodCount <= 9; $periodCount++) {
@@ -215,7 +226,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
                 'teacher_name' => $this->deletedTeacher ? '???' : 'John Smith', 'teacher_initials' => $this->deletedTeacher ? '???' : 'JSM', 'snapshot_class_code' => '9A/Sc1',
                 'snapshot_room_code' => 'LAB-A', 'snapshot_start_slot_id' => 1, 'snapshot_duration_periods' => 2,
                 'prepared_at' => null,
-                'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => 'Very long requisition text',
+                'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => "Very long requisition text\nLine two\nLine three\nLine four\nLine five",
                 'planning_notes' => null, 'risk_assessment_text' => null,
             ], [
                 'id' => 51, 'lesson_date' => $date->format('Y-m-d'), 'snapshot_teacher_user_id' => 10,

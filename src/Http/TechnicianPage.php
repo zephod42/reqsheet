@@ -54,7 +54,7 @@ final class TechnicianPage
         $body .= $this->daySheets($date, $rooms, $selected, $data['slots'], $data['occurrences'], false, $vertical, $horizontal);
         if ($rooms !== [] && $selected === []) $body .= '<p class="notice">No rooms selected. Select one or more rooms above to display the technician timetable.</p>';
         $body .= $this->inspectionLinks($date);
-        return PageLayout::render('Technician daily preparation', $body, $this->user);
+        return PageLayout::render('Technician daily preparation', $body . $this->requisitionInteractionScript(), $this->user);
     }
 
     private function roomControls(array $rooms, array $selected, bool $hasSelection, DateTimeImmutable $date, bool $vertical, bool $horizontal): string
@@ -132,12 +132,19 @@ final class TechnicianPage
 
     private function cell(array $occurrence, bool $readOnly = false): string
     {
-        $text = trim((string) ($occurrence['requirements_text'] ?? '')); $label = $text === '' ? (($occurrence['state'] ?? '') === 'nothing_required' ? 'Nothing required' : 'Not requisitioned') : $text;
+        $text = (string) ($occurrence['requirements_text'] ?? '');
+        $hasText = trim($text) !== '';
+        $label = !$hasText ? (($occurrence['state'] ?? '') === 'nothing_required' ? 'Nothing required' : 'Not requisitioned') : $text;
         $prepared = !empty($occurrence['prepared_at']);
         $marker = $prepared ? '<span class="technician-prepped" aria-label="Prepared" title="Prepared">✓</span>' : '<span class="technician-prepped technician-prepped-empty" aria-hidden="true"></span>';
         $csrf = $this->e(CsrfToken::value());
         $toggle = $readOnly ? '' : '<form method="post" class="technician-prep-form"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="action" value="set_prepared"><input type="hidden" name="occurrence_id" value="' . (int) $occurrence['id'] . '"><input type="hidden" name="prepared" value="' . ($prepared ? 'no' : 'yes') . '"><input type="hidden" name="date" value="' . $this->e((string) $occurrence['lesson_date']) . '"><button type="submit" class="secondary">' . ($prepared ? 'Mark as Not Prepped' : 'Mark as Prepped') . '</button></form>';
-        return '<details class="technician-cell class-tone-' . ClassTone::forCode((string) $occurrence['snapshot_class_code']) . '"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition" title="' . $this->e($label) . '">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p>' . $toggle . '<details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
+        $requisitionId = 'technician-requisition-' . (int) $occurrence['id'];
+        $requisition = $hasText && ($occurrence['state'] ?? '') !== 'nothing_required'
+            ? '<span class="technician-requisition-control" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-describedby="' . $this->e($requisitionId) . '"><span class="technician-requisition" title="' . $this->e($text) . '">' . $this->e($text) . '</span><span class="technician-requisition-popout" id="' . $this->e($requisitionId) . '" role="tooltip">' . $this->e($text) . '</span></span>'
+            : '<span class="technician-requisition technician-requisition-static" title="' . $this->e($label) . '">' . $this->e($label) . '</span>';
+        $details = '<strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e(!$hasText ? 'No requisition has been entered.' : $text)) . '</p>' . $toggle . '<details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details>';
+        return '<details class="technician-cell class-tone-' . ClassTone::forCode((string) $occurrence['snapshot_class_code']) . '"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span>' . $requisition . '</summary><div class="technician-detail">' . $details . '</div></details>';
     }
 
     private function weekPrint(DateTimeImmutable $date, array $selected, bool $vertical, bool $horizontal): string
@@ -149,7 +156,12 @@ final class TechnicianPage
         $html = '<main class="technician-week-print"><header class="page-header technician-print-header"><div><p class="eyebrow">Technician</p><h1>Print View</h1></div><a class="button secondary" href="' . $backUrl . '">Back to Technician View</a></header>';
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
         foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->daySheets($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true, $vertical, $horizontal); }
-        return $html . '</main><script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
+        return $html . '</main>' . $this->requisitionInteractionScript() . '<script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
+    }
+
+    private function requisitionInteractionScript(): string
+    {
+        return '<script>(function(){function close(control){control.classList.remove("is-open");control.setAttribute("aria-expanded","false");}document.querySelectorAll(".technician-requisition-control").forEach(function(control){control.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();var open=control.classList.contains("is-open");document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);if(!open){control.classList.add("is-open");control.setAttribute("aria-expanded","true");}});control.addEventListener("keydown",function(event){if(event.key==="Enter"||event.key===" "){event.preventDefault();control.click();}if(event.key==="Escape")close(control);});});document.addEventListener("click",function(event){if(!event.target.closest(".technician-requisition-control"))document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);});document.addEventListener("keydown",function(event){if(event.key==="Escape")document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);});})();</script>';
     }
 
     private function roomQuery(array $selected, bool $vertical = false, bool $horizontal = false): string
