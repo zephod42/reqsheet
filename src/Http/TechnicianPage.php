@@ -67,13 +67,13 @@ final class TechnicianPage
         return $html . $this->roomPreferenceScript($key, !$hasSelection) . $this->printerPreferenceScript($printerKey, !$vertical && !$horizontal);
     }
 
-    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false, string $layout = 'default', int $groupNumber = 0, int $groupCount = 1): string
+    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false, string $layout = 'default', int $groupNumber = 0, int $groupCount = 1, string $printStyle = ''): string
     {
         $rooms = array_values(array_filter($rooms, static fn (array $room): bool => in_array((int) $room['id'], $selected, true)));
         $byRoom = []; foreach ($occurrences as $occurrence) $byRoom[(string) $occurrence['snapshot_room_code']][] = $occurrence;
         $groupLabel = $groupCount > 1 ? ' · Room group ' . $groupNumber . ' of ' . $groupCount : '';
-        $html = '<section class="technician-sheet" data-print-layout="' . $this->e($layout) . '"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . $this->e($groupLabel) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>P</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
-        foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $html .= '<td>' . ($separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence, $readOnly))) . '</td>'; } $html .= '</tr>'; }
+        $html = '<section class="technician-sheet" data-print-layout="' . $this->e($layout) . '" style="' . $this->e($printStyle) . '"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . $this->e($groupLabel) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>P</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
+        foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $content = $separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence, $readOnly)); $html .= '<td><div class="technician-print-cell">' . $content . '</div></td>'; } $html .= '</tr>'; }
         return $html . '</tbody></table></div></section>';
     }
 
@@ -83,9 +83,25 @@ final class TechnicianPage
         $groups = $horizontal ? array_chunk($selectedRooms, 6) : [$selectedRooms];
         if ($groups === []) $groups = [[]];
         $layout = $vertical && $horizontal ? 'vertical-horizontal' : ($vertical ? 'vertical' : ($horizontal ? 'horizontal' : 'default'));
+        $printStyle = $this->printStyle($slots);
         $html = '';
-        foreach ($groups as $index => $group) $html .= $this->grid($date, $rooms, array_column($group, 'id'), $slots, $occurrences, $readOnly, $layout, $index + 1, count($groups));
+        foreach ($groups as $index => $group) $html .= $this->grid($date, $rooms, array_column($group, 'id'), $slots, $occurrences, $readOnly, $layout, $index + 1, count($groups), $printStyle);
         return $html;
+    }
+
+    private function printStyle(array $slots): string
+    {
+        $teaching = 0;
+        $separators = 0;
+        foreach ($slots as $slot) (($slot['kind'] ?? '') === 'teaching' ? $teaching++ : $separators++);
+        // A4 landscape is 210mm high with 8mm margins. Reserve space for the
+        // date heading, table heading, and a small browser rounding allowance.
+        $bodyBudget = 170.0;
+        $separatorRow = 6.0;
+        $teachingRow = $teaching > 0 ? max(1.0, ($bodyBudget - ($separators * $separatorRow)) / $teaching) : 1.0;
+        $separatorContent = max(1.0, $separatorRow - 3.0);
+        $teachingContent = max(1.0, $teachingRow - 3.0);
+        return '--technician-print-teaching-height:' . rtrim(rtrim(number_format($teachingContent, 2, '.', ''), '0'), '.') . 'mm;--technician-print-separator-height:' . rtrim(rtrim(number_format($separatorContent, 2, '.', ''), '0'), '.') . 'mm;';
     }
 
     private function occurrenceForSlot(array $occurrences, array $slot, array $slots): ?array

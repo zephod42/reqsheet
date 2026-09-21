@@ -363,6 +363,18 @@ dialog .close { float: right; }
     .technician-sheet[data-print-layout="vertical"] .technician-grid, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-grid { break-inside: auto; page-break-inside: auto; }
     .technician-grid thead { display: table-header-group; }
     .technician-grid tr { break-inside: avoid; page-break-inside: avoid; }
+    .technician-sheet[data-print-layout="default"] .technician-grid tbody tr:not(.technician-separator) td,
+    .technician-sheet[data-print-layout="horizontal"] .technician-grid tbody tr:not(.technician-separator) td { height: var(--technician-print-teaching-height); }
+    .technician-sheet[data-print-layout="default"] .technician-grid tbody tr.technician-separator td,
+    .technician-sheet[data-print-layout="horizontal"] .technician-grid tbody tr.technician-separator td { height: var(--technician-print-separator-height); }
+    .technician-sheet[data-print-layout="default"] .technician-print-cell,
+    .technician-sheet[data-print-layout="horizontal"] .technician-print-cell { box-sizing: border-box; height: 100%; max-height: 100%; overflow: hidden; }
+    .technician-sheet[data-print-layout="default"] .technician-cell,
+    .technician-sheet[data-print-layout="horizontal"] .technician-cell { box-sizing: border-box; height: 100%; max-height: 100%; overflow: hidden; }
+    .technician-sheet[data-print-layout="default"] .technician-cell summary,
+    .technician-sheet[data-print-layout="horizontal"] .technician-cell summary { box-sizing: border-box; height: 100%; max-height: 100%; overflow: hidden; }
+    .technician-sheet[data-print-layout="default"] .technician-requisition,
+    .technician-sheet[data-print-layout="horizontal"] .technician-requisition { display: block; overflow: hidden; -webkit-line-clamp: unset; }
     .technician-sheet[data-print-layout="vertical"] .technician-grid td, .technician-sheet[data-print-layout="vertical"] .technician-cell,
     .technician-sheet[data-print-layout="vertical-horizontal"] .technician-grid td, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-cell { height: auto; overflow: visible; }
     .technician-grid { font-size: 9pt; }

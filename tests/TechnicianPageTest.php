@@ -66,6 +66,8 @@ final class TechnicianPageTest
         assertNotContainsValue('name="printer_vertical" value="1" checked', $day, 'Vertical printer extension was selected by default.');
         assertNotContainsValue('name="printer_horizontal" value="1" checked', $day, 'Horizontal printer extension was selected by default.');
         assertContainsValue('reqsheet:technician-printer:1:20', $day, 'Printer preferences were not namespaced by organisation and technician.');
+        assertContainsValue('--technician-print-teaching-height:', $day, 'Default print output did not receive a slot-based height budget.');
+        assertContainsValue('class="technician-print-cell"', $day, 'Lesson cells did not receive an explicit print-content container.');
 
         $store->deletedTeacher = true;
         $deletedDay = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
@@ -97,6 +99,9 @@ final class TechnicianPageTest
         assertContainsValue('.technician-cell-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .35rem; font-size: .9em; }', $css, 'Technician class and teacher labels were not compacted consistently.');
         assertContainsValue('.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }', $css, 'Technician print day heading was not centred.');
         assertContainsValue('.site-nav, .alpha-banner, .page-header a, dialog', $css, 'Alpha banner was not excluded from print output.');
+        assertContainsValue('height: var(--technician-print-teaching-height);', $css, 'Non-vertical print rows were not assigned a strict teaching-period height.');
+        assertContainsValue('max-height: 100%; overflow: hidden;', $css, 'Non-vertical print cell content was not clipped inside its cell.');
+        assertContainsValue('[data-print-layout="vertical"] .technician-grid td', $css, 'Vertical print mode no longer has its expandable-row rule.');
         $store->dailyCalls = [];
         $customDay = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['2']], []);
         assertNotContainsValue('All rooms', $customDay, 'Technician room selection still exposed an all/custom mode selector.');
@@ -144,6 +149,12 @@ final class TechnicianPageTest
         assertSameValue(6, substr_count($combined, 'data-print-layout="vertical-horizontal"'), 'Combined Week Print did not produce two room groups per working day.');
         assertContainsValue('Both extensions selected', $page->handle('GET', ['date' => '2026-09-23', 'printer_vertical' => '1', 'printer_horizontal' => '1'], []), 'Combined printer mode was not reported in the interface.');
         assertContainsValue('localStorage.setItem(key,JSON.stringify({vertical:vertical.checked,horizontal:horizontal.checked}))', $day, 'Printer preferences were not saved in browser storage.');
+        for ($periodCount = 6; $periodCount <= 9; $periodCount++) {
+            $store->teachingPeriodCount = $periodCount;
+            $periodPrint = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['1'], 'print' => 'week'], []);
+            assertSameValue(3, substr_count($periodPrint, 'data-print-layout="default"'), 'Default print layout changed page grouping for a ' . $periodCount . '-period timetable.');
+            assertContainsValue('--technician-print-teaching-height:', $periodPrint, 'A ' . $periodCount . '-period timetable did not receive a height budget.');
+        }
     }
 }
 
@@ -182,6 +193,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
     public array $rooms = [['id' => 1, 'code' => 'LAB-A'], ['id' => 2, 'code' => 'LAB-B']];
     public bool $hasActiveTimetable = true;
     public bool $deletedTeacher = false;
+    public int $teachingPeriodCount = 2;
     public array $preparationUpdate = [];
     public array $dailyCalls = [];
     public function technicianBelongsToOrganisation(int $userId, int $organisationId): bool { return $userId === 20 && $organisationId === 1; }
@@ -197,10 +209,7 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
         $this->dailyCalls[] = $roomIds;
         return [
             'version' => $this->hasActiveTimetable ? ['id' => 1] : null,
-            'slots' => [
-                ['id' => 1, 'sequence_number' => 1, 'kind' => 'teaching', 'label' => 'P1'],
-                ['id' => 2, 'sequence_number' => 2, 'kind' => 'teaching', 'label' => 'P2'],
-            ],
+            'slots' => array_map(static fn (int $period): array => ['id' => $period, 'sequence_number' => $period, 'kind' => 'teaching', 'label' => 'P' . $period], range(1, $this->teachingPeriodCount)),
             'occurrences' => [[
                 'id' => 50, 'lesson_date' => $date->format('Y-m-d'), 'snapshot_teacher_user_id' => 10,
                 'teacher_name' => $this->deletedTeacher ? '???' : 'John Smith', 'teacher_initials' => $this->deletedTeacher ? '???' : 'JSM', 'snapshot_class_code' => '9A/Sc1',
