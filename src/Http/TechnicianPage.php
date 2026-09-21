@@ -40,38 +40,52 @@ final class TechnicianPage
         $hasSelection = (string) ($query['room_selection'] ?? '') === '1' || (string) ($query['rooms'] ?? '') === 'custom';
         $requestedRoomIds = array_map('intval', (array) ($query['room_ids'] ?? []));
         $selected = $hasSelection ? $this->orderedRoomIds($availableRoomIds, $requestedRoomIds) : $availableRoomIds;
-        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected), $this->user);
+        $vertical = $this->flag($query['printer_vertical'] ?? false);
+        $horizontal = $this->flag($query['printer_horizontal'] ?? false);
+        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected, $vertical, $horizontal), $this->user);
         $data = $this->store->daily($this->organisationId, $date, $selected);
-        $roomQuery = $this->roomQuery($selected);
+        $roomQuery = $this->roomQuery($selected, $vertical, $horizontal);
         $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . $roomQuery . '&print=week">Print Selected Week</a></div></section>';
         $body .= '<div class="technician-controls"><a class="week-arrow" href="/technician?date=' . $date->modify('-1 day')->format('Y-m-d') . $roomQuery . '">‹</a><strong class="technician-date">' . $this->e($date->format('l j F Y')) . '</strong><a class="week-arrow" href="/technician?date=' . $date->modify('+1 day')->format('Y-m-d') . $roomQuery . '">›</a><a class="button secondary" href="/technician?date=' . (new DateTimeImmutable('today'))->format('Y-m-d') . $roomQuery . '">Today</a></div>';
         $body .= $message === null ? '' : '<p class="notice">' . $this->e($message) . '</p>';
         if ($rooms === []) $body .= '<p class="notice">No rooms have been configured for this school yet. Add rooms in the timetable settings to use the technician grid.</p>';
         elseif (($data['version'] ?? null) === null) $body .= '<p class="notice">No active timetable is configured for this school yet.</p>';
-        $body .= $this->roomControls($rooms, $selected, $hasSelection, $date);
-        $body .= $this->grid($date, $rooms, $selected, $data['slots'], $data['occurrences']);
+        $body .= $this->roomControls($rooms, $selected, $hasSelection, $date, $vertical, $horizontal);
+        $body .= $this->daySheets($date, $rooms, $selected, $data['slots'], $data['occurrences'], false, $vertical, $horizontal);
         if ($rooms !== [] && $selected === []) $body .= '<p class="notice">No rooms selected. Select one or more rooms above to display the technician timetable.</p>';
         $body .= $this->inspectionLinks($date);
         return PageLayout::render('Technician daily preparation', $body, $this->user);
     }
 
-    private function roomControls(array $rooms, array $selected, bool $hasSelection, DateTimeImmutable $date): string
+    private function roomControls(array $rooms, array $selected, bool $hasSelection, DateTimeImmutable $date, bool $vertical, bool $horizontal): string
     {
         $key = 'reqsheet:technician-rooms:' . $this->organisationId . ':' . $this->userId;
-        $html = '<section class="technician-room-controls" data-room-preference-key="' . $this->e($key) . '"><form method="get"><input type="hidden" name="date" value="' . $this->e($date->format('Y-m-d')) . '"><input type="hidden" name="room_selection" value="1"><fieldset><legend>Rooms</legend><div class="technician-room-actions"><button type="button" class="secondary" data-room-select-all>Select all</button><button type="button" class="secondary" data-room-clear-all>Clear all</button></div><div class="technician-room-list">';
+        $printerKey = 'reqsheet:technician-printer:' . $this->organisationId . ':' . $this->userId;
+        $html = '<section class="technician-room-controls" data-room-preference-key="' . $this->e($key) . '" data-printer-preference-key="' . $this->e($printerKey) . '"><form method="get"><input type="hidden" name="date" value="' . $this->e($date->format('Y-m-d')) . '"><input type="hidden" name="room_selection" value="1"><fieldset><legend>Rooms</legend><div class="technician-room-actions"><button type="button" class="secondary" data-room-select-all>Select all</button><button type="button" class="secondary" data-room-clear-all>Clear all</button></div><div class="technician-room-list">';
         foreach ($rooms as $room) $html .= '<label class="check-label"><input type="checkbox" name="room_ids[]" value="' . (int) $room['id'] . '"' . (in_array((int) $room['id'], $selected, true) ? ' checked' : '') . '> ' . $this->e($room['code']) . '</label>';
-        $html .= '</div></fieldset><button class="secondary">Apply display</button></form></section>';
-        if ($hasSelection) return $html . $this->roomPreferenceScript($key, false) ;
-        return $html . $this->roomPreferenceScript($key, true);
+        $html .= '</div></fieldset><fieldset class="technician-printer-logic"><legend>Printer Logic</legend><label class="check-label"><input type="checkbox" name="printer_vertical" value="1"' . ($vertical ? ' checked' : '') . '> Extend vertically over more pages</label><label class="check-label"><input type="checkbox" name="printer_horizontal" value="1"' . ($horizontal ? ' checked' : '') . '> Extend horizontally over more pages</label><p class="muted printer-logic-summary">' . $this->e($this->printerSummary($vertical, $horizontal)) . '</p></fieldset><button class="secondary">Apply display</button></form></section>';
+        return $html . $this->roomPreferenceScript($key, !$hasSelection) . $this->printerPreferenceScript($printerKey, !$vertical && !$horizontal);
     }
 
-    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false): string
+    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false, string $layout = 'default', int $groupNumber = 0, int $groupCount = 1): string
     {
         $rooms = array_values(array_filter($rooms, static fn (array $room): bool => in_array((int) $room['id'], $selected, true)));
         $byRoom = []; foreach ($occurrences as $occurrence) $byRoom[(string) $occurrence['snapshot_room_code']][] = $occurrence;
-        $html = '<section class="technician-sheet"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>P</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
+        $groupLabel = $groupCount > 1 ? ' · Room group ' . $groupNumber . ' of ' . $groupCount : '';
+        $html = '<section class="technician-sheet" data-print-layout="' . $this->e($layout) . '"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . $this->e($groupLabel) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>P</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
         foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $html .= '<td>' . ($separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence, $readOnly))) . '</td>'; } $html .= '</tr>'; }
         return $html . '</tbody></table></div></section>';
+    }
+
+    private function daySheets(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly, bool $vertical, bool $horizontal): string
+    {
+        $selectedRooms = array_values(array_filter($rooms, static fn (array $room): bool => in_array((int) $room['id'], $selected, true)));
+        $groups = $horizontal ? array_chunk($selectedRooms, 6) : [$selectedRooms];
+        if ($groups === []) $groups = [[]];
+        $layout = $vertical && $horizontal ? 'vertical-horizontal' : ($vertical ? 'vertical' : ($horizontal ? 'horizontal' : 'default'));
+        $html = '';
+        foreach ($groups as $index => $group) $html .= $this->grid($date, $rooms, array_column($group, 'id'), $slots, $occurrences, $readOnly, $layout, $index + 1, count($groups));
+        return $html;
     }
 
     private function occurrenceForSlot(array $occurrences, array $slot, array $slots): ?array
@@ -110,23 +124,41 @@ final class TechnicianPage
         return '<details class="technician-cell class-tone-' . ClassTone::forCode((string) $occurrence['snapshot_class_code']) . '"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition" title="' . $this->e($label) . '">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p>' . $toggle . '<details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
     }
 
-    private function weekPrint(DateTimeImmutable $date, array $selected): string
+    private function weekPrint(DateTimeImmutable $date, array $selected, bool $vertical, bool $horizontal): string
     {
         $days = method_exists($this->store, 'workingDays') ? $this->store->workingDays($this->organisationId) : [1, 2, 3, 4, 5];
         $first = (int) ($days[0] ?? 1);
         $start = method_exists($this->store, 'workingWeekStart') ? $this->store->workingWeekStart($this->organisationId, $date) : $date->modify('-' . (((int) $date->format('N') - $first + 7) % 7) . ' days');
-        $backUrl = '/technician?date=' . $this->e($date->format('Y-m-d')) . $this->roomQuery($selected);
+        $backUrl = '/technician?date=' . $this->e($date->format('Y-m-d')) . $this->roomQuery($selected, $vertical, $horizontal);
         $html = '<main class="technician-week-print"><header class="page-header technician-print-header"><div><p class="eyebrow">Technician</p><h1>Print View</h1></div><a class="button secondary" href="' . $backUrl . '">Back to Technician View</a></header>';
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
-        foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->grid($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true); }
+        foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->daySheets($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true, $vertical, $horizontal); }
         return $html . '</main><script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
     }
 
-    private function roomQuery(array $selected): string
+    private function roomQuery(array $selected, bool $vertical = false, bool $horizontal = false): string
     {
         $query = '&room_selection=1';
         foreach (array_values(array_unique(array_map('intval', $selected))) as $roomId) if ($roomId > 0) $query .= '&room_ids[]=' . $roomId;
+        if ($vertical) $query .= '&printer_vertical=1';
+        if ($horizontal) $query .= '&printer_horizontal=1';
         return $query;
+    }
+
+    private function printerSummary(bool $vertical, bool $horizontal): string
+    {
+        if ($vertical && $horizontal) return 'Both extensions selected: room groups print in order, with each group able to continue vertically.';
+        if ($vertical) return 'Vertical extension selected: each day may continue over additional pages with the room columns retained.';
+        if ($horizontal) return 'Horizontal extension selected: room groups print as separate pages; each page keeps the period column.';
+        return 'Default: fit each day to one A4 page.';
+    }
+
+    private function flag(mixed $value): bool { return in_array(strtolower((string) $value), ['1', 'true', 'on', 'yes'], true); }
+
+    private function printerPreferenceScript(string $key, bool $restore): string
+    {
+        $restoreFlag = $restore ? 'true' : 'false';
+        return '<script>(function(){var box=document.querySelector("[data-printer-preference-key]");if(!box)return;var form=box.querySelector("form"),key=box.dataset.printerPreferenceKey,vertical=form.querySelector("[name=printer_vertical]"),horizontal=form.querySelector("[name=printer_horizontal]");function save(){try{localStorage.setItem(key,JSON.stringify({vertical:vertical.checked,horizontal:horizontal.checked}));}catch(error){}}vertical.addEventListener("change",function(){save();form.submit();});horizontal.addEventListener("change",function(){save();form.submit();});if(' . $restoreFlag . '){try{var saved=JSON.parse(localStorage.getItem(key));if(saved&&typeof saved==="object"){vertical.checked=saved.vertical===true;horizontal.checked=saved.horizontal===true;if(vertical.checked||horizontal.checked)form.submit();}}catch(error){}}})();</script>';
     }
 
     private function orderedRoomIds(array $availableRoomIds, array $requestedRoomIds): array

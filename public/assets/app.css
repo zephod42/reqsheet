@@ -304,6 +304,10 @@ dialog .close { float: right; }
 .technician-room-controls fieldset { display: contents; border: 0; margin: 0; padding: 0; }
 .technician-room-controls legend { font-weight: 700; padding: 0; }
 .technician-room-actions, .technician-room-list { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .8rem; }
+.technician-printer-logic { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .8rem; border: 0; margin: .7rem 0 0; padding: 0; }
+.technician-printer-logic legend { font-weight: 700; padding: 0; }
+.technician-printer-logic .check-label { align-items: center; }
+.printer-logic-summary { flex-basis: 100%; margin: 0; }
 .technician-sheet { font-family: var(--technical); }
 .print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }
 .technician-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -318,6 +322,9 @@ dialog .close { float: right; }
 .technician-prep-form { margin: .65rem 0; }
 .technician-prep-form button { font-size: .8rem; }
 .technician-secondary { margin-top: var(--space-4); }
+.technician-sheet[data-print-layout="vertical"] .technician-grid td, .technician-sheet[data-print-layout="vertical"] .technician-cell,
+.technician-sheet[data-print-layout="vertical-horizontal"] .technician-grid td, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-cell { height: auto; overflow: visible; }
+.technician-sheet[data-print-layout="vertical"] .technician-requisition, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-requisition { -webkit-line-clamp: unset; }
 
 @media (max-width: 48rem) {
     .site-shell { display: block; }
@@ -348,6 +355,16 @@ dialog .close { float: right; }
     @page { size: A4 landscape; margin: 8mm; }
     .technician-controls, .technician-room-controls, .technician-secondary, .technician-sheet .technician-detail, .technician-cell summary::marker { display: none !important; }
     .technician-sheet { display: block; }
+    .technician-week-print .technician-sheet { break-after: page; break-inside: avoid; page-break-after: always; }
+    .technician-week-print .technician-sheet:last-of-type { break-after: auto; page-break-after: auto; }
+    .technician-sheet[data-print-layout="horizontal"], .technician-sheet[data-print-layout="vertical-horizontal"] { break-after: page; page-break-after: always; }
+    .technician-sheet[data-print-layout="horizontal"]:last-of-type, .technician-sheet[data-print-layout="vertical-horizontal"]:last-of-type { break-after: auto; page-break-after: auto; }
+    .technician-sheet[data-print-layout="vertical"], .technician-sheet[data-print-layout="vertical-horizontal"] { break-inside: auto !important; page-break-inside: auto !important; }
+    .technician-sheet[data-print-layout="vertical"] .technician-grid, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-grid { break-inside: auto; page-break-inside: auto; }
+    .technician-grid thead { display: table-header-group; }
+    .technician-grid tr { break-inside: avoid; page-break-inside: avoid; }
+    .technician-sheet[data-print-layout="vertical"] .technician-grid td, .technician-sheet[data-print-layout="vertical"] .technician-cell,
+    .technician-sheet[data-print-layout="vertical-horizontal"] .technician-grid td, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-cell { height: auto; overflow: visible; }
     .technician-grid { font-size: 9pt; }
     .technician-grid th, .technician-grid td { padding: 1.5mm; }
     .technician-cell { display: block; border-color: #000 !important; }

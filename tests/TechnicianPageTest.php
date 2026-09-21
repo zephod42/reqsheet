@@ -59,6 +59,13 @@ final class TechnicianPageTest
         assertContainsValue('ROOM FREE', $day, 'Technician grid did not distinguish a genuinely free room.');
         assertContainsValue('Mark as Prepped', $day, 'Occupied technician lesson did not expose preparation control.');
         assertNotContainsValue('Save My rooms', $day, 'Personal room saving remained exposed.');
+        assertContainsValue('Printer Logic', $day, 'Printer Logic controls were not visible in the technician interface.');
+        assertContainsValue('name="printer_vertical" value="1"', $day, 'Vertical printer extension control was missing.');
+        assertContainsValue('name="printer_horizontal" value="1"', $day, 'Horizontal printer extension control was missing.');
+        assertContainsValue('Default: fit each day to one A4 page.', $day, 'Default printer behaviour was not clearly explained.');
+        assertNotContainsValue('name="printer_vertical" value="1" checked', $day, 'Vertical printer extension was selected by default.');
+        assertNotContainsValue('name="printer_horizontal" value="1" checked', $day, 'Horizontal printer extension was selected by default.');
+        assertContainsValue('reqsheet:technician-printer:1:20', $day, 'Printer preferences were not namespaced by organisation and technician.');
 
         $store->deletedTeacher = true;
         $deletedDay = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
@@ -82,6 +89,7 @@ final class TechnicianPageTest
         assertNotContainsValue('Mark as Not Prepped', $print, 'Selected-week print exposed the interactive un-preparation action.');
         assertContainsValue('Day View · Monday 21 September 2026', $print, 'Selected week was not calculated from the selected date.');
         assertContainsValue('Day View · Thursday 24 September 2026', $print, 'Non-standard working-day print date was incorrect.');
+        assertSameValue(3, substr_count($print, 'data-print-layout="default"'), 'Default Week Print did not retain one layout per working day.');
         $css = (string) file_get_contents(__DIR__ . '/../public/assets/app.css');
         assertContainsValue('break-inside: avoid', $css, 'Technician weekly print sheets did not prevent internal pagination splits.');
         assertNotContainsValue('.technician-week-print .technician-sheet { min-height: 100vh', $css, 'Technician weekly print retained the overflow-causing viewport height.');
@@ -119,6 +127,23 @@ final class TechnicianPageTest
         $staleSelection = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['999', '2']], []);
         assertSameValue([2], $store->dailyCalls[array_key_last($store->dailyCalls)], 'Stale room IDs were not discarded server-side.');
         assertContainsValue('21-09-2026 Mon', $page->handle('GET', ['date' => '2026-09-21', 'teacher' => 10], []), 'Secondary technician date format was not UK-style.');
+
+        $store->rooms = [
+            ['id' => 1, 'code' => 'LAB-A'], ['id' => 2, 'code' => 'LAB-B'], ['id' => 3, 'code' => 'LAB-C'],
+            ['id' => 4, 'code' => 'LAB-D'], ['id' => 5, 'code' => 'LAB-E'], ['id' => 6, 'code' => 'LAB-F'],
+            ['id' => 7, 'code' => 'LAB-G'],
+        ];
+        $horizontal = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['7', '1', '2', '3', '4', '5', '6'], 'printer_horizontal' => '1'], []);
+        assertSameValue(2, substr_count($horizontal, 'data-print-layout="horizontal"'), 'Horizontal printing did not create deliberate room groups.');
+        assertContainsValue('Room group 1 of 2', $horizontal, 'Horizontal room group numbering was missing.');
+        assertContainsValue('Room group 2 of 2', $horizontal, 'Horizontal room group ordering was incomplete.');
+        assertContainsValue('LAB-A</th><th>LAB-B</th><th>LAB-C</th><th>LAB-D</th><th>LAB-E</th><th>LAB-F</th>', $horizontal, 'Horizontal grouping did not preserve available room order.');
+        assertContainsValue('<th>P</th>', $horizontal, 'Horizontal room groups did not repeat the period column.');
+        assertContainsValue('Vertical extension selected', $page->handle('GET', ['date' => '2026-09-23', 'printer_vertical' => '1'], []), 'Vertical printer mode was not reported in the interface.');
+        $combined = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['1', '2', '3', '4', '5', '6', '7'], 'printer_vertical' => '1', 'printer_horizontal' => '1', 'print' => 'week'], []);
+        assertSameValue(6, substr_count($combined, 'data-print-layout="vertical-horizontal"'), 'Combined Week Print did not produce two room groups per working day.');
+        assertContainsValue('Both extensions selected', $page->handle('GET', ['date' => '2026-09-23', 'printer_vertical' => '1', 'printer_horizontal' => '1'], []), 'Combined printer mode was not reported in the interface.');
+        assertContainsValue('localStorage.setItem(key,JSON.stringify({vertical:vertical.checked,horizontal:horizontal.checked}))', $day, 'Printer preferences were not saved in browser storage.');
     }
 }
 
