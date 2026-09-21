@@ -64,7 +64,14 @@ final class SettingsPage
                     if ($source === 0) $data = array_replace($data, ['working_days' => $input['working_days'] ?? [], 'first_day_of_week' => $input['first_day_of_week'] ?? 0, 'periods_per_day' => $input['periods_per_day'] ?? 0]);
                     $service = new TimetableTemplateService($this->timetable);
                     if ($source > 0) { $service->update($this->organisationId, $source, $label, $data); $this->settings->save($this->organisationId, $data); $message = 'Timetable saved.'; }
-                    else { $service->create($this->organisationId, null, $label, null, $data); $message = 'Timetable saved.'; }
+                    else {
+                        $versionId = $service->create($this->organisationId, null, $label, null, $data);
+                        if (!headers_sent()) header('Location: /admin/timetable?version=' . $versionId, true, 303);
+                        // Keep rendering a harmless fallback for non-HTTP callers. The
+                        // browser follows the redirect above, while unit-level page
+                        // renderers can still inspect the persisted Settings state.
+                        $message = 'Timetable saved.';
+                    }
                 } catch (SettingsValidationException | \Reqsheet\Timetable\TimetableValidationException $exception) {
                     $message = implode(' ', $exception->errors());
                     $editor = ((int) ($input['source_version_id'] ?? 0)) > 0 ? 'edit' : 'create';

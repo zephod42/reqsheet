@@ -16,7 +16,7 @@ final class TimetableCsvImportPreviewService
             throw new TimetableCsvImportException(['The selected timetable is not available for this organisation.']);
         }
         $rooms = $this->store->roomsForOrganisation($organisationId);
-        if ($rooms === []) throw new TimetableCsvImportException(['Add at least one room before importing a timetable CSV.']);
+        if ($rooms === [] && $rows === []) throw new TimetableCsvImportException(['Add at least one room before importing a timetable CSV.']);
         $slots = $this->store->slotsForVersion($versionId);
         $teaching = array_values(array_filter($slots, static fn (TimetableSlot $slot): bool => $slot->isTeaching()));
         if ($teaching === []) throw new TimetableCsvImportException(['The selected timetable has no teaching periods to import.']);
@@ -110,6 +110,9 @@ final class TimetableCsvImportPreviewService
                 self::error($errors, sprintf('Missing CSV slot: %s / %s / %s.', $slot['day'], $slot['period'], $slot['room']['code']));
             }
         }
+        foreach (array_keys($skippedRooms) as $roomCode) {
+            self::error($errors, 'Room ' . $roomCode . ' does not exist within the selected timetable template. Add it and validate the CSV again.');
+        }
         if ($recognisedRows !== count($expected)) {
             self::error($errors, sprintf('The CSV contains %d retained data rows; %d are required for this timetable structure.', $recognisedRows, count($expected)));
         }
@@ -119,7 +122,13 @@ final class TimetableCsvImportPreviewService
             self::error($errors, 'Import failed. The following teachers do not exist or are not eligible teachers: ' . implode(', ', $codes) . '. Please add the teachers in People and run the import again.');
         }
         if ($recognisedRows === 0) $errors[] = 'The CSV contains no importable rows for rooms in the selected timetable template.';
-        if ($errors !== []) throw new TimetableCsvImportException($errors);
+        if ($errors !== []) {
+            $missingRoomCodes = array_keys($skippedRooms);
+            sort($missingRoomCodes);
+            $missingTeacherCodes = array_keys($missingTeachers);
+            sort($missingTeacherCodes);
+            throw new TimetableCsvImportException($errors, $missingRoomCodes, $missingTeacherCodes);
+        }
 
         self::validateConflicts($occupied, $errors);
         $assignments = self::group($occupied, $slots, $allowConjoinedPeriods, $version->firstDayOfWeek, $errors);

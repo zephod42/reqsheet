@@ -557,7 +557,8 @@ if ($currentUser !== null && in_array($route, [ApplicationRoute::TEACHER_WEEK, A
         $environment = ExternalEnvironment::load($environment);
         $config = DatabaseConfig::fromEnvironment($environment);
         $settings = (new SettingsService(new PdoOrganisationSettingsStore((new Database($config))->connection())))->load($currentUser['organisation_id']);
-        if (empty($settings['complete'])) {
+        $adminTimetableRoutes = [ApplicationRoute::ADMIN_TIMETABLE, ApplicationRoute::ADMIN_TIMETABLE_EXPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT, ApplicationRoute::ADMIN_TIMETABLE_IMPORT_CONFIRM, ApplicationRoute::ADMIN_TIMETABLE_RESOURCES];
+        if (empty($settings['complete']) && !($currentUser !== null && SessionAuth::isAdmin($currentUser) && in_array($route, $adminTimetableRoutes, true))) {
             if (SessionAuth::isAdmin($currentUser)) {
                 header('Location: /settings', true, 302);
                 exit;
@@ -759,6 +760,8 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE_IMPORT) {
             (int) $user['organisation_id'],
             $user,
             (bool) ($settings['allow_double_periods'] ?? false),
+            $store,
+            new AccountService(new PdoAccountStore($database->connection())),
         ))->handle($_POST, $_FILES);
         http_response_code($response->status);
         header('Content-Type: text/html; charset=UTF-8');

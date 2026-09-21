@@ -128,9 +128,7 @@ final class TimetableCsvImportTest
 
         $rows = self::csvRows($blank);
         $rows[] = ['Monday', 'P1', 'ROOM-35', 'IGNORED', 'NOT-A-TEACHER'];
-        $skipped = $service->preview(1, 1, $parser->parse(self::writeRows($rows)), true);
-        assertSameValue([['code' => 'ROOM-35', 'row_count' => 1]], $skipped->skippedRooms, 'Unknown room rows were not reported as skipped.');
-        assertSameValue([], $skipped->newClassCodes, 'A discarded room row proposed a class.');
+        self::expectError(fn () => $service->preview(1, 1, $parser->parse(self::writeRows($rows)), true), 'Room ROOM-35 does not exist');
     }
 
     private static function parserLimitsAndMalformedInput(): void
