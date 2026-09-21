@@ -33,3 +33,7 @@ When Composer can reach Packagist, install the local development dependency with
 The optional isolated MySQL integration suite exercises migrations and database-backed service invariants; see `SETUP.md` for its strict `reqsheet_test` safety gate and configuration.
 
 See [SETUP.md](SETUP.md), [PRODUCT_DESIGN.md](PRODUCT_DESIGN.md), [ROADMAP.md](ROADMAP.md), and [SECURITY.md](SECURITY.md) for the initial project direction.
+
+For the Pumba-only fictional-school development dataset, see
+[docs/FICTIONAL_SCHOOLS.md](docs/FICTIONAL_SCHOOLS.md). It requires protected
+administrator configuration and must never be run against production.
