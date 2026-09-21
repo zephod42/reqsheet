@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Reqsheet\Tests;
 
 use DateTimeImmutable;
+use Reqsheet\Account\AccountService;
 use Reqsheet\Http\AdminTimetableCsvImport;
 use Reqsheet\Http\AdminTimetableResourceCsvExport;
 use Reqsheet\Http\CsrfToken;
@@ -212,6 +213,11 @@ final class TimetableCsvImportTest
         assertSameValue(422, $response->status, 'A missing room did not block validation.');
         assertContainsValue('retained for 15 minutes', $response->html, 'The failed validation did not retain the CSV.');
         assertContainsValue('Validate Again', $response->html, 'Failed validation omitted Validate Again.');
+        assertSameValue(1, substr_count($response->html, 'action="/admin/timetable/import" data-resource-form'), 'The room action form was not rendered once.');
+        assertContainsValue('fetch(endpoint', $response->html, 'Inline resource creation did not use the explicit endpoint variable.');
+        assertContainsValue('endpoint=form.getAttribute("action")', $response->html, 'Inline resource creation did not read the form action attribute explicitly.');
+        assertSameValue(false, str_contains($response->html, 'fetch(form.action'), 'Inline resource creation retained the ambiguous form.action lookup.');
+        assertSameValue(false, str_contains($response->html, '[object HTMLInputElement]'), 'Inline resource markup exposed an element object as an endpoint.');
         $draft = $_SESSION['timetable_csv_import_draft'] ?? [];
         assertSameValue($csv, $draft['csv_content'] ?? null, 'The exact uploaded CSV was not retained.');
         $created = $action->handle([
@@ -230,6 +236,36 @@ final class TimetableCsvImportTest
         assertSameValue(200, $again->status, 'Validate Again did not reuse the retained CSV.');
         assertContainsValue('Import Timetable', $again->html, 'Revalidation did not reach the existing confirmation flow.');
         assertSameValue(0, count($store->lessons), 'Resource resolution partially imported lessons.');
+
+        $failed = $action->handle([
+            'version' => 1, 'csrf_token' => CsrfToken::value(), 'draft_id' => $draft['id'] ?? '',
+            'action' => 'create_missing_resource', 'resource_type' => 'room', 'code' => 'NOT-IN-CSV',
+        ], []);
+        assertSameValue(422, $failed->status, 'An unrelated inline resource was accepted.');
+        assertSameValue(false, json_decode($failed->html, true, 512, JSON_THROW_ON_ERROR)['success'] ?? true, 'A failed inline resource request returned false success state.');
+
+        $teacherStore = self::store();
+        $teacherAccountsStore = new \Reqsheet\Tests\AccountStoreFake();
+        $teacherAccountsStore->createOrganisationAdmin('Test School', 'ADM', 'teacher', password_hash('admin-pass', PASSWORD_DEFAULT), 'test-school');
+        $teacherAction = new AdminTimetableCsvImport(new TimetableCsvParser(), new TimetableCsvImportPreviewService($teacherStore), new TimetableCsvImportDraftStore(), 1, $admin, true, $teacherStore, new AccountService($teacherAccountsStore));
+        $teacherRows = self::csvRows($blank);
+        $teacherRows[1][3] = 'C1'; $teacherRows[1][4] = 'ANO';
+        $teacherCsv = self::writeRows($teacherRows);
+        $teacherPreview = $teacherAction->handle(['version' => 1, 'csrf_token' => CsrfToken::value()], ['csv_file' => self::upload($teacherCsv)]);
+        assertSameValue(422, $teacherPreview->status, 'A missing teacher did not block validation.');
+        assertSameValue(1, substr_count($teacherPreview->html, 'action="/admin/timetable/import" data-resource-form'), 'The teacher action form was not rendered once.');
+        assertContainsValue('✓ Added', $teacherPreview->html, 'The inline success confirmation text was not retained.');
+        assertContainsValue('button.replaceWith(done)', $teacherPreview->html, 'The inline success confirmation did not replace the action button.');
+        $teacherDraft = $_SESSION['timetable_csv_import_draft'] ?? [];
+        $teacherCreated = $teacherAction->handle([
+            'version' => 1, 'csrf_token' => CsrfToken::value(), 'draft_id' => $teacherDraft['id'] ?? '',
+            'action' => 'create_missing_resource', 'resource_type' => 'teacher', 'code' => 'ANO',
+        ], []);
+        assertSameValue(200, $teacherCreated->status, 'Inline teacher creation did not return success.');
+        assertSameValue(true, json_decode($teacherCreated->html, true, 512, JSON_THROW_ON_ERROR)['success'] ?? false, 'Inline teacher creation returned false success state.');
+        $teacherAccount = $teacherAccountsStore->findLogin('ANO', 1);
+        assertSameValue(['teacher'], $teacherAccount['roles'] ?? null, 'Inline teacher creation did not create a Teacher-only account.');
+        assertSameValue('awaiting_first_login', $teacherAccount['account_state'] ?? null, 'Inline teacher creation did not preserve the first-login lifecycle.');
     }
 
     private static function resourceReferenceCsv(): void
