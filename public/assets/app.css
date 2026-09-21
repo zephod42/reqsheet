@@ -114,8 +114,15 @@ small { font-size: .82rem; }
 .about-principles { margin-top: 3.5rem; border-top: 1px solid var(--rule); padding-top: 2.5rem; }
 .about-principles h2 { margin: 0 0 2rem; font-size: clamp(1.6rem, 3vw, 2rem); }
 .about-principles h3 { margin: 2.25rem 0 0; font-size: 1.15rem; }
-.donation-placeholder { margin: 1.5rem 0 2rem; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--secondary-pale); padding: .85rem 1rem; }
-.donation-placeholder p { margin: .35rem 0 0; color: var(--muted); }
+.donation-section { margin: 1.5rem 0 2rem; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--secondary-pale); padding: .85rem 1rem; }
+.donation-section > h4 { margin: 0; font-size: 1.15rem; }
+.donation-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.donation-method { min-width: 0; border: 1px solid var(--rule); border-radius: var(--corner); background: #fff; padding: .85rem; }
+.donation-method h5 { margin: 0 0 .65rem; font-size: 1rem; }
+.donation-qr { display: block; width: min(100%, 13rem); height: auto; margin: 0 auto .8rem; image-rendering: pixelated; }
+.donation-destination-label { margin: .5rem 0 .2rem; font-size: .85rem; font-weight: 700; }
+.donation-destination { display: block; overflow-wrap: anywhere; font-size: .85rem; line-height: 1.45; }
+.donation-copy-status { color: var(--muted); font-size: .85rem; }
 .public-landing { min-height: calc(100vh - 3.6rem); display: grid; place-content: center; justify-items: center; padding: clamp(2rem, 6vh, 5rem) 1rem; text-align: center; }
 .public-landing h1 { margin: 0; font-size: clamp(3.2rem, 10vw, 7rem); font-weight: 780; letter-spacing: -.07em; line-height: 1; }
 .public-landing-tagline { margin: 1rem 0 2rem; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.35rem); }
@@ -345,6 +352,7 @@ dialog .close { float: right; }
     .timetable-toolbar label, .timetable-toolbar .button { width: 100%; box-sizing: border-box; }
     dialog { width: calc(100% - 1rem); max-height: calc(100vh - 1rem); margin: .5rem auto; padding: 1rem; }
     .assignment-dialog, .resource-dialog { top: .5rem; left: .5rem; right: .5rem; width: auto; max-width: none; max-height: calc(100vh - 1rem); transform: none; }
+    .donation-methods { grid-template-columns: 1fr; }
 }
 
 @media print {

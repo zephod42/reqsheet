@@ -358,7 +358,29 @@ HTML;
             <h3>Economic model</h3>
             <p>Reqsheet is currently free to use, but hosting it isn't free.</p>
             <p>If you'd like to support the project, you can share your feedback at <a href="mailto:feedback@reqsheet.com">feedback@reqsheet.com</a> or make a donation using the options below.</p>
-            <div class="donation-placeholder"><strong>Donations</strong><p>Donation options coming soon.</p></div>
+            <section class="donation-section" aria-labelledby="donations-heading">
+                <h4 id="donations-heading">Donations</h4>
+                <p>Donations are optional and go directly to the public addresses below. Choose the amount in your own wallet.</p>
+                <div class="donation-methods">
+                    <article class="donation-method">
+                        <h5>Bitcoin</h5>
+                        <img class="donation-qr" src="/assets/bitcoin-donation.svg" alt="QR code for the Bitcoin donation address">
+                        <p class="donation-destination-label">Bitcoin address</p>
+                        <code class="donation-destination">bc1q09zx0wxur0hlyks3mgvxx8yxkvzx3p8fuaaed9</code>
+                        <p><button type="button" class="secondary" data-copy-donation="bc1q09zx0wxur0hlyks3mgvxx8yxkvzx3p8fuaaed9">Copy Address</button> <span class="donation-copy-status" role="status" aria-live="polite"></span></p>
+                        <p class="muted">The QR contains the Bitcoin payment URI without a fixed amount.</p>
+                    </article>
+                    <article class="donation-method">
+                        <h5>Lightning Network</h5>
+                        <img class="donation-qr" src="/assets/lightning-donation.svg" alt="QR code for the Lightning donation address">
+                        <p class="donation-destination-label">Lightning Address</p>
+                        <code class="donation-destination">nuttyhandle26@walletofsatoshi.com</code>
+                        <p><button type="button" class="secondary" data-copy-donation="nuttyhandle26@walletofsatoshi.com">Copy Lightning Address</button> <span class="donation-copy-status" role="status" aria-live="polite"></span></p>
+                        <p class="muted">This QR contains the Lightning Address itself. Wallet support for scanning a plain Lightning Address may vary.</p>
+                    </article>
+                </div>
+                <script>(function(){document.querySelectorAll('[data-copy-donation]').forEach(function(button){button.addEventListener('click',function(){var status=button.parentElement.querySelector('.donation-copy-status'),value=button.dataset.copyDonation;function done(){status.textContent='Copied';}if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(value).then(done).catch(function(){fallback();});}else{fallback();}function fallback(){var field=document.createElement('textarea');field.value=value;field.setAttribute('readonly','');field.style.position='fixed';field.style.opacity='0';document.body.appendChild(field);field.select();try{document.execCommand('copy');done();}finally{field.remove();}}});});})();</script>
+            </section>
         </section>
         <section>
             <h3>Advertising</h3>

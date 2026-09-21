@@ -215,7 +215,10 @@ foreach ([
     'Reqsheet is currently free to use, but hosting it isn\'t free.',
     'mailto:feedback@reqsheet.com',
     'Donations',
-    'Donation options coming soon.',
+    'bc1q09zx0wxur0hlyks3mgvxx8yxkvzx3p8fuaaed9',
+    'nuttyhandle26@walletofsatoshi.com',
+    'Copy Address',
+    'Copy Lightning Address',
     'Ultimately, Reqsheet is intended to operate as a software-as-a-service (SaaS) business.',
     'potentially in the region of £20, €20 or $20 per school',
     'at least 60 days after that notice',
@@ -238,8 +241,18 @@ foreach ($alphaFragments as $alphaFragment) {
         throw new RuntimeException('Alpha page content or routing is missing: ' . $alphaFragment);
     }
 }
-if (!preg_match('/<div class="donation-placeholder">(.*?)<\/div>/s', $publicIndex, $donationMatch) || str_contains($donationMatch[1], 'href=')) {
-    throw new RuntimeException('Donation placeholder unexpectedly contains an active link.');
+if (!preg_match('/<section class="donation-section".*?<\/section>/s', $publicIndex, $donationMatch) || str_contains($donationMatch[0], 'private') || str_contains($donationMatch[0], 'seed')) {
+    throw new RuntimeException('Donation section is missing or contains private wallet information.');
+}
+foreach (['public/assets/bitcoin-donation.svg', 'public/assets/lightning-donation.svg'] as $donationAsset) {
+    if (!is_file(dirname(__DIR__) . '/' . $donationAsset) || filesize(dirname(__DIR__) . '/' . $donationAsset) < 100) {
+        throw new RuntimeException('Donation QR asset is missing: ' . $donationAsset);
+    }
+}
+$bitcoinQr = file_get_contents(dirname(__DIR__) . '/public/assets/bitcoin-donation.svg');
+$lightningQr = file_get_contents(dirname(__DIR__) . '/public/assets/lightning-donation.svg');
+if ($bitcoinQr === false || $lightningQr === false || str_contains($bitcoinQr, 'bc1q09') || str_contains($lightningQr, 'walletofsatoshi')) {
+    throw new RuntimeException('Donation QR assets unexpectedly embed visible destination text.');
 }
 foreach (['The prep room wall, reimagined for the 21st century.', '<h1>ABOUT REQSHEET</h1>'] as $removedAboutFragment) {
     if (str_contains($publicIndex, $removedAboutFragment)) {
