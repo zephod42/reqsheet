@@ -301,11 +301,14 @@ dialog .close { float: right; }
 .technician-room-controls form { display: flex; align-items: end; flex-wrap: wrap; gap: .6rem; }
 .technician-room-controls label { margin: 0; }
 .technician-room-controls .check-label { align-items: center; }
+.technician-room-controls fieldset { display: contents; border: 0; margin: 0; padding: 0; }
+.technician-room-controls legend { font-weight: 700; padding: 0; }
+.technician-room-actions, .technician-room-list { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .8rem; }
 .technician-sheet { font-family: var(--technical); }
 .print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }
 .technician-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.technician-grid th, .technician-grid td { border: 1px solid var(--rule); padding: .35rem; vertical-align: top; }
-.technician-grid th:first-child { width: 6rem; min-width: max-content; text-align: center; vertical-align: middle; white-space: nowrap; }
+.technician-grid th, .technician-grid td { border: 1px solid var(--rule); padding: .3rem; vertical-align: top; }
+.technician-grid th:first-child { width: 3.25rem; min-width: 3.25rem; text-align: center; vertical-align: middle; white-space: nowrap; }
 .technician-grid td { height: 4.2rem; }
 .technician-separator th, .technician-separator td { height: 1.5rem; background: #eee; color: var(--muted); }
 .technician-cell { height: 100%; overflow: hidden; }
@@ -346,7 +349,7 @@ dialog .close { float: right; }
     .technician-controls, .technician-room-controls, .technician-secondary, .technician-sheet .technician-detail, .technician-cell summary::marker { display: none !important; }
     .technician-sheet { display: block; }
     .technician-grid { font-size: 9pt; }
-    .technician-grid th, .technician-grid td { padding: 2mm; }
+    .technician-grid th, .technician-grid td { padding: 1.5mm; }
     .technician-cell { display: block; border-color: #000 !important; }
     .technician-cell summary { display: block; white-space: normal; }
     .technician-requisition { display: block; overflow: visible; -webkit-line-clamp: unset; }

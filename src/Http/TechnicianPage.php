@@ -17,8 +17,6 @@ final class TechnicianPage
     {
         if (!$this->store->technicianBelongsToOrganisation($this->userId, $this->organisationId)) { http_response_code(403); return PageLayout::render('Technician', '<p class="error">Technician access is not available.</p>', $this->user); }
         $message = null;
-        // Room selection is deliberately request-scoped. Personal room defaults are retained in
-        // the database for compatibility, but are no longer exposed or loaded here.
         $date = $this->date((string) ($query['date'] ?? ($input['date'] ?? 'today')));
         if ($method === 'POST' && (string) ($input['action'] ?? '') === 'set_prepared') {
             if (!CsrfToken::valid($input['csrf_token'] ?? null)) {
@@ -38,37 +36,40 @@ final class TechnicianPage
             return PageLayout::render('Technician inspection', $this->inspectionPage($date, $rows), $this->user);
         }
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
-        $defaults = array_column($rooms, 'id');
-        $requestedMode = (string) ($query['rooms'] ?? 'my');
-        $mode = in_array($requestedMode, ['all', 'my', 'custom'], true) ? $requestedMode : 'my';
-        $selected = $mode === 'all' ? array_column($rooms, 'id') : ($mode === 'custom' ? array_values(array_intersect(array_map('intval', (array) ($query['room_ids'] ?? [])), array_column($rooms, 'id'))) : array_values(array_intersect($defaults, array_column($rooms, 'id'))));
-        if ($mode === 'my' && $selected === []) $selected = array_column($rooms, 'id');
-        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected, $mode, (array) ($query['room_ids'] ?? [])), $this->user);
+        $availableRoomIds = array_map('intval', array_column($rooms, 'id'));
+        $hasSelection = (string) ($query['room_selection'] ?? '') === '1' || (string) ($query['rooms'] ?? '') === 'custom';
+        $requestedRoomIds = array_map('intval', (array) ($query['room_ids'] ?? []));
+        $selected = $hasSelection ? $this->orderedRoomIds($availableRoomIds, $requestedRoomIds) : $availableRoomIds;
+        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected), $this->user);
         $data = $this->store->daily($this->organisationId, $date, $selected);
-        $roomQuery = $this->roomQuery($mode, $selected);
+        $roomQuery = $this->roomQuery($selected);
         $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . $roomQuery . '&print=week">Print Selected Week</a></div></section>';
         $body .= '<div class="technician-controls"><a class="week-arrow" href="/technician?date=' . $date->modify('-1 day')->format('Y-m-d') . $roomQuery . '">‹</a><strong class="technician-date">' . $this->e($date->format('l j F Y')) . '</strong><a class="week-arrow" href="/technician?date=' . $date->modify('+1 day')->format('Y-m-d') . $roomQuery . '">›</a><a class="button secondary" href="/technician?date=' . (new DateTimeImmutable('today'))->format('Y-m-d') . $roomQuery . '">Today</a></div>';
         $body .= $message === null ? '' : '<p class="notice">' . $this->e($message) . '</p>';
         if ($rooms === []) $body .= '<p class="notice">No rooms have been configured for this school yet. Add rooms in the timetable settings to use the technician grid.</p>';
         elseif (($data['version'] ?? null) === null) $body .= '<p class="notice">No active timetable is configured for this school yet.</p>';
-        $body .= $this->roomControls($rooms, $defaults, $mode, $selected);
+        $body .= $this->roomControls($rooms, $selected, $hasSelection, $date);
         $body .= $this->grid($date, $rooms, $selected, $data['slots'], $data['occurrences']);
+        if ($rooms !== [] && $selected === []) $body .= '<p class="notice">No rooms selected. Select one or more rooms above to display the technician timetable.</p>';
         $body .= $this->inspectionLinks($date);
         return PageLayout::render('Technician daily preparation', $body, $this->user);
     }
 
-    private function roomControls(array $rooms, array $defaults, string $mode, array $selected): string
+    private function roomControls(array $rooms, array $selected, bool $hasSelection, DateTimeImmutable $date): string
     {
-        $html = '<section class="technician-room-controls"><form method="get"><input type="hidden" name="date" value="' . $this->e((string) ($_GET['date'] ?? 'today')) . '"><label>Rooms<select name="rooms" onchange="this.form.submit()"><option value="all"' . ($mode === 'all' ? ' selected' : '') . '>All rooms</option><option value="custom"' . ($mode === 'custom' ? ' selected' : '') . '>Custom room selection</option></select></label>';
-        if ($mode === 'custom') foreach ($rooms as $room) $html .= '<label class="check-label"><input type="checkbox" name="room_ids[]" value="' . (int) $room['id'] . '"' . (in_array((int) $room['id'], $selected, true) ? ' checked' : '') . '> ' . $this->e($room['code']) . '</label>';
-        return $html . '<button class="secondary">Apply display</button></form></section>';
+        $key = 'reqsheet:technician-rooms:' . $this->organisationId . ':' . $this->userId;
+        $html = '<section class="technician-room-controls" data-room-preference-key="' . $this->e($key) . '"><form method="get"><input type="hidden" name="date" value="' . $this->e($date->format('Y-m-d')) . '"><input type="hidden" name="room_selection" value="1"><fieldset><legend>Rooms</legend><div class="technician-room-actions"><button type="button" class="secondary" data-room-select-all>Select all</button><button type="button" class="secondary" data-room-clear-all>Clear all</button></div><div class="technician-room-list">';
+        foreach ($rooms as $room) $html .= '<label class="check-label"><input type="checkbox" name="room_ids[]" value="' . (int) $room['id'] . '"' . (in_array((int) $room['id'], $selected, true) ? ' checked' : '') . '> ' . $this->e($room['code']) . '</label>';
+        $html .= '</div></fieldset><button class="secondary">Apply display</button></form></section>';
+        if ($hasSelection) return $html . $this->roomPreferenceScript($key, false) ;
+        return $html . $this->roomPreferenceScript($key, true);
     }
 
     private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false): string
     {
         $rooms = array_values(array_filter($rooms, static fn (array $room): bool => in_array((int) $room['id'], $selected, true)));
         $byRoom = []; foreach ($occurrences as $occurrence) $byRoom[(string) $occurrence['snapshot_room_code']][] = $occurrence;
-        $html = '<section class="technician-sheet"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>Period</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
+        $html = '<section class="technician-sheet"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>P</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
         foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $html .= '<td>' . ($separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence, $readOnly))) . '</td>'; } $html .= '</tr>'; }
         return $html . '</tbody></table></div></section>';
     }
@@ -109,24 +110,35 @@ final class TechnicianPage
         return '<details class="technician-cell class-tone-' . ClassTone::forCode((string) $occurrence['snapshot_class_code']) . '"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span><span class="technician-requisition" title="' . $this->e($label) . '">' . $this->e($label) . '</span></summary><div class="technician-detail"><strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e($text === '' ? 'No requisition has been entered.' : $text)) . '</p>' . $toggle . '<details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details></div></details>';
     }
 
-    private function weekPrint(DateTimeImmutable $date, array $selected, string $mode, array $roomIds): string
+    private function weekPrint(DateTimeImmutable $date, array $selected): string
     {
         $days = method_exists($this->store, 'workingDays') ? $this->store->workingDays($this->organisationId) : [1, 2, 3, 4, 5];
         $first = (int) ($days[0] ?? 1);
         $start = method_exists($this->store, 'workingWeekStart') ? $this->store->workingWeekStart($this->organisationId, $date) : $date->modify('-' . (((int) $date->format('N') - $first + 7) % 7) . ' days');
-        $backUrl = '/technician?date=' . $this->e($date->format('Y-m-d')) . '&rooms=' . $this->e($mode);
-        if ($mode === 'custom') foreach (array_values(array_unique(array_map('intval', $roomIds))) as $roomId) if ($roomId > 0) $backUrl .= '&room_ids[]=' . $roomId;
+        $backUrl = '/technician?date=' . $this->e($date->format('Y-m-d')) . $this->roomQuery($selected);
         $html = '<main class="technician-week-print"><header class="page-header technician-print-header"><div><p class="eyebrow">Technician</p><h1>Print View</h1></div><a class="button secondary" href="' . $backUrl . '">Back to Technician View</a></header>';
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
         foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->grid($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true); }
         return $html . '</main><script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
     }
 
-    private function roomQuery(string $mode, array $selected): string
+    private function roomQuery(array $selected): string
     {
-        $query = '&rooms=' . rawurlencode($mode);
-        if ($mode === 'custom') foreach (array_values(array_unique(array_map('intval', $selected))) as $roomId) if ($roomId > 0) $query .= '&room_ids[]=' . $roomId;
+        $query = '&room_selection=1';
+        foreach (array_values(array_unique(array_map('intval', $selected))) as $roomId) if ($roomId > 0) $query .= '&room_ids[]=' . $roomId;
         return $query;
+    }
+
+    private function orderedRoomIds(array $availableRoomIds, array $requestedRoomIds): array
+    {
+        $requested = array_fill_keys(array_values(array_unique($requestedRoomIds)), true);
+        return array_values(array_filter($availableRoomIds, static fn (int $roomId): bool => isset($requested[$roomId])));
+    }
+
+    private function roomPreferenceScript(string $key, bool $restore): string
+    {
+        $restoreFlag = $restore ? 'true' : 'false';
+        return '<script>(function(){var box=document.querySelector("[data-room-preference-key]");if(!box)return;var form=box.querySelector("form"),key=box.dataset.roomPreferenceKey,checks=Array.from(box.querySelectorAll("input[name=\\"room_ids[]\\"]"));function ids(){return checks.filter(function(input){return input.checked;}).map(function(input){return Number(input.value);});}function save(){try{localStorage.setItem(key,JSON.stringify(ids()));}catch(error){}}checks.forEach(function(input){input.addEventListener("change",save);});box.querySelector("[data-room-select-all]").addEventListener("click",function(){checks.forEach(function(input){input.checked=true;});save();});box.querySelector("[data-room-clear-all]").addEventListener("click",function(){checks.forEach(function(input){input.checked=false;});save();});if(' . $restoreFlag . '){try{var saved=JSON.parse(localStorage.getItem(key));if(Array.isArray(saved)){var allowed=checks.map(function(input){return Number(input.value);});var valid=saved.filter(function(id){return allowed.indexOf(Number(id))!==-1;}).map(Number);checks.forEach(function(input){input.checked=valid.indexOf(Number(input.value))!==-1;});form.submit();}}catch(error){}}})();</script>';
     }
 
     private function date(string $value): DateTimeImmutable { if ($value === 'today' || $value === '') return new DateTimeImmutable('today'); $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value); return $date !== false && $date->format('Y-m-d') === $value ? $date : new DateTimeImmutable('today'); }

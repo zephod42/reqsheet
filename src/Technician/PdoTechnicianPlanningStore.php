@@ -21,7 +21,7 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
 
     public function roomsForOrganisation(int $organisationId): array
     {
-        $s = $this->pdo->prepare('SELECT id, room_code AS code FROM organisation_rooms WHERE organisation_id = :organisation_id ORDER BY room_code');
+        $s = $this->pdo->prepare('SELECT id, room_code AS code FROM organisation_rooms WHERE organisation_id = :organisation_id AND archived_at IS NULL ORDER BY room_code, id');
         $s->execute(['organisation_id' => $organisationId]); return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'code' => (string) $r['code']], $s->fetchAll());
     }
     public function workingDays(int $organisationId): array
