@@ -13,6 +13,7 @@ require __DIR__ . '/BlankTimetableCsvExporterTest.php';
 require __DIR__ . '/TimetableCsvImportTest.php';
 require __DIR__ . '/TimetableCsvConfirmTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
+require __DIR__ . '/TeacherDisplayTest.php';
 require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
 require __DIR__ . '/AccountTest.php';
 require __DIR__ . '/TenantTest.php';
@@ -108,8 +109,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -140,6 +141,10 @@ $settingsMigration = file_get_contents($migrationDirectory . '/0004_add_organisa
 if ($settingsMigration === false) throw new RuntimeException('Settings migration could not be read.');
 foreach (['organisation_settings', 'organisation_rooms', 'allow_double_periods'] as $expectedSettingsFragment) {
     if (!str_contains($settingsMigration, $expectedSettingsFragment)) throw new RuntimeException('Expected settings schema fragment is missing: ' . $expectedSettingsFragment);
+}
+$dateFormatMigration = file_get_contents($migrationDirectory . '/0014_add_date_format.sql');
+if ($dateFormatMigration === false || !str_contains($dateFormatMigration, "date_format VARCHAR(10) NOT NULL DEFAULT 'DD/MM/YYYY'")) {
+    throw new RuntimeException('Date format migration is missing the agreed default.');
 }
 $tenantMigration = file_get_contents($migrationDirectory . '/0005_add_tenant_slugs.sql');
 if ($tenantMigration === false) throw new RuntimeException('Tenant migration could not be read.');
@@ -281,6 +286,7 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\BlankTimetableCsvExporterTest::run();
 \Reqsheet\Tests\TimetableCsvImportTest::run();
 \Reqsheet\Tests\TimetableCsvConfirmTest::run();
+\Reqsheet\Tests\TeacherDisplayTest::run();
 \Reqsheet\Tests\AccountTest::run();
 \Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();

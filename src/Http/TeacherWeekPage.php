@@ -11,6 +11,7 @@ use Reqsheet\Teacher\TeacherWeek;
 use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\ClassTone;
 use Reqsheet\Timetable\TimetableValidationException;
+use Reqsheet\Date\DateDisplay;
 
 final class TeacherWeekPage
 {
@@ -20,8 +21,12 @@ final class TeacherWeekPage
         private readonly int $teacherId,
         private readonly DateTimeImmutable $today = new DateTimeImmutable('today'),
         private readonly ?array $user = null,
+        ?string $dateFormat = null,
     ) {
+        $this->dateDisplay = new DateDisplay($dateFormat ?? DateDisplay::DEFAULT_FORMAT);
     }
+
+    private readonly DateDisplay $dateDisplay;
 
     /** @param array<string, mixed> $query @param array<string, mixed> $input */
     public function handle(string $method, array $query, array $input): string
@@ -80,11 +85,11 @@ final class TeacherWeekPage
         $body .= '<div class="timetable-scroll"><table class="week-grid"><caption class="visually-hidden">Teacher timetable week</caption><thead><tr><th scope="col">Period</th>';
         foreach ($week->days as $day) {
             $date = $day['date'];
-            $body .= '<th scope="col" class="day-label ' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'today-heading' : '') . '"><a href="/teacher/day?date=' . $date->format('Y-m-d') . '">' . $this->e($date->format('D')) . '<br><small>' . $date->format('j M') . '</small></a></th>';
+            $body .= '<th scope="col" class="day-label ' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'today-heading' : '') . '"><a href="/teacher/day?date=' . $date->format('Y-m-d') . '">' . $this->e($date->format('D')) . '<br><small>' . $this->e($this->dateDisplay->format($date)) . '</small></a></th>';
         }
         $body .= '</tr></thead><tbody>';
         foreach ($periods as $sequence => $axisSlot) {
-            $body .= '<tr><th scope="row" class="period-label ' . ($axisSlot->isTeaching() ? '' : 'separator-axis') . '">' . $this->e($axisSlot->isTeaching() ? $this->periodLabel($axisSlot) : $this->separatorLabel($axisSlot)) . '</th>';
+            $body .= '<tr' . ($axisSlot->isTeaching() ? '' : ' class="separator-row"') . '><th scope="row" class="period-label ' . ($axisSlot->isTeaching() ? '' : 'separator-axis') . '">' . $this->e($axisSlot->isTeaching() ? $this->periodLabel($axisSlot) : $this->separatorLabel($axisSlot)) . '</th>';
             foreach ($week->days as $day) {
                 $date = $day['date'];
             $bySequence = [];
@@ -146,7 +151,7 @@ final class TeacherWeekPage
         return $date;
     }
 
-    private function weekDayLabel(DateTimeImmutable $date): string { return $date->format('l j F Y'); }
+    private function weekDayLabel(DateTimeImmutable $date): string { return $date->format('l') . ' ' . $this->dateDisplay->format($date); }
     private function periodLabel(TimetableSlot $slot): string { return $slot->label ?: 'P' . $slot->teachingPeriodNumber; }
     private function separatorLabel(TimetableSlot $slot): string
     {

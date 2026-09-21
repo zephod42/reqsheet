@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Reqsheet\Settings;
 
 use DateTimeImmutable;
+use Reqsheet\Date\DateDisplay;
 
 final class SettingsService
 {
@@ -20,6 +21,7 @@ final class SettingsService
     {
         $settings = $this->store->find($organisationId);
         if (trim((string) ($settings['start_time'] ?? '')) === '') $settings['start_time'] = '08:00';
+        if (!in_array((string) ($settings['date_format'] ?? ''), DateDisplay::FORMATS, true)) $settings['date_format'] = DateDisplay::DEFAULT_FORMAT;
         return $settings;
     }
 
@@ -41,6 +43,12 @@ final class SettingsService
         if ($startTime !== '' && !$this->validTime($startTime)) $errors[] = 'Start time is invalid.';
         $periodLength = trim((string) ($input['standard_period_minutes'] ?? ''));
         if ($periodLength !== '' && ((int) $periodLength < 1 || (string) (int) $periodLength !== $periodLength)) $errors[] = 'Standard period length must be a positive number of minutes.';
+
+        $current = $this->store->find($organisationId);
+        $dateFormat = array_key_exists('date_format', $input)
+            ? trim((string) $input['date_format'])
+            : (string) ($current['date_format'] ?? DateDisplay::DEFAULT_FORMAT);
+        if (!in_array($dateFormat, DateDisplay::FORMATS, true)) $errors[] = 'Date format is invalid.';
 
         $rooms = null;
         if (array_key_exists('rooms', $input)) {
@@ -89,6 +97,7 @@ final class SettingsService
             'periods_per_day' => $periods, 'start_time' => $startTime,
             'standard_period_minutes' => $periodLength, 'custom_day_settings' => $customDays,
             'separators' => $separators, 'allow_double_periods' => isset($input['allow_conjoined_periods']) || isset($input['allow_double_periods']),
+            'date_format' => $dateFormat,
         ], $rooms);
     }
 

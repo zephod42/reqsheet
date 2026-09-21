@@ -10,6 +10,7 @@ use Reqsheet\Timetable\TimetableConfigurationStore;
 use Reqsheet\Timetable\TimetableTemplateService;
 use Reqsheet\Timetable\TimetableValidationException;
 use Reqsheet\Http\CsrfToken;
+use Reqsheet\Date\DateDisplay;
 
 final class SettingsPage
 {
@@ -20,6 +21,7 @@ final class SettingsPage
     /** @param array<string, mixed> $input */
     public function handle(string $method, array $input): string
     {
+        if (!SessionAuth::isAdmin($this->user)) return PageLayout::render('Settings', '<p class="notice error">Administrator access is required.</p>', $this->user);
         if ($this->timetable !== null) return $this->templateHandle($method, $input);
         $message = null;
         if ($method === 'POST') {
@@ -178,7 +180,7 @@ final class SettingsPage
             foreach ($sourceSlots as $slot) if ($slot->isTeaching()) $sourcePeriods = max($sourcePeriods, (int) $slot->teachingPeriodNumber);
             $data = array_replace($data, ['working_days' => $sourceDays, 'first_day_of_week' => $source->firstDayOfWeek, 'periods_per_day' => max(1, $sourcePeriods)]);
         }
-        $form = $this->form($data, null, false);
+        $form = $this->form($data, null, false, false);
         $replacement = '<form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="save_template">' . $sourceInput . '<label>Timetable name<input name="template_label" value="' . $this->e($label) . '" maxlength="255" required></label>';
         $count = 1;
         $form = str_replace('<form method="post">', $replacement, $form, $count);
@@ -186,7 +188,7 @@ final class SettingsPage
     }
 
     /** @param array<string, mixed> $data */
-    private function form(array $data, ?string $message, bool $includeSchoolName = true): string
+    private function form(array $data, ?string $message, bool $includeSchoolName = true, bool $includeDateFormat = true): string
     {
         $days = (array) ($data['working_days'] ?? []);
         $separators = (array) ($data['separators'] ?? []);
@@ -201,8 +203,16 @@ final class SettingsPage
         if ($separatorInputs === '') $separatorInputs = $this->separatorRow('', '', 0, '', $periodOptions);
         $separatorTemplate = $this->separatorRow('', '', 0, '', $periodOptions);
         $schoolField = $includeSchoolName ? '<label>School name<input name="school_name" value="' . $this->e((string) ($data['school_name'] ?? '')) . '" required></label>' : '';
-        $html = '<section class="content-narrow"><h1>Settings</h1><p>Complete the organisation settings before normal use.</p>' . $notice . '<form method="post"><div class="settings-section"><h2>Required</h2><label>School name<input name="school_name" value="' . $this->e((string) ($data['school_name'] ?? '')) . '" required></label><fieldset><legend>Working days</legend><div class="day-options">' . $dayInputs . '</div></fieldset><label>First day of working week<select name="first_day_of_week">' . $this->dayOptions($dayNames, (int) ($data['first_day_of_week'] ?? 1)) . '</select></label><label>Periods per day<input type="number" name="periods_per_day" min="1" max="20" value="' . (int) ($data['periods_per_day'] ?? 6) . '" required data-period-count></label></div><div class="settings-section"><h2>Optional timings</h2><label>Start time<input type="time" name="start_time" value="' . $this->e((string) ($data['start_time'] ?? '08:00')) . '"></label><label>Standard period length (minutes)<input type="number" min="1" name="standard_period_minutes" value="' . $this->e((string) ($data['standard_period_minutes'] ?? '')) . '"></label><fieldset><legend>Breaks and separators</legend><p>Choose what occurs between periods. Duration is optional.</p><div class="separator-list" data-separators>' . $separatorInputs . '</div><button type="button" data-add-separator>Add separator</button></fieldset><label class="check-label"><input type="checkbox" name="allow_conjoined_periods" value="1"' . (!empty($data['allow_double_periods']) ? ' checked' : '') . '> Allow conjoined periods</label><p>When enabled, one lesson may span any number of adjoining teaching periods. A Break, Lunch, or Other separator always stops the span.</p></div><div class="form-actions"><button>Save settings</button></div></form></section><template id="separator-template">' . $separatorTemplate . '</template><script>' . $this->script() . '</script>';
+        $dateFormat = $includeDateFormat ? '<label>Date format<select name="date_format">' . $this->dateFormatOptions((string) ($data['date_format'] ?? DateDisplay::DEFAULT_FORMAT)) . '</select></label>' : '';
+        $html = '<section class="content-narrow"><h1>Settings</h1><p>Complete the organisation settings before normal use.</p>' . $notice . '<form method="post"><div class="settings-section"><h2>Required</h2><label>School name<input name="school_name" value="' . $this->e((string) ($data['school_name'] ?? '')) . '" required></label><fieldset><legend>Working days</legend><div class="day-options">' . $dayInputs . '</div></fieldset><label>First day of working week<select name="first_day_of_week">' . $this->dayOptions($dayNames, (int) ($data['first_day_of_week'] ?? 1)) . '</select></label><label>Periods per day<input type="number" name="periods_per_day" min="1" max="20" value="' . (int) ($data['periods_per_day'] ?? 6) . '" required data-period-count></label></div><div class="settings-section"><h2>Optional timings</h2><label>Start time<input type="time" name="start_time" value="' . $this->e((string) ($data['start_time'] ?? '08:00')) . '"></label><label>Standard period length (minutes)<input type="number" min="1" name="standard_period_minutes" value="' . $this->e((string) ($data['standard_period_minutes'] ?? '')) . '"></label><fieldset><legend>Breaks and separators</legend><p>Choose what occurs between periods. Duration is optional.</p><div class="separator-list" data-separators>' . $separatorInputs . '</div><button type="button" data-add-separator>Add separator</button></fieldset><label class="check-label"><input type="checkbox" name="allow_conjoined_periods" value="1"' . (!empty($data['allow_double_periods']) ? ' checked' : '') . '> Allow conjoined periods</label><p>When enabled, one lesson may span any number of adjoining teaching periods. A Break, Lunch, or Other separator always stops the span.</p></div>' . ($includeDateFormat ? '<div class="settings-section"><h2>Display</h2>' . $dateFormat . '<p class="muted">Dates are stored internally as YYYY-MM-DD.</p></div>' : '') . '<div class="form-actions"><button>Save settings</button></div></form></section><template id="separator-template">' . $separatorTemplate . '</template><script>' . $this->script() . '</script>';
         return $includeSchoolName ? $html : str_replace($schoolField === '' ? '<label>School name<input name="school_name" value="' . $this->e((string) ($data['school_name'] ?? '')) . '" required></label>' : '', '', $html);
+    }
+
+    private function dateFormatOptions(string $selected): string
+    {
+        $html = '';
+        foreach (DateDisplay::FORMATS as $format) $html .= '<option value="' . $format . '"' . ($format === $selected ? ' selected' : '') . '>' . $format . '</option>';
+        return $html;
     }
 
     private function separatorRow(string $type = '', string $label = '', int $after = 0, string $duration = '', string $periodOptions = ''): string

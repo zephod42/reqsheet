@@ -150,9 +150,11 @@ small { font-size: .82rem; }
 .day-label a:hover, .day-label a:focus-visible { text-decoration: underline; }
 .today-row .day-label { background: var(--primary-pale); font-weight: 750; }
 .week-grid td { height: 7rem; padding: .3rem; vertical-align: top; }
+.week-grid tr.separator-row th, .week-grid tr.separator-row td { height: 1.5rem; padding-top: .12rem; padding-bottom: .12rem; }
 .day-view-heading { margin: .25rem 0 0; font-size: 1rem; font-weight: 500; }
 .day-picker { display: flex; align-items: end; flex-wrap: wrap; gap: .6rem; margin: var(--space-4) 0; }
 .day-picker label { margin: 0; }
+.date-display { color: var(--muted); font-family: var(--technical); font-size: .9rem; padding-bottom: .45rem; }
 .teacher-day-table-wrap { max-width: 100%; overflow-x: auto; }
 .teacher-day-table { width: 100%; min-width: 60rem; border-collapse: collapse; font-family: var(--technical); }
 .teacher-day-table th, .teacher-day-table td { border: 1px solid var(--rule); padding: .65rem .7rem; text-align: left; vertical-align: top; }

@@ -22,7 +22,7 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
 
         $settings = $this->prepare(
             'SELECT working_days, first_day_of_week, periods_per_day, start_time,
-                    standard_period_minutes, custom_day_settings, separators, allow_double_periods
+                    standard_period_minutes, custom_day_settings, separators, allow_double_periods, date_format
              FROM organisation_settings WHERE organisation_id = :id',
         );
         $settings->execute(['id' => $organisationId]);
@@ -41,6 +41,7 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
             'custom_day_settings' => $row === false ? [] : self::jsonObject($row['custom_day_settings']),
             'separators' => $row === false ? [] : self::jsonList($row['separators']),
             'allow_double_periods' => $row !== false && (bool) $row['allow_double_periods'],
+            'date_format' => $row === false ? 'DD/MM/YYYY' : (string) ($row['date_format'] ?? 'DD/MM/YYYY'),
             'rooms' => $roomCodes,
             'complete' => $row !== false,
         ];
@@ -55,13 +56,13 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
             $statement = $this->prepare(
                 'INSERT INTO organisation_settings
                     (organisation_id, working_days, first_day_of_week, periods_per_day, start_time,
-                     standard_period_minutes, custom_day_settings, separators, allow_double_periods)
-                 VALUES (:id, :days, :first_day, :periods, :start_time, :period_length, :custom_days, :separators, :double_periods)
+                     standard_period_minutes, custom_day_settings, separators, allow_double_periods, date_format)
+                 VALUES (:id, :days, :first_day, :periods, :start_time, :period_length, :custom_days, :separators, :double_periods, :date_format)
                  ON DUPLICATE KEY UPDATE
                     working_days = VALUES(working_days), first_day_of_week = VALUES(first_day_of_week),
                     periods_per_day = VALUES(periods_per_day), start_time = VALUES(start_time),
                     standard_period_minutes = VALUES(standard_period_minutes), custom_day_settings = VALUES(custom_day_settings),
-                    separators = VALUES(separators), allow_double_periods = VALUES(allow_double_periods)',
+                    separators = VALUES(separators), allow_double_periods = VALUES(allow_double_periods), date_format = VALUES(date_format)',
             );
             $statement->execute([
                 'id' => $organisationId,
@@ -73,6 +74,7 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
                 'custom_days' => json_encode($settings['custom_day_settings'], JSON_THROW_ON_ERROR),
                 'separators' => json_encode($settings['separators'], JSON_THROW_ON_ERROR),
                 'double_periods' => $settings['allow_double_periods'] ? 1 : 0,
+                'date_format' => $settings['date_format'] ?? 'DD/MM/YYYY',
             ]);
             if ($rooms !== null) {
                 $existingRoomCodes = $this->prepare('SELECT room_code FROM organisation_rooms WHERE organisation_id = :id ORDER BY room_code');

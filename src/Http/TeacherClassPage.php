@@ -7,6 +7,7 @@ namespace Reqsheet\Http;
 use DateTimeImmutable;
 use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Timetable\TimetableValidationException;
+use Reqsheet\Date\DateDisplay;
 
 final class TeacherClassPage
 {
@@ -16,7 +17,12 @@ final class TeacherClassPage
         private readonly int $teacherId,
         private readonly DateTimeImmutable $today = new DateTimeImmutable('today'),
         private readonly ?array $user = null,
-    ) {}
+        ?string $dateFormat = null,
+    ) {
+        $this->dateDisplay = new DateDisplay($dateFormat ?? DateDisplay::DEFAULT_FORMAT);
+    }
+
+    private readonly DateDisplay $dateDisplay;
 
     /** @param array<string,mixed> $query @param array<string,mixed> $input */
     public function handle(string $method, array $query = [], array $input = []): string
@@ -76,7 +82,7 @@ final class TeacherClassPage
         foreach ($lessons as $lesson) {
             $date = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $lesson['lesson_date']) ?: $this->today;
             $period = (string) ($lesson['slot_label'] ?? ('P' . (int) ($lesson['teaching_period_number'] ?? 0)));
-            $body .= '<tr><th scope="row">' . $this->e($date->format('j M Y')) . '</th><td>' . $this->e($date->format('l') . ' / ' . $period) . '</td><td>' . $this->e((string) $lesson['snapshot_room_code']) . '</td><td>' . $this->editor($lesson, 'outline', 'Lesson outline', (string) ($lesson['planning_notes'] ?? ''), $selected['id'], $date) . '</td><td>' . $this->editor($lesson, 'requisitions', 'Requisitions', $this->requirements($lesson), $selected['id'], $date) . '</td><td>' . $this->editor($lesson, 'risk', 'Risk assessment', (string) ($lesson['risk_assessment_text'] ?? ''), $selected['id'], $date) . '</td></tr>';
+            $body .= '<tr><th scope="row">' . $this->e($this->dateDisplay->format($date)) . '</th><td>' . $this->e($date->format('l') . ' / ' . $period) . '</td><td>' . $this->e((string) $lesson['snapshot_room_code']) . '</td><td>' . $this->editor($lesson, 'outline', 'Lesson outline', (string) ($lesson['planning_notes'] ?? ''), $selected['id'], $date) . '</td><td>' . $this->editor($lesson, 'requisitions', 'Requisitions', $this->requirements($lesson), $selected['id'], $date) . '</td><td>' . $this->editor($lesson, 'risk', 'Risk assessment', (string) ($lesson['risk_assessment_text'] ?? ''), $selected['id'], $date) . '</td></tr>';
         }
         return PageLayout::render('Teacher class', $body . '</tbody></table></div>', $this->user);
     }

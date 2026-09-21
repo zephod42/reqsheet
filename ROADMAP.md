@@ -89,6 +89,11 @@ Bounded usability milestone completed 2026-09-19:
 - My Account renders only the current user’s identity and supports CSRF-protected self-service password changes under the existing password policy. Identity fields remain administrator-managed.
 - Administrator Settings now contains the “Reqsheet account” placeholder section. Membership status, plans, pricing, renewals, payment management, and billing integration remain future work and must be specified before implementation.
 
+Teacher display refinement completed 2026-09-21:
+
+- Teacher Week View renders all configured non-teaching separator rows compactly while preserving normal lesson tiles.
+- Administrators can select an organisation-wide `DD/MM/YYYY`, `MM/DD/YYYY`, or `YYYY/MM/DD` display format; the default is `DD/MM/YYYY`, with ISO date values retained for controls, URLs, storage, and navigation.
+
 Teacher and public-page polish completed 2026-09-20:
 
 - Teacher Week View identifies the selected week using the configured first working day, including past and future navigation.

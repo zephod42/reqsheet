@@ -605,10 +605,10 @@ if (in_array($route, [ApplicationRoute::TEACHER_WEEK, ApplicationRoute::TEACHER_
         );
         $today = new \DateTimeImmutable('today');
         $page = $route === ApplicationRoute::TEACHER_DAY
-            ? new TeacherDayPage($planning, $user['organisation_id'], $user['id'], $today, $user)
+            ? new TeacherDayPage($planning, $user['organisation_id'], $user['id'], $today, $user, $settings['date_format'] ?? null)
             : ($route === ApplicationRoute::TEACHER_CLASS
-                ? new TeacherClassPage($planning, $user['organisation_id'], $user['id'], $today, $user)
-                : new TeacherWeekPage($planning, $user['organisation_id'], $user['id'], $today, $user));
+                ? new TeacherClassPage($planning, $user['organisation_id'], $user['id'], $today, $user, $settings['date_format'] ?? null)
+                : new TeacherWeekPage($planning, $user['organisation_id'], $user['id'], $today, $user, $settings['date_format'] ?? null));
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);
     } catch (\Throwable $exception) {

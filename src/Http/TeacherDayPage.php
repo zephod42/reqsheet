@@ -9,6 +9,7 @@ use DateTimeImmutable;
 use Reqsheet\Teacher\TeacherPlanningService;
 use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\TimetableValidationException;
+use Reqsheet\Date\DateDisplay;
 
 final class TeacherDayPage
 {
@@ -18,8 +19,12 @@ final class TeacherDayPage
         private readonly int $teacherId,
         private readonly DateTimeImmutable $today = new DateTimeImmutable('today'),
         private readonly ?array $user = null,
+        ?string $dateFormat = null,
     ) {
+        $this->dateDisplay = new DateDisplay($dateFormat ?? DateDisplay::DEFAULT_FORMAT);
     }
+
+    private readonly DateDisplay $dateDisplay;
 
     /** @param array<string, mixed> $query @param array<string, mixed> $input */
     public function handle(string $method, array $query = [], array $input = []): string
@@ -78,10 +83,11 @@ final class TeacherDayPage
                 break;
             }
         }
-        $body = '<header class="page-header"><div><p class="eyebrow">Teacher</p><h1>Day View</h1><h2 class="day-view-heading">' . $this->e($date->format('l j F Y')) . '</h2></div><div class="form-actions"><a class="button secondary" href="/teacher/day?date=' . $date->sub(new DateInterval('P1D'))->format('Y-m-d') . '">Previous day</a><a class="button secondary" href="/teacher/day?date=' . $this->today->format('Y-m-d') . '">Today</a><a class="button secondary" href="/teacher/day?date=' . $date->add(new DateInterval('P1D'))->format('Y-m-d') . '">Next day</a></div></header>';
+        $displayedDate = $date->format('l') . ' ' . $this->dateDisplay->format($date);
+        $body = '<header class="page-header"><div><p class="eyebrow">Teacher</p><h1>Day View</h1><h2 class="day-view-heading">' . $this->e($displayedDate) . '</h2></div><div class="form-actions"><a class="button secondary" href="/teacher/day?date=' . $date->sub(new DateInterval('P1D'))->format('Y-m-d') . '">Previous day</a><a class="button secondary" href="/teacher/day?date=' . $this->today->format('Y-m-d') . '">Today</a><a class="button secondary" href="/teacher/day?date=' . $date->add(new DateInterval('P1D'))->format('Y-m-d') . '">Next day</a></div></header>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
-        $body .= '<form class="day-picker" method="get"><label for="teacher-day-date">Select day</label><input id="teacher-day-date" type="date" name="date" value="' . $date->format('Y-m-d') . '"><button>Go</button></form>';
-        $body .= '<p class="context">' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'Today\'s lessons' : 'Lessons for ' . $this->e($date->format('l j F Y'))) . '</p>';
+        $body .= '<form class="day-picker" method="get"><label for="teacher-day-date">Select day</label><input id="teacher-day-date" type="date" name="date" value="' . $date->format('Y-m-d') . '" aria-describedby="teacher-day-date-display"><span id="teacher-day-date-display" class="date-display">' . $this->e($this->dateDisplay->format($date)) . '</span><button>Go</button></form>';
+        $body .= '<p class="context">' . ($date->format('Y-m-d') === $this->today->format('Y-m-d') ? 'Today\'s lessons' : 'Lessons for ' . $this->e($displayedDate)) . '</p>';
         if ($selected === null || $selected['occurrences'] === []) {
             $body .= '<p class="notice">No lessons are scheduled for this date.</p>';
             return PageLayout::render('Teacher day', $body, $this->user);
@@ -91,7 +97,7 @@ final class TeacherDayPage
         foreach ($selected['slots'] as $slot) $slots[$slot->id] = $slot;
         $occurrences = $selected['occurrences'];
         usort($occurrences, static fn (array $a, array $b): int => ((int) ($a['snapshot_start_slot_id'] ?? 0) <=> (int) ($b['snapshot_start_slot_id'] ?? 0)) ?: ((int) $a['id'] <=> (int) $b['id']));
-        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table"><caption class="visually-hidden">Lessons for ' . $this->e($date->format('l j F Y')) . '</caption><thead><tr><th scope="col">Period</th><th scope="col">Room</th><th scope="col">Class code</th><th scope="col">Lesson outline</th><th scope="col">Requisitions</th><th scope="col">Risk assessment</th></tr></thead><tbody>';
+        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table"><caption class="visually-hidden">Lessons for ' . $this->e($displayedDate) . '</caption><thead><tr><th scope="col">Period</th><th scope="col">Room</th><th scope="col">Class code</th><th scope="col">Lesson outline</th><th scope="col">Requisitions</th><th scope="col">Risk assessment</th></tr></thead><tbody>';
         foreach ($occurrences as $occurrence) {
             $start = $slots[(int) ($occurrence['snapshot_start_slot_id'] ?? 0)] ?? null;
             if (!$start instanceof TimetableSlot) continue;

@@ -241,7 +241,7 @@ try {
 
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 13, 'Expected all migrations to apply to the clean test database.');
+        integrationAssert($migrationCount === 14, 'Expected all migrations to apply to the clean test database.');
         assertMigration0013Schema($pdo);
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);

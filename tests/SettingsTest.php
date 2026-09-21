@@ -29,11 +29,12 @@ final class SettingsTest
         $service->save(1, [
             'school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
             'periods_per_day' => 6, 'rooms' => ['LAB-A'], 'allow_double_periods' => '1',
-            'separator_type' => ['Break'], 'separator_after' => [2], 'separator_duration' => ['10'],
+            'separator_type' => ['Break'], 'separator_after' => [2], 'separator_duration' => ['10'], 'date_format' => 'YYYY/MM/DD',
         ]);
         assertSameValue('Test School', $store->saved['school_name'], 'School name was not saved.');
         assertSameValue(['LAB-A'], $store->rooms, 'Room was not saved.');
         assertSameValue(true, $store->saved['allow_double_periods'], 'Double-period setting was not saved.');
+        assertSameValue('YYYY/MM/DD', $store->saved['date_format'], 'Date format setting was not saved.');
         assertSameValue('Break', $store->saved['separators'][0]['type'], 'Separator type was not saved.');
         $service->save(1, [
             'school_name' => 'Nine Period School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
@@ -46,6 +47,12 @@ final class SettingsTest
         $ninePeriodView = (new SettingsPage(new SettingsService($store), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]))->handle('GET', []);
         assertContainsValue('After period 8', $ninePeriodView, 'Nine-period settings did not expose the period 8/9 separator boundary.');
         assertNotContainsValue('Contact email', $ninePeriodView, 'Organisation Settings still collected a contact email.');
+        assertSameValue(1, substr_count($ninePeriodView, 'value="YYYY/MM/DD" selected'), 'Saved date format was not selected in Settings.');
+        assertSameValue(1, substr_count($ninePeriodView, 'value="DD/MM/YYYY"'), 'Date format options did not include the default.');
+        assertSameValue(1, substr_count($ninePeriodView, 'value="MM/DD/YYYY"'), 'Date format options did not include the US format.');
+
+        $nonAdminSettings = (new SettingsPage(new SettingsService($store), 1, ['id' => 2, 'organisation_id' => 1, 'roles' => ['teacher']]))->handle('POST', ['date_format' => 'MM/DD/YYYY']);
+        assertContainsValue('Administrator access is required.', $nonAdminSettings, 'Non-administrator modified organisation settings.');
 
         $transitionStore = new SettingsTransitionStoreFake();
         $settingsPage = new SettingsPage(new SettingsService($transitionStore), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
@@ -200,7 +207,7 @@ final class SettingsStoreFake implements OrganisationSettingsStore
 
     public function find(int $organisationId): array
     {
-        return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => $this->saved['periods_per_day'] ?? 6, 'start_time' => $this->saved['start_time'] ?? '', 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => $this->saved['separators'] ?? [], 'allow_double_periods' => $this->saved['allow_double_periods'] ?? false];
+        return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => $this->saved['periods_per_day'] ?? 6, 'start_time' => $this->saved['start_time'] ?? '', 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => $this->saved['separators'] ?? [], 'allow_double_periods' => $this->saved['allow_double_periods'] ?? false, 'date_format' => $this->saved['date_format'] ?? 'DD/MM/YYYY'];
     }
 
     public function activeVersionId(int $organisationId): ?int { return $this->active[$organisationId] ?? null; }
