@@ -12,6 +12,10 @@ final class ApplicationRoute
     public const ABOUT = 'about';
     public const ALPHA = 'alpha';
     public const DEMO = 'demo';
+    public const HOW_TO = 'how_to';
+    public const HOW_TO_TEACHER = 'how_to_teacher';
+    public const HOW_TO_TECHNICIAN = 'how_to_technician';
+    public const HOW_TO_ADMINISTRATOR = 'how_to_administrator';
     public const CONTACT = 'contact';
     public const HEALTH = 'health';
     public const ADMIN_TIMETABLE = 'admin_timetable';
@@ -76,6 +80,10 @@ final class ApplicationRoute
         if ($path === '/about') return self::ABOUT;
         if ($path === '/alpha') return self::ALPHA;
         if ($path === '/demo') return self::DEMO;
+        if ($path === '/how-to') return self::HOW_TO;
+        if ($path === '/how-to/teacher') return self::HOW_TO_TEACHER;
+        if ($path === '/how-to/technician') return self::HOW_TO_TECHNICIAN;
+        if ($path === '/how-to/administrator') return self::HOW_TO_ADMINISTRATOR;
         if ($path === '/contact') return self::CONTACT;
         if ($method === 'GET' && $path === '/') {
             return self::ROOT;

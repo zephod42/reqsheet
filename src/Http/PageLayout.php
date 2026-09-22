@@ -20,7 +20,7 @@ final class PageLayout
         $assetPath = dirname(__DIR__, 2) . '/public/assets/app.css';
         $assetVersion = is_file($assetPath) ? (string) filemtime($assetPath) : '1';
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-        $active = static fn (string $path): string => ($path === '/teacher' ? in_array($currentPath, ['/teacher', '/teacher/week'], true) : $currentPath === $path) ? ' class="active" aria-current="page"' : '';
+        $active = static fn (string $path): string => ($path === '/teacher' ? in_array($currentPath, ['/teacher', '/teacher/week'], true) : ($path === '/how-to' ? str_starts_with($currentPath, '/how-to') : $currentPath === $path)) ? ' class="active" aria-current="page"' : '';
         $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet α</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
         if ($user !== null) {
             $nav .= '<li class="nav-separator" role="separator" aria-hidden="true"></li>';
@@ -32,6 +32,14 @@ final class PageLayout
             $adminLink = fn (string $path, string $label): string => $admin ? '<a' . $active($path) . ' href="' . $path . '">' . $label . '</a>' : '<span class="nav-disabled" aria-disabled="true" title="Administrators only">' . $label . '</span>';
             $nav .= '<li>' . $adminLink('/settings', 'Settings') . '</li><li>' . $adminLink('/admin/people', 'People') . '</li><li>' . $adminLink('/admin/timetable', 'Timetable') . '</li>';
             $nav .= '<li><a' . $active('/account') . ' href="/account">My Account</a></li>';
+            $nav .= '<li class="nav-divider"><a' . $active('/how-to') . ' href="/how-to">How-to</a></li>';
+            if (str_starts_with($currentPath, '/how-to')) {
+                $teacherGuide = SessionAuth::hasRole($user, 'teacher');
+                $technicianGuide = SessionAuth::hasRole($user, 'technician');
+                $administratorGuide = SessionAuth::isAdmin($user);
+                $guideLink = static fn (string $path, string $label, bool $allowed): string => '<li class="nav-subitem">' . ($allowed ? '<a' . $active($path) . ' href="' . $path . '">' . $label . '</a>' : '<span class="nav-disabled" aria-disabled="true" title="This guide is not available for your role">' . $label . '</span>') . '</li>';
+                $nav .= $guideLink('/how-to/teacher', 'Teacher', $teacherGuide) . $guideLink('/how-to/technician', 'Technician', $technicianGuide) . $guideLink('/how-to/administrator', 'Administrator', $administratorGuide);
+            }
             $nav .= '<li><a href="/logout">Log out</a></li>';
         }
         $nav .= '</ul></nav>';

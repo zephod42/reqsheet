@@ -28,6 +28,7 @@ require __DIR__ . '/TechnicianPageTest.php';
 require __DIR__ . '/RecoveryTest.php';
 require __DIR__ . '/MonitorReportTest.php';
 require __DIR__ . '/FictionalGeneratorTest.php';
+require __DIR__ . '/DemoHowToTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -199,9 +200,6 @@ if ($publicIndex === false) {
     throw new RuntimeException('Public front controller could not be read.');
 }
 foreach ([
-    'Reqsheet is designed to be simple and intuitive.',
-    'Use an AI assistant, such as ChatGPT, to populate the Reqsheet CSV',
-    'Your new timetable will be created and activated automatically.',
     'mailto:feedback@reqsheet.com',
     'mailto:accounts@reqsheet.com',
     '<h1 class="about-wordmark">Reqsheet.</h1>',
@@ -322,5 +320,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\TechnicianPageTest::run();
 \Reqsheet\Tests\RecoveryTest::run();
 \Reqsheet\Tests\MonitorReportTest::run();
+\Reqsheet\Tests\DemoHowToTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

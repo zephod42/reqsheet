@@ -30,6 +30,8 @@ use Reqsheet\Http\AccountRecoveryPage;
 use Reqsheet\Http\RecoveryKeyPage;
 use Reqsheet\Http\HomePage;
 use Reqsheet\Http\PageLayout;
+use Reqsheet\Http\DemoPage;
+use Reqsheet\Http\HowToPage;
 use Reqsheet\Http\RequestExceptionLogger;
 use Reqsheet\Http\SessionAuth;
 use Reqsheet\Http\SettingsPage;
@@ -302,6 +304,22 @@ if ($route === ApplicationRoute::ONBOARDING) {
     exit;
 }
 
+if (in_array($route, [ApplicationRoute::HOW_TO, ApplicationRoute::HOW_TO_TEACHER, ApplicationRoute::HOW_TO_TECHNICIAN, ApplicationRoute::HOW_TO_ADMINISTRATOR], true)) {
+    if ($currentUser === null) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $guide = match ($route) {
+        ApplicationRoute::HOW_TO_TEACHER => 'teacher',
+        ApplicationRoute::HOW_TO_TECHNICIAN => 'technician',
+        ApplicationRoute::HOW_TO_ADMINISTRATOR => 'administrator',
+        default => '',
+    };
+    header('Content-Type: text/html; charset=UTF-8');
+    echo HowToPage::render($guide, $currentUser);
+    exit;
+}
+
 if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::ALPHA, ApplicationRoute::DEMO, ApplicationRoute::CONTACT], true)) {
     $heading = $route === ApplicationRoute::ALPHA ? 'Reqsheet α — Alpha testing' : ucfirst($route);
     $content = '<section class="content-narrow"><h1>' . htmlspecialchars($heading, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1></section>';
@@ -407,7 +425,9 @@ HTML;
 </section>
 HTML;
     } elseif ($route === ApplicationRoute::DEMO) {
-        $content = '<section class="content-narrow public-copy demo-page"><h1>Demo</h1><p>Reqsheet is designed to be simple and intuitive. A few short tutorials will appear here in time, but for now, here\'s how to get started.</p><ol><li>Sign up and set up your school using the on-screen instructions.</li><li>Create your timetable template in Settings, configuring your working days and teaching periods.</li><li>Add your rooms and use People to create your staff accounts.</li><li>Export your blank timetable CSV from the timetable builder.</li><li>Download your department\'s existing timetable from your school\'s MIS or other timetable system.</li><li>Use an AI assistant, such as ChatGPT, to populate the Reqsheet CSV using your existing timetable information.</li><li>Import the completed CSV into Reqsheet. Your new timetable will be created and activated automatically.</li></ol><p>Of course, you can build your timetable manually if you prefer, although importing it can save a considerable amount of time.</p><p>Once your timetable, rooms, staff and class codes are in place, you\'re pretty much good to go!</p><p>Reqsheet is ready for your teachers and technicians to start using.</p></section>';
+        header('Content-Type: text/html; charset=UTF-8');
+        echo DemoPage::render($currentUser);
+        exit;
     } elseif ($route === ApplicationRoute::CONTACT) {
         $content = '<section class="content-narrow public-copy contact-page"><h1>Contact</h1><p>Feedback, bug reports and feature requests:<br><a href="mailto:feedback@reqsheet.com">feedback@reqsheet.com</a></p><p>Account enquiries and access issues:<br><a href="mailto:accounts@reqsheet.com">accounts@reqsheet.com</a></p></section>';
     }

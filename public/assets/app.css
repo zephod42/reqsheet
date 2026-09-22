@@ -111,6 +111,38 @@ small { font-size: .82rem; }
 .alpha-page h3 { margin: 1.5rem 0 .5rem; font-size: 1.05rem; }
 .demo-page ol { padding-left: 1.5rem; }
 .demo-page li { margin: .75rem 0; padding-left: .25rem; }
+.showcase { max-width: 68rem; margin: 0 auto; }
+.showcase-intro { max-width: 42rem; margin: 0 auto 3rem; text-align: center; }
+.showcase-intro h1 { margin: 0 0 .75rem; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.04em; }
+.showcase-intro > p:last-child { color: var(--muted); font-size: 1.12rem; }
+.showcase-section { border-top: 2px solid var(--rule-strong); margin-top: 3.5rem; padding-top: 2rem; }
+.showcase-section-heading h2 { margin: 0; font-size: clamp(1.55rem, 3vw, 2.2rem); }
+.showcase-feature { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(15rem, .8fr); gap: 2rem; align-items: center; margin-top: 1.5rem; }
+.showcase-feature > div { max-width: 28rem; }
+.showcase-feature h3, .showcase-secondary-grid h3, .showcase-people h3 { margin-top: 0; }
+.showcase-steps { padding-left: 1.35rem; }
+.showcase-steps li { margin: .55rem 0; }
+.demo-figure, .how-to-figure { margin: 0; border: 1px solid var(--rule); background: #fff; padding: .45rem; }
+.demo-figure img, .how-to-figure img { display: block; width: 100%; height: auto; }
+.demo-figure figcaption, .how-to-figure figcaption { margin: .35rem .15rem .05rem; color: var(--muted); font-size: .78rem; }
+.showcase-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin-top: 2.5rem; }
+.showcase-secondary-grid > div, .showcase-people > div { min-width: 0; }
+.showcase-secondary-grid .demo-figure { margin-top: .8rem; }
+.showcase-note { border-left: 3px solid var(--primary-accent); margin-top: 1.5rem; padding-left: .8rem; color: var(--muted); }
+.showcase-admin-images { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+.showcase-people { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 2rem; align-items: center; margin-top: 2rem; }
+.how-to-sections { border: 1px solid var(--rule); margin: 0 auto 2.5rem; padding: .8rem 1rem; max-width: 42rem; }
+.how-to-sections p { margin: 0 0 .35rem; font-weight: 700; }
+.how-to-sections ul { display: flex; flex-wrap: wrap; gap: .35rem 1.2rem; list-style: none; margin: 0; padding: 0; }
+.how-to-sections li { margin: 0; }
+.how-to-section { max-width: 56rem; margin: 0 auto; }
+.how-to-section h2 { border-top: 1px solid var(--rule); margin: 2.5rem 0 1rem; padding-top: 1.5rem; }
+.how-to-section h2:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+.how-to-section .how-to-figure { margin: 1.25rem 0; }
+.how-to-steps { padding-left: 1.4rem; }
+.how-to-steps li { margin: .6rem 0; }
+.how-to-image-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.how-to-overview { max-width: 42rem; margin: 0 auto; text-align: center; }
 .about-page { max-width: 44rem; text-align: left; font-size: 1.08rem; }
 .about-wordmark { margin: 0 0 2rem; text-align: center; font-size: clamp(2.4rem, 7.5vw, 4.5rem); font-weight: 780; letter-spacing: -.07em; line-height: 1; }
 .about-page p { margin: 1.25rem 0; }
@@ -393,6 +425,8 @@ dialog .close { float: right; }
     dialog { width: calc(100% - 1rem); max-height: calc(100vh - 1rem); margin: .5rem auto; padding: 1rem; }
     .assignment-dialog, .resource-dialog { top: .5rem; left: .5rem; right: .5rem; width: auto; max-width: none; max-height: calc(100vh - 1rem); transform: none; }
     .donation-methods { grid-template-columns: 1fr; }
+    .showcase-feature, .showcase-people { grid-template-columns: 1fr; gap: 1rem; }
+    .showcase-secondary-grid, .showcase-admin-images, .how-to-image-grid { grid-template-columns: 1fr; }
 }
 
 @media print {
