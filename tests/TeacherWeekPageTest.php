@@ -54,6 +54,8 @@ final class TeacherWeekPageTest
         assertContainsValue('text-align: center; vertical-align: middle; white-space: nowrap;', $css, 'Teacher period labels were not centred without truncation.');
         assertContainsValue('.day-label { padding: .6rem; text-align: center; vertical-align: middle;', $css, 'Teacher day headings were not centred.');
         assertContainsValue('.teacher-day-table { width: 100%; min-width: 48rem; border-collapse: collapse; table-layout: fixed;', $css, 'Teacher day/class views did not retain a compact bounded table layout.');
+        assertContainsValue('.teacher-day-table thead th:nth-child(2) { width: 5.5rem; }', $css, 'Teacher day/class context column was not narrowed.');
+        assertContainsValue('overflow-wrap: anywhere; word-break: break-word;', $css, 'Teacher day/class context codes were not configured to wrap.');
         assertContainsValue('.lesson-date-box { display: inline-flex; flex-direction: column;', $css, 'Teacher day/class views did not style the combined date box.');
         assertContainsValue('.day-lesson-value { margin-top: .3rem; overflow-wrap: anywhere; white-space: pre-wrap;', $css, 'Teacher day/class planning text was not configured to wrap in full.');
 
@@ -92,6 +94,7 @@ final class TeacherWeekPageTest
         assertContainsValue('07/09', $day, 'Day View did not render the compact date without the year.');
         assertContainsValue('Day / period / date', $day, 'Day View did not retain its compact lesson table heading.');
         assertContainsValue('Class / room', $day, 'Day View did not keep class and room in one compact context column.');
+        assertColumnHeadings($day, ['Day / period / date', 'Class / room', 'Requisitions', 'Lesson outline', 'Risk assessment'], 'Day View column order changed unexpectedly.');
         assertContainsValue('Plan the experiment', $day, 'Day view did not show the complete lesson outline.');
         assertContainsValue('Bring goggles', $day, 'Day view did not show the complete requisition text.');
         assertContainsValue('Wear eye protection', $day, 'Day view did not show the complete risk assessment.');
@@ -138,6 +141,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Day / period / date', $class, 'Class View did not retain its compact lesson table heading.');
         assertContainsValue('<tr><th scope="row"><span class="lesson-date-box">', $class, 'Class View did not retain one table row per lesson.');
         assertContainsValue('name="nothing_required"', $class, 'Class View did not preserve the Nothing required editing control.');
+        assertColumnHeadings($class, ['Day / period / date', 'Room', 'Requisitions', 'Lesson outline', 'Risk assessment'], 'Class View column order changed unexpectedly.');
         $boundedStore = new TeacherStore();
         for ($offset = 1; $offset <= 4; $offset++) {
             $row = $boundedStore->occurrences[500];
@@ -181,6 +185,17 @@ function assertContainsValue(string $needle, string $haystack, string $message):
 function assertNotContainsValue(string $needle, string $haystack, string $message): void
 {
     if (str_contains($haystack, $needle)) throw new \RuntimeException($message);
+}
+
+/** @param list<string> $headings */
+function assertColumnHeadings(string $html, array $headings, string $message): void
+{
+    $position = -1;
+    foreach ($headings as $heading) {
+        $next = strpos($html, '>' . $heading . '</th>', $position + 1);
+        if ($next === false || $next < $position) throw new \RuntimeException($message);
+        $position = $next;
+    }
 }
 
 final class TeacherStore implements TeacherPlanningStore

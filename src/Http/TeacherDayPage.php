@@ -97,7 +97,7 @@ final class TeacherDayPage
         foreach ($selected['slots'] as $slot) $slots[$slot->id] = $slot;
         $occurrences = $selected['occurrences'];
         usort($occurrences, static fn (array $a, array $b): int => ((int) ($a['snapshot_start_slot_id'] ?? 0) <=> (int) ($b['snapshot_start_slot_id'] ?? 0)) ?: ((int) $a['id'] <=> (int) $b['id']));
-        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table"><caption class="visually-hidden">Lessons for ' . $this->e($displayedDate) . '</caption><thead><tr><th scope="col">Day / period / date</th><th scope="col">Class / room</th><th scope="col">Lesson outline</th><th scope="col">Requisitions</th><th scope="col">Risk assessment</th></tr></thead><tbody>';
+        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table"><caption class="visually-hidden">Lessons for ' . $this->e($displayedDate) . '</caption><thead><tr><th scope="col">Day / period / date</th><th scope="col">Class / room</th><th scope="col">Requisitions</th><th scope="col">Lesson outline</th><th scope="col">Risk assessment</th></tr></thead><tbody>';
         foreach ($occurrences as $occurrence) {
             $start = $slots[(int) ($occurrence['snapshot_start_slot_id'] ?? 0)] ?? null;
             if (!$start instanceof TimetableSlot) continue;
@@ -108,7 +108,7 @@ final class TeacherDayPage
                 : 'P' . ($start->teachingPeriodNumber ?? $start->sequenceNumber);
             $requirements = (string) ($occurrence['requirements_text'] ?? '');
             if ($requirements === '' && ($occurrence['state'] ?? '') === 'nothing_required') $requirements = 'Nothing required';
-            $body .= '<tr><th scope="row"><span class="lesson-date-box"><span>' . $this->e($date->format('D') . ' ' . $period) . '</span><span>' . $date->format('d/m') . '</span></span></th><td class="lesson-context-cell"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) $occurrence['snapshot_room_code']) . '</span></td><td>' . $this->sectionEditor($occurrence, 'outline', 'Lesson outline', (string) ($occurrence['planning_notes'] ?? ''), $editing, $form, $date) . '</td><td>' . $this->sectionEditor($occurrence, 'requisitions', 'Requisitions', $requirements, $editing, $form, $date, ($occurrence['state'] ?? '') === 'nothing_required') . '</td><td>' . $this->sectionEditor($occurrence, 'risk', 'Risk assessment', (string) ($occurrence['risk_assessment_text'] ?? ''), $editing, $form, $date) . '</td></tr>';
+            $body .= '<tr><th scope="row"><span class="lesson-date-box"><span>' . $this->e($date->format('D') . ' ' . $period) . '</span><span>' . $date->format('d/m') . '</span></span></th><td class="lesson-context-cell"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) $occurrence['snapshot_room_code']) . '</span></td><td>' . $this->sectionEditor($occurrence, 'requisitions', 'Requisitions', $requirements, $editing, $form, $date, ($occurrence['state'] ?? '') === 'nothing_required') . '</td><td>' . $this->sectionEditor($occurrence, 'outline', 'Lesson outline', (string) ($occurrence['planning_notes'] ?? ''), $editing, $form, $date) . '</td><td>' . $this->sectionEditor($occurrence, 'risk', 'Risk assessment', (string) ($occurrence['risk_assessment_text'] ?? ''), $editing, $form, $date) . '</td></tr>';
         }
         $body .= '</tbody></table></div>';
         return PageLayout::render('Teacher day', $body, $this->user);
