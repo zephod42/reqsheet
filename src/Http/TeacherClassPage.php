@@ -32,6 +32,7 @@ final class TeacherClassPage
         $classes = [];
         $editing = null;
         $form = null;
+        $async = $method === 'POST' && (($input['_async'] ?? '') === '1');
         if ($method === 'POST') {
             try {
                 if (!CsrfToken::valid($input['csrf_token'] ?? null)) throw new TimetableValidationException(['Your request expired. Please try again.']);
@@ -46,13 +47,17 @@ final class TeacherClassPage
                 if ($section === 'outline') $outline = (string) ($input['value'] ?? '');
                 if ($section === 'requisitions') $requisitions = ($input['nothing_required'] ?? '') === 'yes' ? 'Nothing required' : (string) ($input['value'] ?? '');
                 if ($section === 'risk') $risk = (string) ($input['value'] ?? '');
+                if ($async) {
+                    $saved = $this->service->saveSection($this->organisationId, $this->teacherId, (int) ($input['occurrence_id'] ?? 0), $section, (string) ($input['value'] ?? ''), ($input['nothing_required'] ?? '') === 'yes');
+                    return $this->json(['ok' => true] + $saved);
+                }
                 $this->service->save(
                     $this->organisationId, $this->teacherId, (int) ($input['occurrence_id'] ?? 0),
                     $outline, $requisitions, $risk,
                 );
                 $message = 'Lesson planning saved.';
-            } catch (TimetableValidationException $exception) { $message = implode(' ', $exception->errors()); $editing = (int) ($input['occurrence_id'] ?? 0); $form = $input; }
-            catch (\Throwable) { $message = 'Lesson planning could not be saved. Please try again.'; $editing = (int) ($input['occurrence_id'] ?? 0); $form = $input; }
+            } catch (TimetableValidationException $exception) { if ($async) return $this->json(['ok' => false, 'message' => implode(' ', $exception->errors())], 422); $message = implode(' ', $exception->errors()); $editing = (int) ($input['occurrence_id'] ?? 0); $form = $input; }
+            catch (\Throwable) { if ($async) return $this->json(['ok' => false, 'message' => 'Lesson planning could not be saved. Please try again.'], 500); $message = 'Lesson planning could not be saved. Please try again.'; $editing = (int) ($input['occurrence_id'] ?? 0); $form = $input; }
         }
 
         try {
@@ -105,7 +110,15 @@ final class TeacherClassPage
 
     private function inlineEditingScript(): string
     {
+        return '<script src="/assets/teacher-inline-planning.js" defer></script>';
         return '<script>(function(){var active=null;function resize(a){a.style.height="auto";a.style.height=Math.max(a.scrollHeight,80)+"px";}function text(v,empty){return v?v.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\\n/g,"<br>"):"<span class=\"muted\">"+empty+"</span>";}function close(cell){if(!cell)return;cell.innerHTML="<div class=\"day-lesson-heading\"><span>"+cell.dataset.label+"</span></div><div class=\"day-lesson-value\">"+text(cell.dataset.savedValue||"",cell.dataset.section==="requisitions"?"No requisitions entered":cell.dataset.section==="outline"?"No outline entered":"No risk assessment entered")+"</div>";cell.classList.remove("is-editing");}function open(cell){if(active&&active!==cell){var old=active.querySelector("textarea");if(old&&old.value!==active.dataset.savedValue&&!window.confirm("Discard unsaved changes?"))return;close(active);}active=cell;cell.classList.add("is-editing");var s=cell.dataset.section,l=cell.dataset.label,v=cell.dataset.savedValue||"",r=s==="requisitions",checked=cell.dataset.nothingRequired==="true";cell.innerHTML="<div class=\"day-lesson-heading\"><span>"+l+"</span></div><form method=\"post\" class=\"inline-lesson-form\"><input type=\"hidden\" name=\"csrf_token\" value=\""+cell.dataset.csrf+"\"><input type=\"hidden\" name=\"date\" value=\""+cell.dataset.date+"\"><input type=\"hidden\" name=\"class_id\" value=\""+cell.dataset.classId+"\"><input type=\"hidden\" name=\"occurrence_id\" value=\""+cell.dataset.occurrenceId+"\"><input type=\"hidden\" name=\"section\" value=\""+s+"\"><label><span class=\"visually-hidden\">"+l+"</span><textarea name=\"value\""+(r?" class=\"requisition-editor\"":"")+"></textarea></label>"+(r?"<label class=\"check-label\"><input type=\"checkbox\" name=\"nothing_required\" value=\"yes\""+(checked?" checked":"")+"> Nothing required</label>":"")+"<div class=\"form-actions\"><button type=\"submit\">Save</button><button type=\"button\" class=\"secondary\" data-inline-cancel>Cancel</button></div></form>";var form=cell.querySelector("form"),area=cell.querySelector("textarea"),box=cell.querySelector("[name=nothing_required]");area.value=v;if(box&&box.checked){area.value="Nothing required";area.disabled=true;}if(box)box.addEventListener("change",function(){if(box.checked){area.dataset.previousValue=area.value==="Nothing required"?"":area.value;area.value="Nothing required";area.disabled=true;}else{area.disabled=false;area.value=area.dataset.previousValue||"";}resize(area);});area.addEventListener("input",function(){resize(area);});form.addEventListener("submit",function(){if(box&&!box.checked)area.disabled=false;});cell.querySelector("[data-inline-cancel]").addEventListener("click",function(){close(cell);active=null;});resize(area);area.focus();area.setSelectionRange(area.value.length,area.value.length);}document.querySelectorAll("[data-inline-planning-cell][data-section]").forEach(function(cell){cell.addEventListener("click",function(e){if(e.target.closest("form,button,a,textarea,input"))return;open(cell);});cell.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&!cell.classList.contains("is-editing")){e.preventDefault();open(cell);}});});window.addEventListener("beforeunload",function(e){if(!active)return;var a=active.querySelector("textarea");if(a&&a.value!==active.dataset.savedValue){e.preventDefault();e.returnValue="";}});})();</script>';
+    }
+
+    private function json(array $payload, int $status = 200): string
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        return (string) json_encode($payload, JSON_THROW_ON_ERROR);
     }
 
     private function requirements(array $lesson): string

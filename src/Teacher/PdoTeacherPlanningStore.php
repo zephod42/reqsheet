@@ -257,6 +257,32 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
         ]);
     }
 
+    public function savePlanningSection(int $occurrenceId, string $section, string $value, bool $nothingRequired): array
+    {
+        if (!in_array($section, ['outline', 'requisitions', 'risk'], true)) throw new \InvalidArgumentException('Invalid planning section.');
+        $this->pdo->beginTransaction();
+        try {
+            $statement = $this->prepare('SELECT state, requirements_text, planning_notes, risk_assessment_text FROM requisitions WHERE lesson_occurrence_id = :occurrence_id FOR UPDATE');
+            $statement->execute(['occurrence_id' => $occurrenceId]);
+            $existing = $statement->fetch() ?: ['state' => 'not_completed', 'requirements_text' => null, 'planning_notes' => null, 'risk_assessment_text' => null];
+            $requirements = (string) ($existing['requirements_text'] ?? '');
+            $state = (string) ($existing['state'] ?? 'not_completed');
+            if ($section === 'requisitions') {
+                $requirements = $value;
+                $state = $nothingRequired || $value === 'Nothing required' ? 'nothing_required' : ($value === '' ? 'not_completed' : 'requirements_entered');
+            }
+            $outline = $section === 'outline' ? $value : (string) ($existing['planning_notes'] ?? '');
+            $risk = $section === 'risk' ? $value : (string) ($existing['risk_assessment_text'] ?? '');
+            $upsert = $this->prepare('INSERT INTO requisitions (lesson_occurrence_id, state, requirements_text, planning_notes, risk_assessment_text) VALUES (:occurrence_id, :state, :requirements, :outline, :risk) ON DUPLICATE KEY UPDATE state = VALUES(state), requirements_text = VALUES(requirements_text), planning_notes = VALUES(planning_notes), risk_assessment_text = VALUES(risk_assessment_text)');
+            $upsert->execute(['occurrence_id' => $occurrenceId, 'state' => $state, 'requirements' => $requirements === '' ? null : $requirements, 'outline' => $outline === '' ? null : $outline, 'risk' => $risk === '' ? null : $risk]);
+            $this->pdo->commit();
+            return ['value' => $section === 'requisitions' ? $requirements : ($section === 'outline' ? $outline : $risk), 'nothing_required' => $state === 'nothing_required'];
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
+    }
+
     private function occurrenceQuery(string $condition, string $order = 'o.lesson_date, s.sequence_number, o.id', ?int $limit = null): PDOStatement
     {
         $limitSql = $limit === null ? '' : ' LIMIT ' . max(1, min(21, $limit));

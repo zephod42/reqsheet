@@ -33,6 +33,7 @@ final class TeacherDayPage
         $message = null;
         $editing = null;
         $form = null;
+        $async = $method === 'POST' && (($input['_async'] ?? '') === '1');
         if ($method === 'POST') {
             $date = $this->parseDate((string) ($input['date'] ?? $date->format('Y-m-d')));
             $section = (string) ($input['section'] ?? '');
@@ -59,13 +60,19 @@ final class TeacherDayPage
                 if ($section === 'outline') $outline = $form['value'];
                 if ($section === 'requisitions') $requisitions = $form['nothing_required'] ? 'Nothing required' : $form['value'];
                 if ($section === 'risk') $risk = $form['value'];
+                if ($async) {
+                    $saved = $this->service->saveSection($this->organisationId, $this->teacherId, $form['occurrence_id'], $section, (string) $form['value'], (bool) $form['nothing_required']);
+                    return $this->json(['ok' => true] + $saved);
+                }
                 $this->service->save($this->organisationId, $this->teacherId, $form['occurrence_id'], $outline, $requisitions, $risk);
                 $message = 'Lesson section saved.';
                 $form = null;
             } catch (TimetableValidationException $exception) {
+                if ($async) return $this->json(['ok' => false, 'message' => implode(' ', $exception->errors())], 422);
                 $message = implode(' ', $exception->errors());
                 $editing = $form['occurrence_id'] > 0 ? $this->safeOccurrence($form['occurrence_id'], $date) : null;
             } catch (\Throwable) {
+                if ($async) return $this->json(['ok' => false, 'message' => 'The lesson section could not be saved. Please try again.'], 500);
                 $message = 'The lesson section could not be saved. Please try again.';
                 $editing = $form['occurrence_id'] > 0 ? $this->safeOccurrence($form['occurrence_id'], $date) : null;
             }
@@ -158,7 +165,15 @@ final class TeacherDayPage
 
     private function inlineEditingScript(): string
     {
+        return '<script src="/assets/teacher-inline-planning.js" defer></script>';
         return '<script>(function(){var active=null;function resize(a){a.style.height="auto";a.style.height=Math.max(a.scrollHeight,80)+"px";}function text(v,empty){return v?v.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\\n/g,"<br>"):"<span class=\"muted\">"+empty+"</span>";}function close(cell){if(!cell)return;cell.innerHTML="<div class=\"day-lesson-heading\"><span>"+cell.dataset.label+"</span></div><div class=\"day-lesson-value\">"+text(cell.dataset.savedValue||"",cell.dataset.section==="requisitions"?"No requisitions entered":cell.dataset.section==="outline"?"No outline entered":"No risk assessment entered")+"</div>";cell.classList.remove("is-editing");}function open(cell){if(active&&active!==cell){var old=active.querySelector("textarea");if(old&&old.value!==active.dataset.savedValue&&!window.confirm("Discard unsaved changes?"))return;close(active);}active=cell;cell.classList.add("is-editing");var s=cell.dataset.section,l=cell.dataset.label,v=cell.dataset.savedValue||"",r=s==="requisitions",checked=cell.dataset.nothingRequired==="true";cell.innerHTML="<div class=\"day-lesson-heading\"><span>"+l+"</span></div><form method=\"post\" class=\"inline-lesson-form\"><input type=\"hidden\" name=\"csrf_token\" value=\""+cell.dataset.csrf+"\"><input type=\"hidden\" name=\"date\" value=\""+cell.dataset.date+"\"><input type=\"hidden\" name=\"occurrence_id\" value=\""+cell.dataset.occurrenceId+"\"><input type=\"hidden\" name=\"section\" value=\""+s+"\"><label><span class=\"visually-hidden\">"+l+"</span><textarea name=\"value\""+(r?" class=\"requisition-editor\"":"")+"></textarea></label>"+(r?"<label class=\"check-label\"><input type=\"checkbox\" name=\"nothing_required\" value=\"yes\""+(checked?" checked":"")+"> Nothing required</label>":"")+"<div class=\"form-actions\"><button type=\"submit\">Save</button><button type=\"button\" class=\"secondary\" data-inline-cancel>Cancel</button></div></form>";var form=cell.querySelector("form"),area=cell.querySelector("textarea"),box=cell.querySelector("[name=nothing_required]");area.value=v;if(box&&box.checked){area.value="Nothing required";area.disabled=true;}if(box)box.addEventListener("change",function(){if(box.checked){area.dataset.previousValue=area.value==="Nothing required"?"":area.value;area.value="Nothing required";area.disabled=true;}else{area.disabled=false;area.value=area.dataset.previousValue||"";}resize(area);});area.addEventListener("input",function(){resize(area);});form.addEventListener("submit",function(){if(box&&!box.checked)area.disabled=false;});cell.querySelector("[data-inline-cancel]").addEventListener("click",function(){close(cell);active=null;});resize(area);area.focus();area.setSelectionRange(area.value.length,area.value.length);}document.querySelectorAll("[data-inline-planning-cell][data-section]").forEach(function(cell){cell.addEventListener("click",function(e){if(e.target.closest("form,button,a,textarea,input"))return;open(cell);});cell.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&!cell.classList.contains("is-editing")){e.preventDefault();open(cell);}});});window.addEventListener("beforeunload",function(e){if(!active)return;var a=active.querySelector("textarea");if(a&&a.value!==active.dataset.savedValue){e.preventDefault();e.returnValue="";}});})();</script>';
+    }
+
+    private function json(array $payload, int $status = 200): string
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        return (string) json_encode($payload, JSON_THROW_ON_ERROR);
     }
 
     private function parseDate(string $value): DateTimeImmutable

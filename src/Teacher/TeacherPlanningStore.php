@@ -48,4 +48,7 @@ interface TeacherPlanningStore
         string $requisitions,
         string $riskAssessment,
     ): void;
+
+    /** @return array{value:string,nothing_required:bool} */
+    public function savePlanningSection(int $occurrenceId, string $section, string $value, bool $nothingRequired): array;
 }

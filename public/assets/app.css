@@ -184,6 +184,7 @@ small { font-size: .82rem; }
 .inline-lesson-form { margin-top: .35rem; }
 .inline-lesson-form textarea { box-sizing: border-box; width: 100%; min-height: 5rem; max-width: 100%; resize: none; overflow-y: hidden; }
 .inline-lesson-form .form-actions { flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
+.inline-save-status { margin-left: .4rem; color: var(--muted); font-size: .85rem; }
 .inline-lesson-form .requisition-editor { min-height: 10rem; }
 .template-summary-row { margin: .35rem 0; }
 .empty-cell { background: #fff; }

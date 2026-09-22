@@ -122,4 +122,16 @@ final class TeacherPlanningService
             : ($existingState === 'nothing_required' ? 'nothing_required' : 'not_completed'));
         $this->store->savePlanning($occurrenceId, $state, $lessonOutline, $requisitions, $riskAssessment);
     }
+
+    /** @return array{value:string,nothing_required:bool} */
+    public function saveSection(int $organisationId, int $teacherId, int $occurrenceId, string $section, string $value, bool $nothingRequired = false): array
+    {
+        $this->occurrenceForEdit($organisationId, $teacherId, $occurrenceId);
+        if (!in_array($section, ['outline', 'requisitions', 'risk'], true)) {
+            throw new TimetableValidationException(['Choose a valid lesson section.']);
+        }
+        $value = trim($value);
+        if ($section === 'requisitions' && $nothingRequired) $value = 'Nothing required';
+        return $this->store->savePlanningSection($occurrenceId, $section, $value, $nothingRequired);
+    }
 }

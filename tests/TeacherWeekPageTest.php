@@ -101,6 +101,7 @@ final class TeacherWeekPageTest
         assertContainsValue('name="section" value="outline"', $day, 'Day view did not provide inline outline editing.');
         assertContainsValue('name="section" value="requisitions"', $day, 'Day view did not provide inline requisition editing.');
         assertContainsValue('name="section" value="risk"', $day, 'Day view did not provide inline risk editing.');
+        assertContainsValue('/assets/teacher-inline-planning.js', $day, 'Day view did not load the shared asynchronous inline editor.');
         assertContainsValue('data-inline-planning-cell data-section="requisitions"', $day, 'Day view requisitions cell was not directly interactive.');
         assertContainsValue('data-inline-planning-cell data-section="outline"', $day, 'Day view outline cell was not directly interactive.');
         assertContainsValue('data-inline-planning-cell data-section="risk"', $day, 'Day view risk cell was not directly interactive.');
@@ -121,6 +122,29 @@ final class TeacherWeekPageTest
         $editedDay = $dayPage->handle('GET', ['date' => '2026-09-07']);
         assertContainsValue('Updated directly in day view', $editedDay, 'Day View did not display the saved inline edit.');
         assertSameValue('13PHY', $store->occurrences[500]['snapshot_class_code'], 'Day View changed recurring lesson data.');
+        $asyncDayResponse = $dayPage->handle('POST', ['date' => '2026-09-07'], [
+            '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-07', 'occurrence_id' => 500,
+            'section' => 'risk', 'value' => 'Async risk update',
+        ]);
+        $asyncDay = json_decode($asyncDayResponse, true);
+        assertSameValue(true, $asyncDay['ok'] ?? false, 'Day View asynchronous save was not confirmed.');
+        assertSameValue('Async risk update', $asyncDay['value'] ?? null, 'Day View asynchronous save did not return the saved field.');
+        assertSameValue('Async risk update', $store->occurrences[500]['risk_assessment_text'], 'Day View asynchronous save changed the wrong field.');
+        assertSameValue('Updated requisitions', $store->occurrences[500]['requirements_text'], 'Day View asynchronous save overwrote requisitions.');
+        $asyncNothingResponse = $dayPage->handle('POST', ['date' => '2026-09-07'], [
+            '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-07', 'occurrence_id' => 500,
+            'section' => 'requisitions', 'value' => '', 'nothing_required' => 'yes',
+        ]);
+        $asyncNothing = json_decode($asyncNothingResponse, true);
+        assertSameValue(true, $asyncNothing['nothing_required'] ?? false, 'Asynchronous Nothing required save lost its explicit state.');
+        assertSameValue('Nothing required', $asyncNothing['value'] ?? null, 'Asynchronous Nothing required save did not return its display value.');
+        $failedAsyncResponse = $dayPage->handle('POST', ['date' => '2026-09-07'], [
+            '_async' => '1', 'csrf_token' => 'invalid', 'date' => '2026-09-07', 'occurrence_id' => 500,
+            'section' => 'risk', 'value' => 'Unpersisted risk',
+        ]);
+        $failedAsync = json_decode($failedAsyncResponse, true);
+        assertSameValue(false, $failedAsync['ok'] ?? true, 'Failed asynchronous save was reported as successful.');
+        assertSameValue('Async risk update', $store->occurrences[500]['risk_assessment_text'], 'Failed asynchronous save changed persisted data.');
         $unchanged = $store->occurrences[500]['requirements_text'];
         $dayPage->handle('GET', ['date' => '2026-09-07', 'edit' => 500]);
         assertSameValue($unchanged, $store->occurrences[500]['requirements_text'], 'Opening an inline editor changed requisitions.');
@@ -146,12 +170,28 @@ final class TeacherWeekPageTest
         assertContainsValue('Day / period / date', $class, 'Class View did not retain its compact lesson table heading.');
         assertContainsValue('<tr><th scope="row"><span class="lesson-date-box">', $class, 'Class View did not retain one table row per lesson.');
         assertContainsValue('name="nothing_required"', $class, 'Class View did not preserve the Nothing required editing control.');
+        assertContainsValue('/assets/teacher-inline-planning.js', $class, 'Class View did not load the shared asynchronous inline editor.');
         assertContainsValue('data-inline-planning-cell data-section="requisitions"', $class, 'Class View requisitions cell was not directly interactive.');
         assertContainsValue('data-inline-planning-cell data-section="outline"', $class, 'Class View outline cell was not directly interactive.');
         assertContainsValue('data-inline-planning-cell data-section="risk"', $class, 'Class View risk cell was not directly interactive.');
         assertNotContainsValue('>Edit</summary>', $class, 'Class View retained a separate Edit control.');
         assertNotContainsValue('lesson-edit-control', $class, 'Class View retained an anchored editor control.');
         assertColumnHeadings($class, ['Day / period / date', 'Room', 'Requisitions', 'Lesson outline', 'Risk assessment'], 'Class View column order changed unexpectedly.');
+        $asyncClassResponse = $classPage->handle('POST', ['class_id' => 301], [
+            '_async' => '1', 'csrf_token' => CsrfToken::value(), 'class_id' => 301, 'occurrence_id' => 500,
+            'section' => 'outline', 'value' => 'Async class outline',
+        ]);
+        $asyncClass = json_decode($asyncClassResponse, true);
+        assertSameValue(true, $asyncClass['ok'] ?? false, 'Class View asynchronous save was not confirmed.');
+        assertSameValue('Async class outline', $asyncClass['value'] ?? null, 'Class View asynchronous save did not return the saved field.');
+        assertSameValue('Async class outline', $store->occurrences[500]['planning_notes'], 'Class View asynchronous outline was not saved.');
+        assertSameValue('Nothing required', $store->occurrences[500]['requirements_text'], 'Class View asynchronous outline overwrote requisitions.');
+        $inlineScript = (string) file_get_contents(__DIR__ . '/../public/assets/teacher-inline-planning.js');
+        assertContainsValue('event.preventDefault()', $inlineScript, 'Inline Save did not prevent ordinary form navigation.');
+        assertContainsValue("window.addEventListener('beforeunload'", $inlineScript, 'Inline editor lost the unsaved-change warning.');
+        assertContainsValue("form.dataset.saving === 'true'", $inlineScript, 'Inline Save did not guard against repeated submissions.');
+        assertContainsValue('data.set(\'value\', area.value)', $inlineScript, 'Failed asynchronous save would not preserve the entered text for retry.');
+        assertContainsValue('button.disabled = true', $inlineScript, 'Inline Save did not disable the submit button while saving.');
         $boundedStore = new TeacherStore();
         for ($offset = 1; $offset <= 4; $offset++) {
             $row = $boundedStore->occurrences[500];
@@ -253,4 +293,5 @@ final class TeacherStore implements TeacherPlanningStore
     public function occurrencesForTeacherClass(int $organisationId, int $teacherId, int $classId, DateTimeImmutable $start, DateTimeImmutable $end, int $limit, bool $descending = false): array { $rows = array_values(array_filter($this->occurrences, static fn (array $o): bool => (int) ($o['class_id'] ?? 0) === $classId && $o['lesson_date'] >= $start->format('Y-m-d') && $o['lesson_date'] <= $end->format('Y-m-d'))); usort($rows, static fn (array $a, array $b): int => [$a['lesson_date'], $a['teaching_period_number'], $a['id']] <=> [$b['lesson_date'], $b['teaching_period_number'], $b['id']]); if ($descending) $rows = array_reverse($rows); return array_slice($rows, 0, $limit); }
     public function findOccurrenceForTeacher(int $organisationId, int $teacherId, int $occurrenceId): ?array { return $this->occurrences[$occurrenceId] ?? null; }
     public function savePlanning(int $occurrenceId, string $state, string $lessonOutline, string $requisitions, string $riskAssessment): void { $this->occurrences[$occurrenceId]['state'] = $state; $this->occurrences[$occurrenceId]['planning_notes'] = $lessonOutline; $this->occurrences[$occurrenceId]['requirements_text'] = $requisitions; $this->occurrences[$occurrenceId]['risk_assessment_text'] = $riskAssessment; }
+    public function savePlanningSection(int $occurrenceId, string $section, string $value, bool $nothingRequired): array { if ($section === 'outline') $this->occurrences[$occurrenceId]['planning_notes'] = $value; elseif ($section === 'risk') $this->occurrences[$occurrenceId]['risk_assessment_text'] = $value; else { $this->occurrences[$occurrenceId]['requirements_text'] = $value; $this->occurrences[$occurrenceId]['state'] = $nothingRequired || $value === 'Nothing required' ? 'nothing_required' : ($value === '' ? 'not_completed' : 'requirements_entered'); } return ['value' => $value, 'nothing_required' => ($this->occurrences[$occurrenceId]['state'] ?? '') === 'nothing_required']; }
 }
