@@ -51,4 +51,15 @@ interface TeacherPlanningStore
 
     /** @return array{value:string,nothing_required:bool} */
     public function savePlanningSection(int $occurrenceId, string $section, string $value, bool $nothingRequired): array;
+
+    /** @return array<string,mixed> */
+    public function duplicatePlanning(
+        int $organisationId,
+        int $teacherId,
+        int $sourceOccurrenceId,
+        int $targetOccurrenceId,
+        DateTimeImmutable $weekStart,
+        bool $overwrite,
+        string $expectedTargetRevision,
+    ): array;
 }

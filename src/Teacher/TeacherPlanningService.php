@@ -134,4 +134,51 @@ final class TeacherPlanningService
         if ($section === 'requisitions' && $nothingRequired) $value = 'Nothing required';
         return $this->store->savePlanningSection($occurrenceId, $section, $value, $nothingRequired);
     }
+
+    /** @return array<string,mixed> */
+    public function duplicate(
+        int $organisationId,
+        int $teacherId,
+        int $sourceOccurrenceId,
+        int $targetOccurrenceId,
+        DateTimeImmutable $weekStart,
+        bool $overwrite = false,
+        string $expectedTargetRevision = '',
+    ): array {
+        if ($sourceOccurrenceId <= 0 || $targetOccurrenceId <= 0) {
+            throw new TimetableValidationException(['Choose two valid lessons.']);
+        }
+        if ($sourceOccurrenceId === $targetOccurrenceId) {
+            throw new TimetableValidationException(['A lesson cannot be copied onto itself.']);
+        }
+        return $this->store->duplicatePlanning(
+            $organisationId,
+            $teacherId,
+            $sourceOccurrenceId,
+            $targetOccurrenceId,
+            $weekStart,
+            $overwrite,
+            $expectedTargetRevision,
+        );
+    }
+
+    /** @param array<string,mixed> $planning */
+    public static function planningPopulated(array $planning): bool
+    {
+        return trim((string) ($planning['planning_notes'] ?? '')) !== ''
+            || trim((string) ($planning['requirements_text'] ?? '')) !== ''
+            || trim((string) ($planning['risk_assessment_text'] ?? '')) !== ''
+            || ($planning['state'] ?? null) === 'nothing_required';
+    }
+
+    /** @param array<string,mixed> $planning */
+    public static function planningRevision(array $planning): string
+    {
+        return hash('sha256', (string) json_encode([
+            (string) ($planning['state'] ?? 'not_completed'),
+            (string) ($planning['requirements_text'] ?? ''),
+            (string) ($planning['planning_notes'] ?? ''),
+            (string) ($planning['risk_assessment_text'] ?? ''),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
 }

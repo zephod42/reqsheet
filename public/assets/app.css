@@ -9,6 +9,9 @@
     --primary-pale: #edf3ef;
     --secondary-accent: #765361;
     --secondary-pale: #f5eef1;
+    --week-previous-pale: #fff3bd;
+    --week-next-pale: #f3dfe3;
+    --week-next-ink: #6d1426;
     --class-code: #174f3a;
     --room-code: #6d2635;
     --corner: .28rem;
@@ -140,7 +143,11 @@ small { font-size: .82rem; }
 .page-header h1 { margin: 0; font-size: clamp(1.25rem, 3vw, 1.8rem); }
 .week-arrow { border-radius: var(--corner); font-size: 2rem; line-height: 1; padding: .25rem .6rem; text-decoration: none; }
 .week-arrow:hover, .week-arrow:focus-visible { background: var(--primary-pale); }
-.this-week { display: inline-block; border-radius: var(--corner); margin-top: .25rem; padding: .2rem .5rem; background: var(--primary-pale); color: var(--ink); font-size: .9rem; font-weight: 700; text-align: center; text-decoration: none; }
+.this-week, .week-context-label { display: inline-block; border-radius: var(--corner); margin: .25rem .35rem 0 0; padding: .2rem .5rem; color: var(--ink); font-size: .9rem; font-weight: 700; text-align: center; }
+.this-week { border: 1px solid #aaa; background: var(--paper); text-decoration: none; }
+.this-week.week-context-current { border-color: transparent; background: var(--primary-pale); }
+.week-context-previous { background: var(--week-previous-pale); }
+.week-context-next { background: var(--week-next-pale); color: var(--week-next-ink); }
 .temporary { border-left: 3px solid var(--secondary-accent); color: var(--muted); padding-left: .65rem; font-size: .85rem; }
 
 .timetable-scroll { max-width: 100%; overflow-x: auto; }
@@ -207,6 +214,12 @@ small { font-size: .82rem; }
     text-decoration: none;
 }
 .lesson-block:hover, .lesson-block:focus-visible { box-shadow: 0 0 0 2px var(--lesson-accent, var(--ink)), var(--interactive-shadow); }
+.lesson-block.copy-target { outline: 2px dashed var(--primary-accent); outline-offset: -5px; }
+.lesson-block.copy-source { opacity: .72; cursor: grabbing; }
+.lesson-block.copy-over { outline: 4px solid var(--week-next-ink); outline-offset: -5px; box-shadow: 0 0 0 3px var(--week-next-pale); }
+.lesson-copy-ghost { position: fixed; z-index: 1000; max-width: 13rem; border: 1px solid var(--rule); border-radius: var(--corner); background: var(--paper); box-shadow: var(--interactive-shadow); padding: .4rem .6rem; font-family: var(--sans); font-size: .82rem; font-weight: 700; pointer-events: none; }
+.lesson-copy-active, .lesson-copy-active * { cursor: grabbing !important; }
+.lesson-copy-saving .lesson-block { pointer-events: none; }
 .lesson-header { display: flex; justify-content: space-between; gap: .4rem; min-width: 0; border-bottom: 1px solid var(--rule); padding: .28rem .4rem; font-size: .8rem; line-height: 1.2; }
 .lesson-header strong { min-width: 0; overflow: hidden; color: var(--class-code); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .lesson-header > span { flex: 0 0 auto; color: var(--room-code); white-space: nowrap; }
@@ -226,6 +239,9 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
 dialog:not([open]) { display: none; }
 dialog h2 { margin: 0 0 .35rem; }
 dialog .close { float: right; }
+.compact-dialog { width: min(32rem, calc(100% - 2rem)); }
+.copy-status { min-height: 1.5rem; margin-top: .65rem; color: #176b3a; font-size: .9rem; font-weight: 650; }
+.copy-status.error { border: 0; background: transparent; color: #8c1d2c; padding: 0; }
 .lesson-context { border-left: 3px solid var(--primary-accent); margin: 0 0 var(--space-4); padding: .55rem .7rem; font-family: var(--technical); }
 #lesson-editor .field-outline textarea { min-height: 7rem; }
 #lesson-editor .field-requisitions textarea { min-height: 12rem; }

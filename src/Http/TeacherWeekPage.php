@@ -32,6 +32,37 @@ final class TeacherWeekPage
     public function handle(string $method, array $query, array $input): string
     {
         $message = null;
+        $date = $this->parseDate((string) ($query['date'] ?? $input['date'] ?? $this->today->format('Y-m-d')));
+        if ($method === 'POST' && ($input['action'] ?? '') === 'duplicate') {
+            try {
+                if (!CsrfToken::valid($input['csrf_token'] ?? null)) {
+                    throw new TimetableValidationException(['Your request expired. Please sign in and try again.']);
+                }
+                $week = $this->service->loadWeek($this->organisationId, $this->teacherId, $date);
+                $visible = [];
+                foreach ($week->days as $day) foreach ($day['occurrences'] as $occurrence) $visible[(int) $occurrence['id']] = true;
+                $sourceId = (int) ($input['source_occurrence_id'] ?? 0);
+                $targetId = (int) ($input['target_occurrence_id'] ?? 0);
+                if (!isset($visible[$sourceId], $visible[$targetId])) {
+                    throw new TimetableValidationException(['Both lessons must be visible in the displayed week.']);
+                }
+                $result = $this->service->duplicate(
+                    $this->organisationId,
+                    $this->teacherId,
+                    $sourceId,
+                    $targetId,
+                    $week->start,
+                    ($input['overwrite'] ?? '') === 'yes',
+                    (string) ($input['target_revision'] ?? ''),
+                );
+                $confirmation = ($result['status'] ?? '') === 'confirmation_required';
+                return $this->json(['ok' => !$confirmation] + $result, $confirmation ? 409 : 200);
+            } catch (TimetableValidationException $exception) {
+                return $this->json(['ok' => false, 'message' => implode(' ', $exception->errors())], 422);
+            } catch (\Throwable) {
+                return $this->json(['ok' => false, 'message' => 'The planning could not be copied. Please try again.'], 500);
+            }
+        }
         if ($method === 'POST') {
             try {
                 if (!CsrfToken::valid($input['csrf_token'] ?? null)) {
@@ -51,7 +82,6 @@ final class TeacherWeekPage
             }
         }
 
-        $date = $this->parseDate((string) ($query['date'] ?? $input['date'] ?? $this->today->format('Y-m-d')));
         try {
             $week = $this->service->loadWeek($this->organisationId, $this->teacherId, $date);
         } catch (TimetableValidationException $exception) {
@@ -76,8 +106,13 @@ final class TeacherWeekPage
             $class = (string) $occurrence['snapshot_class_code'];
             $classTones[$class] ??= $this->classTone($class);
         }
-        $isCurrentWeek = $this->today >= $week->start && $this->today <= $week->end;
-        $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1><a class="this-week' . ($isCurrentWeek ? ' selected-state' : '') . '"' . ($isCurrentWeek ? ' aria-current="date"' : '') . ' href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
+        $currentWeekStart = $this->weekStart($this->today, (int) $week->start->format('N'));
+        $relationship = $week->start->format('Y-m-d') === $currentWeekStart->format('Y-m-d') ? 'current'
+            : ($week->start->format('Y-m-d') === $currentWeekStart->sub(new DateInterval('P7D'))->format('Y-m-d') ? 'previous'
+            : ($week->start->format('Y-m-d') === $currentWeekStart->add(new DateInterval('P7D'))->format('Y-m-d') ? 'next' : null));
+        $context = $relationship === 'previous' ? '<span class="week-context-label week-context-previous">Previous week</span>'
+            : ($relationship === 'next' ? '<span class="week-context-label week-context-next">Next week</span>' : '');
+        $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1>' . $context . '<a class="this-week' . ($relationship === 'current' ? ' selected-state week-context-current' : '') . '"' . ($relationship === 'current' ? ' aria-current="date"' : '') . ' href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
         $identity = trim((string) ($this->user['staff_identifier'] ?? ''));
         $identityLabel = $identity !== '' ? $identity : 'Teacher';
@@ -118,7 +153,8 @@ final class TeacherWeekPage
         }
         $body .= '</tbody></table></div>';
         $body .= $this->modal($editing);
-        return PageLayout::render('Teacher week', $body . '<script>' . $this->script() . '</script>', $this->user);
+        $body .= $this->duplicationDialogs($week);
+        return PageLayout::render('Teacher week', $body . '<script src="/assets/teacher-week.js" defer></script>', $this->user);
     }
 
     /** @param array<string, mixed> $occurrence */
@@ -127,8 +163,10 @@ final class TeacherWeekPage
         $requirements = (string) ($occurrence['requirements_text'] ?? '');
         $outline = (string) ($occurrence['planning_notes'] ?? '');
         $risk = (string) ($occurrence['risk_assessment_text'] ?? '');
+        $state = (string) ($occurrence['state'] ?? 'not_completed');
         $period = $this->periodLabel($slot) . ($occurrence['snapshot_duration_periods'] > 1 ? '–' . $occurrence['snapshot_duration_periods'] : '');
-        return '<a class="lesson-block class-tone-' . $tone . '" href="?date=' . $date->format('Y-m-d') . '&edit=' . (int) $occurrence['id'] . '" data-lesson-id="' . (int) $occurrence['id'] . '" data-class="' . $this->e((string) $occurrence['snapshot_class_code']) . '" data-class-id="' . (int) ($occurrence['class_id'] ?? 0) . '" data-room="' . $this->e((string) $occurrence['snapshot_room_code']) . '" data-date="' . $date->format('Y-m-d') . '" data-period="' . $this->e($period) . '" data-outline="' . $this->e($outline) . '" data-requisitions="' . $this->e($requirements) . '" data-risk="' . $this->e($risk) . '"><span class="lesson-header"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) $occurrence['snapshot_room_code']) . '</span></span><span class="lesson-body">' . ($requirements === '' ? '<span class="muted">No requisitions entered</span>' : $this->e($requirements)) . '</span></a>';
+        $targetLabel = (string) $occurrence['snapshot_class_code'] . ' · ' . (string) $occurrence['snapshot_room_code'] . ' · ' . $this->dateDisplay->format($date) . ' · ' . $period;
+        return '<a class="lesson-block class-tone-' . $tone . '" href="?date=' . $date->format('Y-m-d') . '&edit=' . (int) $occurrence['id'] . '" data-lesson-id="' . (int) $occurrence['id'] . '" data-class="' . $this->e((string) $occurrence['snapshot_class_code']) . '" data-class-id="' . (int) ($occurrence['class_id'] ?? 0) . '" data-room="' . $this->e((string) $occurrence['snapshot_room_code']) . '" data-date="' . $date->format('Y-m-d') . '" data-period="' . $this->e($period) . '" data-outline="' . $this->e($outline) . '" data-requisitions="' . $this->e($requirements) . '" data-risk="' . $this->e($risk) . '" data-state="' . $this->e($state) . '" data-planning-populated="' . (TeacherPlanningService::planningPopulated($occurrence) ? 'true' : 'false') . '" data-planning-revision="' . TeacherPlanningService::planningRevision($occurrence) . '" data-target-label="' . $this->e($targetLabel) . '"><span class="lesson-header"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) $occurrence['snapshot_room_code']) . '</span></span><span class="lesson-body">' . ($requirements === '' ? '<span class="muted">No requisitions entered</span>' : $this->e($requirements)) . '</span></a>';
     }
 
     /** @param array<string, mixed>|null $editing */
@@ -141,7 +179,15 @@ final class TeacherWeekPage
         $classId = $editing === null ? 0 : (int) ($editing['class_id'] ?? 0);
         $context = $editing === null ? 'Select a lesson' : (string) $editing['snapshot_room_code'] . ' | ' . $date . ' · ' . (string) ($editing['slot_label'] ?? 'Teaching');
         $classLink = '<a id="lesson-class-link" href="/teacher/class' . ($classId > 0 ? '?class_id=' . $classId : '') . '"><strong>' . $this->e($class) . '</strong></a>';
-        return '<dialog id="lesson-editor"' . $open . '><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="occurrence_id" value="' . $id . '"><input type="hidden" name="date" value="' . $this->e($date) . '"><button type="button" class="close secondary" data-close>Close</button><p class="eyebrow">Lesson planning</p><h2>Edit lesson planning</h2><p class="lesson-context">' . $classLink . ' · ' . $this->e($context) . '</p><label class="field-outline">Lesson outline<textarea name="lesson_outline">' . $this->e((string) ($editing['planning_notes'] ?? '')) . '</textarea></label><label class="field-requisitions">Requisitions<textarea name="requisitions">' . $this->e((string) ($editing['requirements_text'] ?? '')) . '</textarea><span class="check-label"><input type="checkbox" data-nothing-required> Nothing required</span></label><label class="field-risk">Risk assessment<textarea name="risk_assessment">' . $this->e((string) ($editing['risk_assessment_text'] ?? '')) . '</textarea></label><div class="form-actions"><button type="submit">Save planning</button></div></form></dialog>';
+        return '<dialog id="lesson-editor"' . $open . '><form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="occurrence_id" value="' . $id . '"><input type="hidden" name="date" value="' . $this->e($date) . '"><button type="button" class="close secondary" data-close>Close</button><p class="eyebrow">Lesson planning</p><h2>Edit lesson planning</h2><p class="lesson-context">' . $classLink . ' · ' . $this->e($context) . '</p><label class="field-outline">Lesson outline<textarea name="lesson_outline">' . $this->e((string) ($editing['planning_notes'] ?? '')) . '</textarea></label><label class="field-requisitions">Requisitions<textarea name="requisitions">' . $this->e((string) ($editing['requirements_text'] ?? '')) . '</textarea><span class="check-label"><input type="checkbox" data-nothing-required> Nothing required</span></label><label class="field-risk">Risk assessment<textarea name="risk_assessment">' . $this->e((string) ($editing['risk_assessment_text'] ?? '')) . '</textarea></label><div class="form-actions"><button type="submit">Save planning</button><button type="button" class="secondary" data-open-duplicate>Duplicate lesson…</button></div></form></dialog>';
+    }
+
+    private function duplicationDialogs(TeacherWeek $week): string
+    {
+        return '<dialog id="duplicate-picker" class="compact-dialog"><form method="dialog"><button type="button" class="close secondary" data-close>Close</button><p class="eyebrow">Copy planning</p><h2>Duplicate lesson</h2><p>Choose another lesson in this week.</p><label>Target lesson<select data-duplicate-target></select></label><div class="form-actions"><button type="button" data-copy-selected>Copy planning</button><button type="button" class="secondary" data-close>Cancel</button></div></form></dialog>'
+            . '<dialog id="overwrite-dialog" class="compact-dialog"><form method="dialog"><p class="eyebrow">Confirm overwrite</p><h2>Overwrite target lesson?</h2><p data-overwrite-target></p><p>This action will overwrite the contents of the target lesson. Are you sure you want to proceed?</p><p class="notice warning" data-target-changed hidden>The target lesson changed after it was selected. Review the target and confirm again to overwrite its latest contents.</p><div class="form-actions"><button type="button" data-confirm-overwrite>Yes, overwrite</button><button type="button" class="secondary" data-close>Cancel</button></div></form></dialog>'
+            . '<div class="copy-status" data-copy-status role="status" aria-live="polite"></div>'
+            . '<span class="visually-hidden" data-week-date>' . $week->start->format('Y-m-d') . '</span>';
     }
 
     private function parseDate(string $value): DateTimeImmutable
@@ -149,6 +195,11 @@ final class TeacherWeekPage
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
         if ($date === false || $date->format('Y-m-d') !== $value) return $this->today;
         return $date;
+    }
+    private function weekStart(DateTimeImmutable $date, int $firstDay): DateTimeImmutable
+    {
+        $offset = ((int) $date->format('N') - $firstDay + 7) % 7;
+        return $date->sub(new DateInterval('P' . $offset . 'D'));
     }
 
     private function weekDayLabel(DateTimeImmutable $date): string { return $date->format('l') . ' ' . $this->dateDisplay->format($date); }
@@ -162,5 +213,11 @@ final class TeacherWeekPage
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
     private function error(string $message): string { return PageLayout::render('Teacher week', '<p class="notice error">' . $this->e($message) . '</p>', $this->user); }
     private function classTone(string $class): int { return ClassTone::forCode($class); }
-    private function script(): string { return "document.querySelectorAll('[data-lesson-id]').forEach(function(link){link.addEventListener('click',function(event){var dialog=document.getElementById('lesson-editor');if(!dialog||!dialog.showModal)return;event.preventDefault();dialog.querySelector('input[name=occurrence_id]').value=link.dataset.lessonId;dialog.querySelector('input[name=date]').value=link.dataset.date;dialog.querySelector('h2').textContent='Edit lesson planning';var classLink=document.getElementById('lesson-class-link');classLink.textContent=link.dataset.class;classLink.href='/teacher/class?class_id='+encodeURIComponent(link.dataset.classId);dialog.querySelector('.lesson-context').lastChild.textContent=' · '+link.dataset.room+' | '+link.dataset.date+' · '+link.dataset.period;dialog.querySelector('[name=lesson_outline]').value=link.dataset.outline;dialog.querySelector('[name=requisitions]').value=link.dataset.requisitions;dialog.querySelector('[name=risk_assessment]').value=link.dataset.risk;dialog.querySelector('[data-nothing-required]').checked=link.dataset.requisitions==='Nothing required';dialog.showModal();});});document.querySelectorAll('[data-close]').forEach(function(button){button.addEventListener('click',function(){button.closest('dialog').close();});});document.querySelectorAll('[data-nothing-required]').forEach(function(box){box.addEventListener('change',function(){var field=box.closest('label').querySelector('[name=requisitions]');if(box.checked){field.value='Nothing required';}else if(field.value==='Nothing required'){field.value='';}});});"; }
+    /** @param array<string,mixed> $payload */
+    private function json(array $payload, int $status): string
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        return (string) json_encode($payload, JSON_THROW_ON_ERROR);
+    }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Reqsheet\Teacher;
 
+use DateInterval;
 use DateTimeImmutable;
 use PDO;
 use PDOStatement;
@@ -11,6 +12,7 @@ use Reqsheet\Timetable\TimetableSlot;
 use Reqsheet\Timetable\TimetableVersion;
 use Reqsheet\Timetable\PdoTimetableGenerationStore;
 use Reqsheet\Timetable\TimetableOccurrenceGenerator;
+use Reqsheet\Timetable\TimetableValidationException;
 
 final class PdoTeacherPlanningStore implements TeacherPlanningStore
 {
@@ -240,21 +242,31 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
 
     public function savePlanning(int $occurrenceId, string $state, string $lessonOutline, string $requisitions, string $riskAssessment): void
     {
-        $statement = $this->prepare(
-            'INSERT INTO requisitions
+        $this->pdo->beginTransaction();
+        try {
+            $lock = $this->prepare('SELECT id FROM lesson_occurrences WHERE id = :occurrence_id FOR UPDATE');
+            $lock->execute(['occurrence_id' => $occurrenceId]);
+            if ($lock->fetchColumn() === false) throw new TimetableValidationException(['Lesson occurrence was not found.']);
+            $statement = $this->prepare(
+                'INSERT INTO requisitions
                 (lesson_occurrence_id, state, requirements_text, planning_notes, risk_assessment_text)
              VALUES (:occurrence_id, :state, :requirements, :outline, :risk)
              ON DUPLICATE KEY UPDATE
                 state = VALUES(state), requirements_text = VALUES(requirements_text),
                 planning_notes = VALUES(planning_notes), risk_assessment_text = VALUES(risk_assessment_text)',
-        );
-        $statement->execute([
-            'occurrence_id' => $occurrenceId,
-            'state' => $state,
-            'requirements' => $requisitions === '' ? null : $requisitions,
-            'outline' => $lessonOutline === '' ? null : $lessonOutline,
-            'risk' => $riskAssessment === '' ? null : $riskAssessment,
-        ]);
+            );
+            $statement->execute([
+                'occurrence_id' => $occurrenceId,
+                'state' => $state,
+                'requirements' => $requisitions === '' ? null : $requisitions,
+                'outline' => $lessonOutline === '' ? null : $lessonOutline,
+                'risk' => $riskAssessment === '' ? null : $riskAssessment,
+            ]);
+            $this->pdo->commit();
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
     }
 
     public function savePlanningSection(int $occurrenceId, string $section, string $value, bool $nothingRequired): array
@@ -262,6 +274,9 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
         if (!in_array($section, ['outline', 'requisitions', 'risk'], true)) throw new \InvalidArgumentException('Invalid planning section.');
         $this->pdo->beginTransaction();
         try {
+            $lock = $this->prepare('SELECT id FROM lesson_occurrences WHERE id = :occurrence_id FOR UPDATE');
+            $lock->execute(['occurrence_id' => $occurrenceId]);
+            if ($lock->fetchColumn() === false) throw new TimetableValidationException(['Lesson occurrence was not found.']);
             $statement = $this->prepare('SELECT state, requirements_text, planning_notes, risk_assessment_text FROM requisitions WHERE lesson_occurrence_id = :occurrence_id FOR UPDATE');
             $statement->execute(['occurrence_id' => $occurrenceId]);
             $existing = $statement->fetch() ?: ['state' => 'not_completed', 'requirements_text' => null, 'planning_notes' => null, 'risk_assessment_text' => null];
@@ -277,6 +292,103 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
             $upsert->execute(['occurrence_id' => $occurrenceId, 'state' => $state, 'requirements' => $requirements === '' ? null : $requirements, 'outline' => $outline === '' ? null : $outline, 'risk' => $risk === '' ? null : $risk]);
             $this->pdo->commit();
             return ['value' => $section === 'requisitions' ? $requirements : ($section === 'outline' ? $outline : $risk), 'nothing_required' => $state === 'nothing_required'];
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $exception;
+        }
+    }
+
+    public function duplicatePlanning(
+        int $organisationId,
+        int $teacherId,
+        int $sourceOccurrenceId,
+        int $targetOccurrenceId,
+        DateTimeImmutable $weekStart,
+        bool $overwrite,
+        string $expectedTargetRevision,
+    ): array {
+        $this->pdo->beginTransaction();
+        try {
+            $occurrences = $this->prepare(
+                'SELECT id, organisation_id, snapshot_teacher_user_id, lesson_date
+                 FROM lesson_occurrences
+                 WHERE id IN (:source_id, :target_id)
+                   AND organisation_id = :organisation_id
+                   AND snapshot_teacher_user_id = :teacher_id
+                 ORDER BY id FOR UPDATE',
+            );
+            $occurrences->execute([
+                'source_id' => $sourceOccurrenceId,
+                'target_id' => $targetOccurrenceId,
+                'organisation_id' => $organisationId,
+                'teacher_id' => $teacherId,
+            ]);
+            $rows = $occurrences->fetchAll();
+            if (count($rows) !== 2) throw new TimetableValidationException(['Both lessons must belong to you in the displayed week.']);
+            $weekEnd = $weekStart->add(new DateInterval('P6D'))->format('Y-m-d');
+            $weekStartValue = $weekStart->format('Y-m-d');
+            foreach ($rows as $row) {
+                $date = (string) $row['lesson_date'];
+                if ($date < $weekStartValue || $date > $weekEnd) {
+                    throw new TimetableValidationException(['Lessons can only be copied within the displayed week.']);
+                }
+            }
+
+            $planningStatement = $this->prepare(
+                'SELECT lesson_occurrence_id, state, requirements_text, planning_notes, risk_assessment_text
+                 FROM requisitions WHERE lesson_occurrence_id IN (:source_id, :target_id)
+                 ORDER BY lesson_occurrence_id FOR UPDATE',
+            );
+            $planningStatement->execute(['source_id' => $sourceOccurrenceId, 'target_id' => $targetOccurrenceId]);
+            $planning = [];
+            foreach ($planningStatement->fetchAll() as $row) $planning[(int) $row['lesson_occurrence_id']] = $row;
+            $empty = ['state' => 'not_completed', 'requirements_text' => null, 'planning_notes' => null, 'risk_assessment_text' => null];
+            $source = $planning[$sourceOccurrenceId] ?? $empty;
+            $target = $planning[$targetOccurrenceId] ?? $empty;
+            if (!TeacherPlanningService::planningPopulated($source)) {
+                throw new TimetableValidationException(['The source lesson has no planning information to copy.']);
+            }
+
+            $targetRevision = TeacherPlanningService::planningRevision($target);
+            if (!$overwrite && TeacherPlanningService::planningPopulated($target)) {
+                $this->pdo->commit();
+                return ['status' => 'confirmation_required', 'target_revision' => $targetRevision, 'target_changed' => false];
+            }
+            if ($overwrite && ($expectedTargetRevision === '' || !hash_equals($targetRevision, $expectedTargetRevision))) {
+                $this->pdo->commit();
+                return ['status' => 'confirmation_required', 'target_revision' => $targetRevision, 'target_changed' => true];
+            }
+
+            $state = (string) ($source['state'] ?? 'not_completed');
+            $requirements = (string) ($source['requirements_text'] ?? '');
+            $outline = (string) ($source['planning_notes'] ?? '');
+            $risk = (string) ($source['risk_assessment_text'] ?? '');
+            $upsert = $this->prepare(
+                'INSERT INTO requisitions (lesson_occurrence_id, state, requirements_text, planning_notes, risk_assessment_text)
+                 VALUES (:occurrence_id, :state, :requirements, :outline, :risk)
+                 ON DUPLICATE KEY UPDATE state = VALUES(state), requirements_text = VALUES(requirements_text),
+                    planning_notes = VALUES(planning_notes), risk_assessment_text = VALUES(risk_assessment_text)',
+            );
+            $upsert->execute([
+                'occurrence_id' => $targetOccurrenceId,
+                'state' => $state,
+                'requirements' => $requirements === '' ? null : $requirements,
+                'outline' => $outline === '' ? null : $outline,
+                'risk' => $risk === '' ? null : $risk,
+            ]);
+            $this->pdo->commit();
+            $copied = ['state' => $state, 'requirements_text' => $requirements, 'planning_notes' => $outline, 'risk_assessment_text' => $risk];
+            return [
+                'status' => 'copied',
+                'target_id' => $targetOccurrenceId,
+                'state' => $state,
+                'requisitions' => $requirements,
+                'outline' => $outline,
+                'risk' => $risk,
+                'nothing_required' => $state === 'nothing_required',
+                'populated' => true,
+                'target_revision' => TeacherPlanningService::planningRevision($copied),
+            ];
         } catch (\Throwable $exception) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             throw $exception;

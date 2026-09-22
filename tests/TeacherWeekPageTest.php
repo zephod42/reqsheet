@@ -45,6 +45,7 @@ final class TeacherWeekPageTest
         assertContainsValue('Previous week', $view, 'Previous-week navigation was not rendered.');
         assertContainsValue('Next week', $view, 'Next-week navigation was not rendered.');
         assertContainsValue('This week', $view, 'This-week control was not rendered.');
+        assertContainsValue('week-context-current', $view, 'Current calendar week did not receive its contextual label.');
         assertContainsValue('/teacher/day?date=2026-09-07', $view, 'Week day headings did not link to the teacher day view.');
         assertContainsValue('/teacher/class', \Reqsheet\Http\PageLayout::render('Teacher', '<p>Teacher</p>', ['id' => 10, 'organisation_id' => 1, 'roles' => ['teacher']]), 'Teacher navigation did not expose Class View.');
         assertContainsValue('today-row', $view, 'Current day was not gently highlighted.');
@@ -63,7 +64,19 @@ final class TeacherWeekPageTest
         $alternateWeek = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-23'), ['staff_identifier' => 'NEV']);
         assertContainsValue('Week beginning Wednesday 23 September 2026', $alternateWeek->handle('GET', ['date' => '2026-09-23'], []), 'Week heading ignored the configured first day.');
         assertContainsValue('Week beginning Wednesday 30 September 2026', $alternateWeek->handle('GET', ['date' => '2026-09-30'], []), 'Future week heading did not follow navigation selection.');
+        assertContainsValue('week-context-current', $alternateWeek->handle('GET', ['date' => '2026-09-23'], []), 'Configured first working day was not used for the current-week label.');
+        assertContainsValue('week-context-previous', $alternateWeek->handle('GET', ['date' => '2026-09-16'], []), 'Configured first working day was not used for the previous-week label.');
+        assertContainsValue('week-context-next', $alternateWeek->handle('GET', ['date' => '2026-09-30'], []), 'Configured first working day was not used for the next-week label.');
         $store->firstDay = 1;
+        assertContainsValue('week-context-previous', $page->handle('GET', ['date' => '2026-09-02'], []), 'Immediately preceding week was not labelled Previous week.');
+        assertContainsValue('week-context-next', $page->handle('GET', ['date' => '2026-09-16'], []), 'Immediately following week was not labelled Next week.');
+        $distant = $page->handle('GET', ['date' => '2026-09-23'], []);
+        assertNotContainsValue('week-context-current', $distant, 'A distant week was labelled as current.');
+        assertNotContainsValue('week-context-previous', $distant, 'A distant week was labelled as previous.');
+        assertNotContainsValue('week-context-next', $distant, 'A distant week was labelled as next.');
+        $yearBoundary = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2027-01-02'), ['staff_identifier' => 'NEV']);
+        assertContainsValue('week-context-current', $yearBoundary->handle('GET', ['date' => '2026-12-31'], []), 'Current-week comparison failed across a year boundary.');
+        assertContainsValue('week-context-next', $yearBoundary->handle('GET', ['date' => '2027-01-04'], []), 'Next-week comparison failed across a year boundary.');
 
         $editing = $page->handle('GET', ['date' => '2026-09-09', 'edit' => 500], []);
         assertContainsValue('Lesson outline', $editing, 'Planning editor did not expose lesson outline.');
@@ -224,6 +237,109 @@ final class TeacherWeekPageTest
 
         $foreign = new TeacherWeekPage(new TeacherPlanningService($store), 2, 10, new DateTimeImmutable('2026-09-09'));
         assertContainsValue('Teacher does not belong to the requested organisation.', $foreign->handle('GET', [], []), 'Foreign organisation was not rejected.');
+
+        $copyStore = new TeacherStore();
+        $copyStore->occurrences[501] = [
+            'id' => 501, 'lesson_date' => '2026-09-08', 'timetable_version_id' => 1, 'snapshot_teacher_user_id' => 10,
+            'class_id' => 302, 'snapshot_class_code' => '12CHEM', 'snapshot_room_code' => 'LAB-B', 'snapshot_start_slot_id' => 201,
+            'snapshot_duration_periods' => 1, 'day_of_week' => 2, 'teaching_period_number' => 1, 'slot_label' => 'Period One',
+            'state' => 'not_completed', 'requirements_text' => null, 'planning_notes' => null, 'risk_assessment_text' => null,
+            'prepared_at' => '2026-09-08 07:30:00',
+        ];
+        $copyStore->occurrences[502] = $copyStore->occurrences[501] + [];
+        $copyStore->occurrences[502]['id'] = 502;
+        $copyStore->occurrences[502]['snapshot_teacher_user_id'] = 99;
+        $copyStore->occurrences[502]['snapshot_start_slot_id'] = 104;
+        $copyStore->occurrences[502]['lesson_date'] = '2026-09-07';
+        $copyStore->occurrences[503] = $copyStore->occurrences[501] + [];
+        $copyStore->occurrences[503]['id'] = 503;
+        $copyStore->occurrences[503]['lesson_date'] = '2026-09-14';
+        $copyStore->occurrences[504] = $copyStore->occurrences[501] + [];
+        $copyStore->occurrences[504]['id'] = 504;
+        $copyStore->occurrences[504]['snapshot_start_slot_id'] = 104;
+        $copyStore->occurrences[504]['lesson_date'] = '2026-09-07';
+        $copyPage = new TeacherWeekPage(new TeacherPlanningService($copyStore), 1, 10, new DateTimeImmutable('2026-09-09'), ['staff_identifier' => 'NEV']);
+        $copyView = $copyPage->handle('GET', ['date' => '2026-09-09'], []);
+        assertContainsValue('/assets/teacher-week.js', $copyView, 'Week View did not load the drag-and-drop controller.');
+        assertContainsValue('Duplicate lesson…', $copyView, 'Keyboard-accessible duplication action was not exposed by the lesson editor.');
+        assertContainsValue('data-planning-revision=', $copyView, 'Lesson tiles did not expose a planning concurrency token.');
+        $copyResponse = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 501,
+        ]), true);
+        assertSameValue(true, $copyResponse['ok'] ?? false, 'Empty-target duplication did not succeed.');
+        assertSameValue('Bring goggles', $copyStore->occurrences[501]['requirements_text'], 'Duplication did not copy requisitions.');
+        assertSameValue('Plan the experiment', $copyStore->occurrences[501]['planning_notes'], 'Duplication did not copy the lesson outline.');
+        assertSameValue('Wear eye protection', $copyStore->occurrences[501]['risk_assessment_text'], 'Duplication did not copy the risk assessment.');
+        assertSameValue('Bring goggles', $copyStore->occurrences[500]['requirements_text'], 'Duplication modified the source lesson.');
+        assertSameValue('12CHEM', $copyStore->occurrences[501]['snapshot_class_code'], 'Duplication changed target class identity.');
+        assertSameValue('LAB-B', $copyStore->occurrences[501]['snapshot_room_code'], 'Duplication changed target room identity.');
+        assertSameValue('2026-09-08', $copyStore->occurrences[501]['lesson_date'], 'Duplication changed target date identity.');
+        assertSameValue(1, $copyStore->occurrences[501]['snapshot_duration_periods'], 'Duplication changed target timetable duration.');
+        assertSameValue('2026-09-08 07:30:00', $copyStore->occurrences[501]['prepared_at'], 'Duplication changed technician preparation metadata.');
+        assertThrows(static fn () => (new TeacherPlanningService($copyStore))->duplicate(1, 10, 500, 502, new DateTimeImmutable('2026-09-07')), 'Cross-teacher duplication was accepted.');
+        assertThrows(static fn () => (new TeacherPlanningService($copyStore))->duplicate(2, 10, 500, 501, new DateTimeImmutable('2026-09-07')), 'Cross-organisation duplication was accepted.');
+        assertThrows(static fn () => (new TeacherPlanningService($copyStore))->duplicate(1, 10, 500, 503, new DateTimeImmutable('2026-09-07')), 'Cross-week service duplication was accepted.');
+        assertThrows(static fn () => (new TeacherPlanningService($copyStore))->duplicate(1, 10, 504, 501, new DateTimeImmutable('2026-09-07')), 'A source without planning was allowed to clear a target.');
+
+        $copyStore->occurrences[500]['state'] = 'nothing_required';
+        $copyStore->occurrences[500]['requirements_text'] = 'Nothing required';
+        $copyStore->occurrences[500]['planning_notes'] = 'Theory recap';
+        $copyStore->occurrences[500]['risk_assessment_text'] = '';
+        $confirmation = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 501,
+        ]), true);
+        assertSameValue('confirmation_required', $confirmation['status'] ?? null, 'Populated target did not require overwrite confirmation.');
+        assertSameValue('Bring goggles', $copyStore->occurrences[501]['requirements_text'], 'Unconfirmed duplication changed the target.');
+        $oldRevision = (string) ($confirmation['target_revision'] ?? '');
+        $copyStore->occurrences[501]['planning_notes'] = 'Concurrent edit';
+        $stale = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 501, 'overwrite' => 'yes', 'target_revision' => $oldRevision,
+        ]), true);
+        assertSameValue(true, $stale['target_changed'] ?? false, 'A concurrent target edit was not reported before overwrite.');
+        assertSameValue('Concurrent edit', $copyStore->occurrences[501]['planning_notes'], 'A stale confirmation silently overwrote a concurrent edit.');
+        $overwritten = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 501, 'overwrite' => 'yes', 'target_revision' => $stale['target_revision'],
+        ]), true);
+        assertSameValue(true, $overwritten['ok'] ?? false, 'Confirmed overwrite did not succeed.');
+        assertSameValue('nothing_required', $copyStore->occurrences[501]['state'], 'Explicit Nothing Required state was not copied.');
+        assertSameValue('Nothing required', $copyStore->occurrences[501]['requirements_text'], 'Nothing Required requisition text was not copied.');
+        assertSameValue('Theory recap', $copyStore->occurrences[501]['planning_notes'], 'Confirmed overwrite was not atomic across planning fields.');
+        $repeated = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 501, 'overwrite' => 'yes', 'target_revision' => $oldRevision,
+        ]), true);
+        assertSameValue('confirmation_required', $repeated['status'] ?? null, 'A repeated stale overwrite submission was not safely rejected.');
+        $self = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 500,
+        ]), true);
+        assertSameValue(false, $self['ok'] ?? true, 'Self-duplication was accepted.');
+        $outside = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-16',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 501,
+        ]), true);
+        assertSameValue(false, $outside['ok'] ?? true, 'Cross-week duplication was accepted.');
+        $invalidTarget = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => CsrfToken::value(), 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 999,
+        ]), true);
+        assertSameValue(false, $invalidTarget['ok'] ?? true, 'Duplication into an empty timetable slot was accepted.');
+        $failedCsrf = json_decode($copyPage->handle('POST', [], [
+            'action' => 'duplicate', '_async' => '1', 'csrf_token' => 'invalid', 'date' => '2026-09-09',
+            'source_occurrence_id' => 500, 'target_occurrence_id' => 501,
+        ]), true);
+        assertSameValue(false, $failedCsrf['ok'] ?? true, 'A failed duplication request was reported as successful.');
+        $weekScript = (string) file_get_contents(__DIR__ . '/../public/assets/teacher-week.js');
+        assertContainsValue("event.pointerType !== 'mouse'", $weekScript, 'Touch interaction did not distinguish long-press initiation.');
+        assertContainsValue('}, 500)', $weekScript, 'Mobile long press did not use a deliberate hold threshold.');
+        assertContainsValue("distance >= 6", $weekScript, 'Desktop drag did not preserve click-versus-drag movement distinction.');
+        assertContainsValue("event.preventDefault()", $weekScript, 'Active dragging did not suppress browser movement behaviour.');
+        assertContainsValue("if (busy", $weekScript, 'Duplicate submissions were not guarded while a request is active.');
+        assertContainsValue("target.dataset.requisitions", $weekScript, 'Successful duplication did not update the target tile in place.');
     }
 }
 
@@ -289,9 +405,10 @@ final class TeacherStore implements TeacherPlanningStore
     public function ensureOccurrencesForWeek(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end): void { $this->ensured = true; }
     public function ensureOccurrencesForRange(int $organisationId, DateTimeImmutable $start, DateTimeImmutable $end, ?int $teacherId = null, ?int $classId = null): void { $this->ensured = true; $this->lastRangeScope = [$organisationId, (int) $teacherId, (int) $classId]; }
     public function slotsForVersion(int $versionId): array { return $this->slots; }
-    public function occurrencesForTeacherDate(int $organisationId, int $teacherId, DateTimeImmutable $date): array { return array_values(array_filter($this->occurrences, static fn (array $o): bool => $o['lesson_date'] === $date->format('Y-m-d'))); }
+    public function occurrencesForTeacherDate(int $organisationId, int $teacherId, DateTimeImmutable $date): array { return $organisationId !== 1 ? [] : array_values(array_filter($this->occurrences, static fn (array $o): bool => $o['lesson_date'] === $date->format('Y-m-d') && (int) $o['snapshot_teacher_user_id'] === $teacherId)); }
     public function occurrencesForTeacherClass(int $organisationId, int $teacherId, int $classId, DateTimeImmutable $start, DateTimeImmutable $end, int $limit, bool $descending = false): array { $rows = array_values(array_filter($this->occurrences, static fn (array $o): bool => (int) ($o['class_id'] ?? 0) === $classId && $o['lesson_date'] >= $start->format('Y-m-d') && $o['lesson_date'] <= $end->format('Y-m-d'))); usort($rows, static fn (array $a, array $b): int => [$a['lesson_date'], $a['teaching_period_number'], $a['id']] <=> [$b['lesson_date'], $b['teaching_period_number'], $b['id']]); if ($descending) $rows = array_reverse($rows); return array_slice($rows, 0, $limit); }
-    public function findOccurrenceForTeacher(int $organisationId, int $teacherId, int $occurrenceId): ?array { return $this->occurrences[$occurrenceId] ?? null; }
+    public function findOccurrenceForTeacher(int $organisationId, int $teacherId, int $occurrenceId): ?array { $row = $this->occurrences[$occurrenceId] ?? null; return $row !== null && $organisationId === 1 && $teacherId === (int) $row['snapshot_teacher_user_id'] ? $row : null; }
     public function savePlanning(int $occurrenceId, string $state, string $lessonOutline, string $requisitions, string $riskAssessment): void { $this->occurrences[$occurrenceId]['state'] = $state; $this->occurrences[$occurrenceId]['planning_notes'] = $lessonOutline; $this->occurrences[$occurrenceId]['requirements_text'] = $requisitions; $this->occurrences[$occurrenceId]['risk_assessment_text'] = $riskAssessment; }
     public function savePlanningSection(int $occurrenceId, string $section, string $value, bool $nothingRequired): array { if ($section === 'outline') $this->occurrences[$occurrenceId]['planning_notes'] = $value; elseif ($section === 'risk') $this->occurrences[$occurrenceId]['risk_assessment_text'] = $value; else { $this->occurrences[$occurrenceId]['requirements_text'] = $value; $this->occurrences[$occurrenceId]['state'] = $nothingRequired || $value === 'Nothing required' ? 'nothing_required' : ($value === '' ? 'not_completed' : 'requirements_entered'); } return ['value' => $value, 'nothing_required' => ($this->occurrences[$occurrenceId]['state'] ?? '') === 'nothing_required']; }
+    public function duplicatePlanning(int $organisationId, int $teacherId, int $sourceOccurrenceId, int $targetOccurrenceId, DateTimeImmutable $weekStart, bool $overwrite, string $expectedTargetRevision): array { $source = $this->findOccurrenceForTeacher($organisationId, $teacherId, $sourceOccurrenceId); $target = $this->findOccurrenceForTeacher($organisationId, $teacherId, $targetOccurrenceId); if ($source === null || $target === null) throw new \Reqsheet\Timetable\TimetableValidationException(['Both lessons must belong to you in the displayed week.']); $end = $weekStart->modify('+6 days')->format('Y-m-d'); foreach ([$source, $target] as $lesson) if ($lesson['lesson_date'] < $weekStart->format('Y-m-d') || $lesson['lesson_date'] > $end) throw new \Reqsheet\Timetable\TimetableValidationException(['Lessons can only be copied within the displayed week.']); if (!TeacherPlanningService::planningPopulated($source)) throw new \Reqsheet\Timetable\TimetableValidationException(['The source lesson has no planning information to copy.']); $revision = TeacherPlanningService::planningRevision($target); if (!$overwrite && TeacherPlanningService::planningPopulated($target)) return ['status' => 'confirmation_required', 'target_revision' => $revision, 'target_changed' => false]; if ($overwrite && ($expectedTargetRevision === '' || !hash_equals($revision, $expectedTargetRevision))) return ['status' => 'confirmation_required', 'target_revision' => $revision, 'target_changed' => true]; foreach (['state', 'requirements_text', 'planning_notes', 'risk_assessment_text'] as $field) $this->occurrences[$targetOccurrenceId][$field] = $source[$field] ?? null; $copied = $this->occurrences[$targetOccurrenceId]; return ['status' => 'copied', 'target_id' => $targetOccurrenceId, 'state' => (string) ($copied['state'] ?? 'not_completed'), 'requisitions' => (string) ($copied['requirements_text'] ?? ''), 'outline' => (string) ($copied['planning_notes'] ?? ''), 'risk' => (string) ($copied['risk_assessment_text'] ?? ''), 'nothing_required' => ($copied['state'] ?? '') === 'nothing_required', 'populated' => true, 'target_revision' => TeacherPlanningService::planningRevision($copied)]; }
 }

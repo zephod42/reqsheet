@@ -32,6 +32,13 @@ final class PdoTeacherPlanningStoreTest
         assertSameValue(4, count($rangePdo->occurrences), 'Range generation did not materialise only the selected recurring lesson weekdays.');
         $rangeStore->ensureOccurrencesForRange(7, new DateTimeImmutable('2026-09-01'), new DateTimeImmutable('2026-09-30'), 70, 700);
         assertSameValue(4, count($rangePdo->occurrences), 'Repeated range generation created duplicate occurrences.');
+
+        $source = (string) file_get_contents(__DIR__ . '/../src/Teacher/PdoTeacherPlanningStore.php');
+        assertContainsValue('ORDER BY id FOR UPDATE', $source, 'Lesson duplication did not lock source and target occurrences in a stable order.');
+        assertContainsValue('snapshot_teacher_user_id = :teacher_id', $source, 'Lesson duplication did not scope locked occurrences to the authenticated teacher.');
+        assertContainsValue('organisation_id = :organisation_id', $source, 'Lesson duplication did not scope locked occurrences to the authenticated organisation.');
+        assertContainsValue('planning_notes = VALUES(planning_notes), risk_assessment_text = VALUES(risk_assessment_text)', $source, 'Lesson duplication did not persist the complete planning state together.');
+        assertContainsValue("SELECT id FROM lesson_occurrences WHERE id = :occurrence_id FOR UPDATE", $source, 'Ordinary lesson saves did not participate in duplication concurrency locking.');
     }
 }
 
