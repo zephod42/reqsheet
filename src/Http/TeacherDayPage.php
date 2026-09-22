@@ -97,18 +97,18 @@ final class TeacherDayPage
         foreach ($selected['slots'] as $slot) $slots[$slot->id] = $slot;
         $occurrences = $selected['occurrences'];
         usort($occurrences, static fn (array $a, array $b): int => ((int) ($a['snapshot_start_slot_id'] ?? 0) <=> (int) ($b['snapshot_start_slot_id'] ?? 0)) ?: ((int) $a['id'] <=> (int) $b['id']));
-        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table"><caption class="visually-hidden">Lessons for ' . $this->e($displayedDate) . '</caption><thead><tr><th scope="col">Period</th><th scope="col">Room</th><th scope="col">Class code</th><th scope="col">Lesson outline</th><th scope="col">Requisitions</th><th scope="col">Risk assessment</th></tr></thead><tbody>';
+        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table"><caption class="visually-hidden">Lessons for ' . $this->e($displayedDate) . '</caption><thead><tr><th scope="col">Day / period / date</th><th scope="col">Class / room</th><th scope="col">Lesson outline</th><th scope="col">Requisitions</th><th scope="col">Risk assessment</th></tr></thead><tbody>';
         foreach ($occurrences as $occurrence) {
             $start = $slots[(int) ($occurrence['snapshot_start_slot_id'] ?? 0)] ?? null;
             if (!$start instanceof TimetableSlot) continue;
             $duration = max(1, (int) ($occurrence['snapshot_duration_periods'] ?? 1));
             $end = $this->slotAtSequence($selected['slots'], $start->sequenceNumber + $duration - 1) ?? $start;
             $period = $duration > 1 && $start->teachingPeriodNumber !== null && $end->teachingPeriodNumber !== null
-                ? $start->teachingPeriodNumber . '–' . $end->teachingPeriodNumber
-                : ($start->label ?: 'P' . ($start->teachingPeriodNumber ?? $start->sequenceNumber));
+                ? 'P' . $start->teachingPeriodNumber . '–P' . $end->teachingPeriodNumber
+                : 'P' . ($start->teachingPeriodNumber ?? $start->sequenceNumber);
             $requirements = (string) ($occurrence['requirements_text'] ?? '');
             if ($requirements === '' && ($occurrence['state'] ?? '') === 'nothing_required') $requirements = 'Nothing required';
-            $body .= '<tr><th scope="row">' . $this->e($period) . '</th><td>' . $this->e((string) $occurrence['snapshot_room_code']) . '</td><td><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong></td><td>' . $this->sectionEditor($occurrence, 'outline', 'Lesson outline', (string) ($occurrence['planning_notes'] ?? ''), $editing, $form, $date) . '</td><td>' . $this->sectionEditor($occurrence, 'requisitions', 'Requisitions', $requirements, $editing, $form, $date, ($occurrence['state'] ?? '') === 'nothing_required') . '</td><td>' . $this->sectionEditor($occurrence, 'risk', 'Risk assessment', (string) ($occurrence['risk_assessment_text'] ?? ''), $editing, $form, $date) . '</td></tr>';
+            $body .= '<tr><th scope="row"><span class="lesson-date-box"><span>' . $this->e($date->format('D') . ' ' . $period) . '</span><span>' . $date->format('d/m') . '</span></span></th><td class="lesson-context-cell"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) $occurrence['snapshot_room_code']) . '</span></td><td>' . $this->sectionEditor($occurrence, 'outline', 'Lesson outline', (string) ($occurrence['planning_notes'] ?? ''), $editing, $form, $date) . '</td><td>' . $this->sectionEditor($occurrence, 'requisitions', 'Requisitions', $requirements, $editing, $form, $date, ($occurrence['state'] ?? '') === 'nothing_required') . '</td><td>' . $this->sectionEditor($occurrence, 'risk', 'Risk assessment', (string) ($occurrence['risk_assessment_text'] ?? ''), $editing, $form, $date) . '</td></tr>';
         }
         $body .= '</tbody></table></div>';
         return PageLayout::render('Teacher day', $body, $this->user);
@@ -121,7 +121,7 @@ final class TeacherDayPage
         return null;
     }
 
-    private function textCell(mixed $value, string $empty = 'Not entered'): string
+    private function textCell(mixed $value, string $empty): string
     {
         $text = trim((string) $value);
         return $text === '' ? '<span class="muted">' . $this->e($empty) . '</span>' : nl2br($this->e($text));
@@ -151,7 +151,8 @@ final class TeacherDayPage
         $formHtml = '<form method="post" class="inline-lesson-form"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="date" value="' . $date->format('Y-m-d') . '"><input type="hidden" name="occurrence_id" value="' . (int) $occurrence['id'] . '"><input type="hidden" name="section" value="' . $this->e($section) . '"><label><span class="visually-hidden">' . $this->e($label) . '</span><textarea name="value"' . ($section === 'requisitions' ? ' class="requisition-editor"' : '') . '>' . $this->e($value) . '</textarea></label>';
         if ($section === 'requisitions') $formHtml .= '<label class="check-label"><input type="checkbox" name="nothing_required" value="yes"' . ($checked ? ' checked' : '') . '> Nothing required</label>';
         $formHtml .= '<div class="form-actions"><button type="submit">Save</button><a class="button secondary" href="/teacher/day?date=' . $date->format('Y-m-d') . '">Cancel</a></div></form>';
-        return '<details class="day-lesson-section"' . ($open ? ' open' : '') . '><summary><span>' . $this->e($label) . '</span><span class="section-edit-hint">Edit</span></summary><div class="day-lesson-value">' . $this->textCell($value, $section === 'requisitions' ? 'No requisitions entered' : 'Not entered') . '</div>' . $formHtml . '</details>';
+        $empty = match ($section) { 'outline' => 'No outline entered', 'requisitions' => 'No requisitions entered', default => 'No risk assessment entered' };
+        return '<div class="day-lesson-section"><div class="day-lesson-heading"><span>' . $this->e($label) . '</span><details class="lesson-edit-control"' . ($open ? ' open' : '') . '><summary>Edit</summary>' . $formHtml . '</details></div><div class="day-lesson-value">' . $this->textCell($value, $empty) . '</div></div>';
     }
 
     private function parseDate(string $value): DateTimeImmutable

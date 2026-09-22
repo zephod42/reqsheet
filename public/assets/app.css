@@ -163,18 +163,27 @@ small { font-size: .82rem; }
 .day-picker label { margin: 0; }
 .date-display { color: var(--muted); font-family: var(--technical); font-size: .9rem; padding-bottom: .45rem; }
 .teacher-day-table-wrap { max-width: 100%; overflow-x: auto; }
-.teacher-day-table { width: 100%; min-width: 60rem; border-collapse: collapse; font-family: var(--technical); }
-.teacher-day-table th, .teacher-day-table td { border: 1px solid var(--rule); padding: .65rem .7rem; text-align: left; vertical-align: top; }
+.teacher-day-table { width: 100%; min-width: 48rem; border-collapse: collapse; table-layout: fixed; font-family: var(--technical); }
+.teacher-day-table th, .teacher-day-table td { border: 1px solid var(--rule); padding: .35rem .45rem; text-align: left; vertical-align: top; }
 .teacher-day-table thead th { background: #f7f7f7; font-family: var(--sans); font-weight: 750; }
-.teacher-day-table tbody th { white-space: nowrap; }
+.teacher-day-table thead th:first-child, .teacher-day-table tbody th { width: 5.6rem; }
+.teacher-day-table thead th:nth-child(2) { width: 8rem; }
+.teacher-day-table tbody th { white-space: normal; }
 .teacher-day-table td a { font-family: var(--sans); white-space: nowrap; }
-.day-lesson-section { min-width: 12rem; font-family: var(--sans); }
-.day-lesson-section summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; cursor: pointer; list-style-position: inside; font-weight: 750; }
-.day-lesson-section summary::marker { color: var(--primary-accent); }
-.section-edit-hint { color: var(--muted); font-size: .8rem; font-weight: 500; }
-.day-lesson-value { margin: .5rem 0; overflow-wrap: anywhere; }
+.lesson-date-box { display: inline-flex; flex-direction: column; gap: .12rem; line-height: 1.15; white-space: nowrap; }
+.lesson-date-box span:last-child { color: var(--muted); font-size: .88em; }
+.lesson-context-cell { font-family: var(--sans); overflow-wrap: anywhere; }
+.lesson-context-cell strong, .lesson-context-cell span { display: block; }
+.lesson-context-cell strong { color: var(--class-code); }
+.lesson-context-cell span { color: var(--room-code); font-size: .9em; }
+.day-lesson-section { min-width: 0; font-family: var(--sans); }
+.day-lesson-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; font-size: .78rem; font-weight: 750; }
+.lesson-edit-control { flex: 0 0 auto; font-size: .75rem; font-weight: 500; }
+.lesson-edit-control summary { color: var(--muted); cursor: pointer; }
+.lesson-edit-control summary::marker { color: var(--primary-accent); }
+.day-lesson-value { margin-top: .3rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 .inline-lesson-form { margin-top: .75rem; }
-.inline-lesson-form textarea { min-height: 7rem; }
+.inline-lesson-form textarea { min-height: 5rem; }
 .inline-lesson-form .requisition-editor { min-height: 10rem; }
 .template-summary-row { margin: .35rem 0; }
 .empty-cell { background: #fff; }

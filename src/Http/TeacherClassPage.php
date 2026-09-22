@@ -42,7 +42,7 @@ final class TeacherClassPage
                 if (($current['state'] ?? '') === 'nothing_required' && $requisitions === '') $requisitions = 'Nothing required';
                 $risk = (string) ($current['risk_assessment_text'] ?? '');
                 if ($section === 'outline') $outline = (string) ($input['value'] ?? '');
-                if ($section === 'requisitions') $requisitions = (string) ($input['value'] ?? '');
+                if ($section === 'requisitions') $requisitions = ($input['nothing_required'] ?? '') === 'yes' ? 'Nothing required' : (string) ($input['value'] ?? '');
                 if ($section === 'risk') $risk = (string) ($input['value'] ?? '');
                 $this->service->save(
                     $this->organisationId, $this->teacherId, (int) ($input['occurrence_id'] ?? 0),
@@ -78,18 +78,20 @@ final class TeacherClassPage
         $body .= '<p class="context">Showing the three most recent previous lessons, today and the nearest upcoming lessons.</p>';
         $lessons = array_merge($previous, $upcoming);
         if ($lessons === []) return PageLayout::render('Teacher class', $body . '<p class="notice">No lessons are scheduled for this class.</p>', $this->user);
-        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table class-view-table"><caption class="visually-hidden">Lessons for class ' . $this->e($selected['code']) . '</caption><thead><tr><th>Date</th><th>Day / period</th><th>Room</th><th>Lesson outline</th><th>Requisitions</th><th>Risk assessment</th></tr></thead><tbody>';
+        $body .= '<div class="teacher-day-table-wrap"><table class="teacher-day-table class-view-table"><caption class="visually-hidden">Lessons for class ' . $this->e($selected['code']) . '</caption><thead><tr><th>Day / period / date</th><th>Room</th><th>Lesson outline</th><th>Requisitions</th><th>Risk assessment</th></tr></thead><tbody>';
         foreach ($lessons as $lesson) {
             $date = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $lesson['lesson_date']) ?: $this->today;
-            $period = (string) ($lesson['slot_label'] ?? ('P' . (int) ($lesson['teaching_period_number'] ?? 0)));
-            $body .= '<tr><th scope="row">' . $this->e($this->dateDisplay->format($date)) . '</th><td>' . $this->e($date->format('l') . ' / ' . $period) . '</td><td>' . $this->e((string) $lesson['snapshot_room_code']) . '</td><td>' . $this->editor($lesson, 'outline', 'Lesson outline', (string) ($lesson['planning_notes'] ?? ''), $selected['id'], $date) . '</td><td>' . $this->editor($lesson, 'requisitions', 'Requisitions', $this->requirements($lesson), $selected['id'], $date) . '</td><td>' . $this->editor($lesson, 'risk', 'Risk assessment', (string) ($lesson['risk_assessment_text'] ?? ''), $selected['id'], $date) . '</td></tr>';
+            $period = 'P' . (int) ($lesson['teaching_period_number'] ?? 0);
+            $body .= '<tr><th scope="row"><span class="lesson-date-box"><span>' . $this->e($date->format('D') . ' ' . $period) . '</span><span>' . $date->format('d/m') . '</span></span></th><td class="lesson-context-cell">' . $this->e((string) $lesson['snapshot_room_code']) . '</td><td>' . $this->editor($lesson, 'outline', 'Lesson outline', (string) ($lesson['planning_notes'] ?? ''), $selected['id'], $date) . '</td><td>' . $this->editor($lesson, 'requisitions', 'Requisitions', $this->requirements($lesson), $selected['id'], $date, ($lesson['state'] ?? '') === 'nothing_required') . '</td><td>' . $this->editor($lesson, 'risk', 'Risk assessment', (string) ($lesson['risk_assessment_text'] ?? ''), $selected['id'], $date) . '</td></tr>';
         }
         return PageLayout::render('Teacher class', $body . '</tbody></table></div>', $this->user);
     }
 
-    private function editor(array $lesson, string $section, string $label, string $value, int $classId, DateTimeImmutable $date): string
+    private function editor(array $lesson, string $section, string $label, string $value, int $classId, DateTimeImmutable $date, bool $nothingRequired = false): string
     {
-        return '<details class="day-lesson-section"><summary><span>' . $this->e($label) . '</span><span class="section-edit-hint">Edit</span></summary><div class="day-lesson-value">' . $this->textCell($value, $section === 'requisitions' ? 'No requisitions entered' : 'Not entered') . '</div><form method="post" class="inline-lesson-form"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="class_id" value="' . $classId . '"><input type="hidden" name="occurrence_id" value="' . (int) $lesson['id'] . '"><input type="hidden" name="date" value="' . $date->format('Y-m-d') . '"><input type="hidden" name="section" value="' . $this->e($section) . '"><label><span class="visually-hidden">' . $this->e($label) . '</span><textarea name="value">' . $this->e($value) . '</textarea></label><div class="form-actions"><button>Save</button><a class="button secondary" href="/teacher/class?class_id=' . $classId . '">Cancel</a></div></form></details>';
+        $empty = match ($section) { 'outline' => 'No outline entered', 'requisitions' => 'No requisitions entered', default => 'No risk assessment entered' };
+        $checkbox = $section === 'requisitions' ? '<label class="check-label"><input type="checkbox" name="nothing_required" value="yes"' . ($nothingRequired ? ' checked' : '') . '> Nothing required</label>' : '';
+        return '<div class="day-lesson-section"><div class="day-lesson-heading"><span>' . $this->e($label) . '</span><details class="lesson-edit-control"><summary>Edit</summary><form method="post" class="inline-lesson-form"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="class_id" value="' . $classId . '"><input type="hidden" name="occurrence_id" value="' . (int) $lesson['id'] . '"><input type="hidden" name="date" value="' . $date->format('Y-m-d') . '"><input type="hidden" name="section" value="' . $this->e($section) . '"><label><span class="visually-hidden">' . $this->e($label) . '</span><textarea name="value">' . $this->e($value) . '</textarea></label>' . $checkbox . '<div class="form-actions"><button>Save</button><a class="button secondary" href="/teacher/class?class_id=' . $classId . '">Cancel</a></div></form></details></div><div class="day-lesson-value">' . $this->textCell($value, $empty) . '</div></div>';
     }
 
     private function requirements(array $lesson): string

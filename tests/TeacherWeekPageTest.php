@@ -53,6 +53,9 @@ final class TeacherWeekPageTest
         assertContainsValue('.period-label { width: 1%;', $css, 'Teacher period column was not narrowed.');
         assertContainsValue('text-align: center; vertical-align: middle; white-space: nowrap;', $css, 'Teacher period labels were not centred without truncation.');
         assertContainsValue('.day-label { padding: .6rem; text-align: center; vertical-align: middle;', $css, 'Teacher day headings were not centred.');
+        assertContainsValue('.teacher-day-table { width: 100%; min-width: 48rem; border-collapse: collapse; table-layout: fixed;', $css, 'Teacher day/class views did not retain a compact bounded table layout.');
+        assertContainsValue('.lesson-date-box { display: inline-flex; flex-direction: column;', $css, 'Teacher day/class views did not style the combined date box.');
+        assertContainsValue('.day-lesson-value { margin-top: .3rem; overflow-wrap: anywhere; white-space: pre-wrap;', $css, 'Teacher day/class planning text was not configured to wrap in full.');
 
         $store->firstDay = 3;
         $alternateWeek = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-23'), ['staff_identifier' => 'NEV']);
@@ -84,13 +87,20 @@ final class TeacherWeekPageTest
         $day = $dayPage->handle('GET', ['date' => '2026-09-07']);
         assertContainsValue('Day View', $day, 'Teacher day view heading was not rendered.');
         assertContainsValue("Today's lessons", $day, 'Teacher day view did not identify the selected day.');
-        assertContainsValue('1–2', $day, 'Multi-period lesson did not appear as a single period range.');
+        assertContainsValue('P1–P2', $day, 'Multi-period lesson did not appear as a compact single period range.');
+        assertContainsValue('Mon P1', $day, 'Day View did not combine the abbreviated day and period.');
+        assertContainsValue('07/09', $day, 'Day View did not render the compact date without the year.');
+        assertContainsValue('Day / period / date', $day, 'Day View did not retain its compact lesson table heading.');
+        assertContainsValue('Class / room', $day, 'Day View did not keep class and room in one compact context column.');
         assertContainsValue('Plan the experiment', $day, 'Day view did not show the complete lesson outline.');
         assertContainsValue('Bring goggles', $day, 'Day view did not show the complete requisition text.');
         assertContainsValue('Wear eye protection', $day, 'Day view did not show the complete risk assessment.');
         assertContainsValue('name="section" value="outline"', $day, 'Day view did not provide inline outline editing.');
         assertContainsValue('name="section" value="requisitions"', $day, 'Day view did not provide inline requisition editing.');
         assertContainsValue('name="section" value="risk"', $day, 'Day view did not provide inline risk editing.');
+        assertContainsValue('No outline entered', $day, 'Day View did not define the outline empty state.');
+        assertContainsValue('No risk assessment entered', $day, 'Day View did not define the risk empty state.');
+        assertContainsValue('<tr><th scope="row"><span class="lesson-date-box">', $day, 'Day View did not retain one table row per lesson.');
         assertNotContainsValue('href="/teacher?date=2026-09-07&edit=500"', $day, 'Day view still redirected to the week editor.');
         assertContainsValue('Previous day', $day, 'Day view did not render previous-day navigation.');
         assertContainsValue('type="date"', $day, 'Day view did not render a date picker.');
@@ -123,6 +133,11 @@ final class TeacherWeekPageTest
         assertContainsValue('Class View', $class, 'Class View did not render.');
         assertContainsValue('option value="301" selected', $class, 'Class View did not select the authorised class.');
         assertContainsValue('Plan the experiment', $class, 'Class View did not show the dated lesson planning data.');
+        assertContainsValue('Mon P1', $class, 'Class View did not combine the abbreviated day and period.');
+        assertContainsValue('07/09', $class, 'Class View did not render the compact date without the year.');
+        assertContainsValue('Day / period / date', $class, 'Class View did not retain its compact lesson table heading.');
+        assertContainsValue('<tr><th scope="row"><span class="lesson-date-box">', $class, 'Class View did not retain one table row per lesson.');
+        assertContainsValue('name="nothing_required"', $class, 'Class View did not preserve the Nothing required editing control.');
         $boundedStore = new TeacherStore();
         for ($offset = 1; $offset <= 4; $offset++) {
             $row = $boundedStore->occurrences[500];
