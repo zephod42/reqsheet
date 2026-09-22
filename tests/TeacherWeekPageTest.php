@@ -46,6 +46,9 @@ final class TeacherWeekPageTest
         assertContainsValue('Next week', $view, 'Next-week navigation was not rendered.');
         assertContainsValue('This week', $view, 'This-week control was not rendered.');
         assertContainsValue('week-context-current', $view, 'Current calendar week did not receive its contextual label.');
+        assertContainsValue('>GO TO TODAY</a>', $view, 'Return-to-current-week action did not use the requested label.');
+        assertContainsValue('class="week-navigation-actions"><a class="go-to-today" href="?date=2026-09-09">GO TO TODAY</a><a class="week-arrow"', $view, 'GO TO TODAY was not positioned with the right-hand week navigation controls.');
+        assertNotContainsValue('GO TO TODAY</a></div><a href="/teacher/day', $view, 'GO TO TODAY was incorrectly linked to Teacher Day View.');
         assertContainsValue('/teacher/day?date=2026-09-07', $view, 'Week day headings did not link to the teacher day view.');
         assertContainsValue('/teacher/class', \Reqsheet\Http\PageLayout::render('Teacher', '<p>Teacher</p>', ['id' => 10, 'organisation_id' => 1, 'roles' => ['teacher']]), 'Teacher navigation did not expose Class View.');
         assertContainsValue('today-row', $view, 'Current day was not gently highlighted.');
@@ -337,9 +340,21 @@ final class TeacherWeekPageTest
         assertContainsValue("event.pointerType !== 'mouse'", $weekScript, 'Touch interaction did not distinguish long-press initiation.');
         assertContainsValue('}, 500)', $weekScript, 'Mobile long press did not use a deliberate hold threshold.');
         assertContainsValue("distance >= 6", $weekScript, 'Desktop drag did not preserve click-versus-drag movement distinction.');
+        assertContainsValue("distance > 10", $weekScript, 'Touch swipe did not retain a movement threshold before long-press activation.');
         assertContainsValue("event.preventDefault()", $weekScript, 'Active dragging did not suppress browser movement behaviour.');
+        assertContainsValue("addEventListener('contextmenu'", $weekScript, 'Lesson tiles did not suppress their native long-press context menu.');
+        assertContainsValue("addEventListener('selectstart'", $weekScript, 'Lesson tiles did not suppress native text selection initiation.');
+        assertContainsValue("addEventListener('touchmove'", $weekScript, 'Active touch dragging did not install a non-passive movement guard.');
+        assertContainsValue("{ passive: false }", $weekScript, 'Active touch movement could not be cancelled.');
+        assertContainsValue("window.setTimeout(function () { suppressClick = false; }, 700)", $weekScript, 'Completed or cancelled drags did not suppress delayed mobile clicks.');
         assertContainsValue("if (busy", $weekScript, 'Duplicate submissions were not guarded while a request is active.');
         assertContainsValue("target.dataset.requisitions", $weekScript, 'Successful duplication did not update the target tile in place.');
+        assertContainsValue('.week-grid .lesson-block {', $css, 'Native-interaction suppression was not scoped to Week View lesson tiles.');
+        assertContainsValue('-webkit-touch-callout: none;', $css, 'Week View lesson tiles did not disable iOS touch callouts.');
+        assertContainsValue('-webkit-user-drag: none;', $css, 'Week View lesson tiles did not disable browser-native link dragging.');
+        assertContainsValue('-webkit-user-select: none;', $css, 'Week View lesson tiles did not disable WebKit text selection.');
+        assertContainsValue('touch-action: pan-x pan-y;', $css, 'Lesson tiles did not preserve native horizontal and vertical timetable panning.');
+        assertNotContainsValue('textarea { -webkit-user-select: none;', $css, 'Text-selection suppression leaked into lesson editor textareas.');
     }
 }
 

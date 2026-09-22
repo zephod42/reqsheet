@@ -67,7 +67,7 @@ The current login and access checks are deliberately pilot-grade; this section d
 
 The teacher view is week-oriented. Working days run down the left and teaching periods run across the top. Monday is the default first day of the week, with the configured working-day set controlling which days are shown.
 
-The heading is “Week beginning <Monday date>”, with previous/next navigation, a “This week” control, and a “Select week” calendar/date-picker popout for jumping directly to a week. These quick navigation controls complement one another. When viewing the current week, the current day is gently highlighted.
+The heading is “Week beginning <Monday date>”, with previous/next navigation, contextual This week/Previous week/Next week labels, and a distinct right-aligned `GO TO TODAY` action that returns to the current calendar week. When viewing the current week, the current day is gently highlighted.
 
 Break and lunch appear as narrow grey separator columns in the grid rather than lesson-bearing timetable cells. This is a display decision: the underlying timetable configuration may still contain non-teaching interval records so existing span validation remains authoritative.
 

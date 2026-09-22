@@ -110,9 +110,10 @@ final class TeacherWeekPage
         $relationship = $week->start->format('Y-m-d') === $currentWeekStart->format('Y-m-d') ? 'current'
             : ($week->start->format('Y-m-d') === $currentWeekStart->sub(new DateInterval('P7D'))->format('Y-m-d') ? 'previous'
             : ($week->start->format('Y-m-d') === $currentWeekStart->add(new DateInterval('P7D'))->format('Y-m-d') ? 'next' : null));
-        $context = $relationship === 'previous' ? '<span class="week-context-label week-context-previous">Previous week</span>'
-            : ($relationship === 'next' ? '<span class="week-context-label week-context-next">Next week</span>' : '');
-        $body = '<header class="page-header"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1>' . $context . '<a class="this-week' . ($relationship === 'current' ? ' selected-state week-context-current' : '') . '"' . ($relationship === 'current' ? ' aria-current="date"' : '') . ' href="?date=' . $this->today->format('Y-m-d') . '">This week</a></div><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></header>';
+        $context = $relationship === 'current' ? '<span class="week-context-label week-context-current">This week</span>'
+            : ($relationship === 'previous' ? '<span class="week-context-label week-context-previous">Previous week</span>'
+            : ($relationship === 'next' ? '<span class="week-context-label week-context-next">Next week</span>' : ''));
+        $body = '<header class="page-header week-navigation"><a class="week-arrow" href="?date=' . $week->start->sub(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Previous week">‹</a><div class="week-navigation-heading"><h1>Week beginning ' . $this->e($this->weekDayLabel($week->start)) . '</h1>' . $context . '</div><div class="week-navigation-actions"><a class="go-to-today" href="?date=' . $this->today->format('Y-m-d') . '">GO TO TODAY</a><a class="week-arrow" href="?date=' . $week->start->add(new DateInterval('P7D'))->format('Y-m-d') . '" aria-label="Next week">›</a></div></header>';
         if ($message !== null) $body .= '<p class="message">' . $this->e($message) . '</p>';
         $identity = trim((string) ($this->user['staff_identifier'] ?? ''));
         $identityLabel = $identity !== '' ? $identity : 'Teacher';

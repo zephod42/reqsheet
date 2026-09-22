@@ -1,6 +1,47 @@
 (function () {
     'use strict';
 
+    function createGestureTracker() {
+        var current = null;
+        var dragging = false;
+
+        return {
+            down: function (details) {
+                if (current !== null) return false;
+                current = details;
+                dragging = false;
+                return true;
+            },
+            activate: function (pointerId) {
+                if (!current || current.id !== pointerId) return false;
+                dragging = true;
+                return true;
+            },
+            move: function (pointerId, x, y) {
+                if (!current || current.id !== pointerId) return 'ignore';
+                if (dragging) return 'drag';
+                var distance = Math.hypot(x - current.x, y - current.y);
+                if (current.type === 'mouse' && distance >= 6) {
+                    dragging = true;
+                    return 'start';
+                }
+                if (current.type !== 'mouse' && distance > 10) {
+                    current = null;
+                    return 'scroll';
+                }
+                return 'pending';
+            },
+            current: function () { return current; },
+            isDragging: function () { return dragging; },
+            reset: function () { current = null; dragging = false; }
+        };
+    }
+
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = { createGestureTracker: createGestureTracker };
+        return;
+    }
+
     var lessons = Array.prototype.slice.call(document.querySelectorAll('[data-lesson-id]'));
     var editor = document.getElementById('lesson-editor');
     var picker = document.getElementById('duplicate-picker');
@@ -11,9 +52,8 @@
     var source = null;
     var target = null;
     var busy = false;
-    var pointer = null;
+    var gestures = createGestureTracker();
     var longPressTimer = null;
-    var dragging = false;
     var suppressClick = false;
     var ghost = null;
     var over = null;
@@ -51,10 +91,9 @@
     }
 
     function beginDrag(link, x, y) {
-        if (busy || dragging) return;
+        if (busy || !gestures.isDragging()) return;
         clearLongPress();
         source = link;
-        dragging = true;
         source.classList.add('copy-source');
         document.body.classList.add('lesson-copy-active');
         lessons.forEach(function (lesson) {
@@ -66,6 +105,9 @@
         document.body.appendChild(ghost);
         moveGhost(x, y);
         setStatus('Copying lesson planning. Drop onto another lesson.', false);
+        var selection = window.getSelection ? window.getSelection() : null;
+        if (selection) selection.removeAllRanges();
+        var pointer = gestures.current();
         if (pointer && source.setPointerCapture) {
             try { source.setPointerCapture(pointer.id); } catch (ignore) {}
         }
@@ -92,20 +134,19 @@
 
     function endDrag(cancelled) {
         clearLongPress();
-        if (!dragging) {
-            pointer = null;
+        if (!gestures.isDragging()) {
+            gestures.reset();
             return;
         }
         var droppedOn = cancelled ? null : over;
-        dragging = false;
         suppressClick = true;
-        window.setTimeout(function () { suppressClick = false; }, 80);
+        window.setTimeout(function () { suppressClick = false; }, 700);
         document.body.classList.remove('lesson-copy-active');
         lessons.forEach(function (lesson) { lesson.classList.remove('copy-source', 'copy-target', 'copy-over'); });
         if (ghost) ghost.remove();
         ghost = null;
         over = null;
-        pointer = null;
+        gestures.reset();
         if (droppedOn) prepareCopy(source, droppedOn);
         else setStatus('Copy cancelled.', false);
     }
@@ -206,40 +247,49 @@
     lessons.forEach(function (link) {
         link.draggable = false;
         link.addEventListener('dragstart', function (event) { event.preventDefault(); });
+        link.addEventListener('contextmenu', function (event) { event.preventDefault(); });
+        link.addEventListener('selectstart', function (event) { event.preventDefault(); });
         link.addEventListener('click', function (event) { openEditor(link, event); });
         link.addEventListener('pointerdown', function (event) {
-            if (busy || event.button !== 0 || pointer !== null) return;
-            pointer = { id: event.pointerId, type: event.pointerType, x: event.clientX, y: event.clientY, link: link };
+            if (busy || event.button !== 0 || !gestures.down({ id: event.pointerId, type: event.pointerType, x: event.clientX, y: event.clientY, link: link })) return;
             if (event.pointerType !== 'mouse') {
                 longPressTimer = window.setTimeout(function () {
-                    if (pointer && pointer.id === event.pointerId) beginDrag(link, pointer.x, pointer.y);
+                    var pointer = gestures.current();
+                    if (pointer && gestures.activate(event.pointerId)) beginDrag(link, pointer.x, pointer.y);
                 }, 500);
             }
         });
     });
 
     document.addEventListener('pointermove', function (event) {
-        if (!pointer || pointer.id !== event.pointerId) return;
-        var distance = Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y);
-        if (!dragging && pointer.type === 'mouse' && distance >= 6) beginDrag(pointer.link, event.clientX, event.clientY);
-        if (!dragging && pointer.type !== 'mouse' && distance > 10) {
+        var action = gestures.move(event.pointerId, event.clientX, event.clientY);
+        if (action === 'ignore') return;
+        if (action === 'start') {
+            var pointer = gestures.current();
+            beginDrag(pointer.link, event.clientX, event.clientY);
+        }
+        if (action === 'scroll') {
             clearLongPress();
-            pointer = null;
             return;
         }
-        if (!dragging) return;
+        if (!gestures.isDragging()) return;
         event.preventDefault();
         moveGhost(event.clientX, event.clientY);
         setOver(targetAt(event.clientX, event.clientY));
     }, { passive: false });
     document.addEventListener('pointerup', function (event) {
+        var pointer = gestures.current();
         if (!pointer || pointer.id !== event.pointerId) return;
-        if (dragging) event.preventDefault();
+        if (gestures.isDragging()) event.preventDefault();
         endDrag(false);
     }, { passive: false });
     document.addEventListener('pointercancel', function (event) {
+        var pointer = gestures.current();
         if (pointer && pointer.id === event.pointerId) endDrag(true);
     });
+    document.addEventListener('touchmove', function (event) {
+        if (gestures.isDragging() && event.cancelable) event.preventDefault();
+    }, { passive: false });
 
     document.querySelectorAll('[data-close]').forEach(function (button) {
         button.addEventListener('click', function () {
