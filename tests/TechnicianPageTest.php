@@ -52,6 +52,8 @@ final class TechnicianPageTest
         assertContainsValue('class="alpha-banner"', $day, 'Authenticated technician view did not render the global alpha banner.');
         assertContainsValue('JSM', $day, 'Technician grid did not show teacher initials.');
         assertContainsValue('class="technician-cell class-tone-', $day, 'Technician lesson did not receive a deterministic class colour.');
+        assertContainsValue('tabindex="0" class="technician-cell', $day, 'Occupied technician cells were not keyboard focusable.');
+        assertContainsValue('document.querySelectorAll(".technician-cell")', $day, 'Technician full-cell interaction script was not rendered.');
         assertContainsValue('Very long requisition text', $day, 'Technician grid did not show the saved requisition.');
         assertContainsValue('title="Very long requisition text', $day, 'Technician grid did not expose full requisition text for hover.');
         assertContainsValue('class="technician-requisition-control" tabindex="0" role="button"', $day, 'Long requisition preview was not keyboard accessible.');

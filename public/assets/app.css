@@ -177,13 +177,13 @@ small { font-size: .82rem; }
 .lesson-context-cell strong { color: var(--class-code); }
 .lesson-context-cell span { color: var(--room-code); font-size: .9em; }
 .day-lesson-section { min-width: 0; font-family: var(--sans); }
+.day-lesson-section[data-section] { cursor: text; outline-offset: -2px; }
+.day-lesson-section[data-section]:focus-visible, .day-lesson-section.is-editing { outline: 2px solid var(--primary-accent); }
 .day-lesson-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; font-size: .78rem; font-weight: 750; }
-.lesson-edit-control { flex: 0 0 auto; font-size: .75rem; font-weight: 500; }
-.lesson-edit-control summary { color: var(--muted); cursor: pointer; }
-.lesson-edit-control summary::marker { color: var(--primary-accent); }
 .day-lesson-value { margin-top: .3rem; overflow-wrap: anywhere; white-space: pre-wrap; }
-.inline-lesson-form { margin-top: .75rem; }
-.inline-lesson-form textarea { min-height: 5rem; }
+.inline-lesson-form { margin-top: .35rem; }
+.inline-lesson-form textarea { box-sizing: border-box; width: 100%; min-height: 5rem; max-width: 100%; resize: none; overflow-y: hidden; }
+.inline-lesson-form .form-actions { flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
 .inline-lesson-form .requisition-editor { min-height: 10rem; }
 .template-summary-row { margin: .35rem 0; }
 .empty-cell { background: #fff; }
@@ -303,7 +303,8 @@ dialog .close { float: right; }
 .technician-prepped { color: #176b35; font-size: 1.15rem; line-height: 1; text-align: center; }
 .technician-prepped-empty { display: block; min-width: 1rem; }
 .technician-requisition { display: -webkit-box; overflow: hidden; margin-top: .25rem; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-line-clamp: 4; -webkit-box-orient: vertical; text-overflow: ellipsis; }
-.technician-cell { font-family: Arial, Helvetica, sans-serif; border: 3px solid var(--class-border, var(--rule)); border-radius: var(--corner); }
+.technician-cell { font-family: Arial, Helvetica, sans-serif; border: 3px solid var(--class-border, var(--rule)); border-radius: var(--corner); cursor: pointer; }
+.technician-cell:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .technician-cell summary { font-size: 12px; line-height: 1.25; }
 .technician-cell { overflow: visible; }
 .technician-requisition-control { position: relative; display: block; margin-top: .25rem; cursor: pointer; outline-offset: 2px; }

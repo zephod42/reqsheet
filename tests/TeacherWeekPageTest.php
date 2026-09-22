@@ -101,6 +101,11 @@ final class TeacherWeekPageTest
         assertContainsValue('name="section" value="outline"', $day, 'Day view did not provide inline outline editing.');
         assertContainsValue('name="section" value="requisitions"', $day, 'Day view did not provide inline requisition editing.');
         assertContainsValue('name="section" value="risk"', $day, 'Day view did not provide inline risk editing.');
+        assertContainsValue('data-inline-planning-cell data-section="requisitions"', $day, 'Day view requisitions cell was not directly interactive.');
+        assertContainsValue('data-inline-planning-cell data-section="outline"', $day, 'Day view outline cell was not directly interactive.');
+        assertContainsValue('data-inline-planning-cell data-section="risk"', $day, 'Day view risk cell was not directly interactive.');
+        assertNotContainsValue('>Edit</summary>', $day, 'Day view retained a separate Edit control.');
+        assertNotContainsValue('lesson-edit-control', $day, 'Day view retained an anchored editor control.');
         assertContainsValue('No outline entered', $day, 'Day View did not define the outline empty state.');
         assertContainsValue('No risk assessment entered', $day, 'Day View did not define the risk empty state.');
         assertContainsValue('<tr><th scope="row"><span class="lesson-date-box">', $day, 'Day View did not retain one table row per lesson.');
@@ -141,6 +146,11 @@ final class TeacherWeekPageTest
         assertContainsValue('Day / period / date', $class, 'Class View did not retain its compact lesson table heading.');
         assertContainsValue('<tr><th scope="row"><span class="lesson-date-box">', $class, 'Class View did not retain one table row per lesson.');
         assertContainsValue('name="nothing_required"', $class, 'Class View did not preserve the Nothing required editing control.');
+        assertContainsValue('data-inline-planning-cell data-section="requisitions"', $class, 'Class View requisitions cell was not directly interactive.');
+        assertContainsValue('data-inline-planning-cell data-section="outline"', $class, 'Class View outline cell was not directly interactive.');
+        assertContainsValue('data-inline-planning-cell data-section="risk"', $class, 'Class View risk cell was not directly interactive.');
+        assertNotContainsValue('>Edit</summary>', $class, 'Class View retained a separate Edit control.');
+        assertNotContainsValue('lesson-edit-control', $class, 'Class View retained an anchored editor control.');
         assertColumnHeadings($class, ['Day / period / date', 'Room', 'Requisitions', 'Lesson outline', 'Risk assessment'], 'Class View column order changed unexpectedly.');
         $boundedStore = new TeacherStore();
         for ($offset = 1; $offset <= 4; $offset++) {
