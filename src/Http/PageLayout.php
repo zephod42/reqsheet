@@ -21,7 +21,7 @@ final class PageLayout
         $assetVersion = is_file($assetPath) ? (string) filemtime($assetPath) : '1';
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $active = static fn (string $path): string => ($path === '/teacher' ? in_array($currentPath, ['/teacher', '/teacher/week'], true) : ($path === '/how-to' ? str_starts_with($currentPath, '/how-to') : $currentPath === $path)) ? ' class="active" aria-current="page"' : '';
-        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet α</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
+        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet α</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null && self::$tenantOrganisation === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
         if ($user !== null) {
             $nav .= '<li class="nav-separator" role="separator" aria-hidden="true"></li>';
             $landing = SessionAuth::landingPath($user);
@@ -44,12 +44,34 @@ final class PageLayout
         }
         $nav .= '</ul></nav>';
         $tenant = self::$tenantOrganisation === null ? '' : '<p class="tenant-name">' . self::e(self::$tenantOrganisation['name']) . '</p>';
-        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title><link rel="stylesheet" href="/assets/app.css?v=' . rawurlencode($assetVersion) . '"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . self::alphaBanner() . $tenant . $body . '</main></div></body></html>';
+        $metadata = self::metadata($title, $currentPath);
+        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title>' . $metadata . '<link rel="stylesheet" href="/assets/app.css?v=' . rawurlencode($assetVersion) . '"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . self::alphaBanner() . $tenant . $body . '</main></div></body></html>';
     }
 
     public static function alphaBanner(): string
     {
         return '<aside class="alpha-banner" role="note">Reqsheet is currently in alpha testing. Do not rely solely on Reqsheet at this stage. Read more about what this means <a href="/alpha">here</a>.</aside>';
+    }
+
+    private static function metadata(string $title, string $path): string
+    {
+        $environment = getenv();
+        $environment = is_array($environment) ? $environment : [];
+        try {
+            $baseHosts = TenantHostResolver::configuredBaseHosts($environment, $_SERVER);
+            $host = TenantHostResolver::canonicalPublicHost($environment, $baseHosts) ?? 'reqsheet.com';
+            if ($host === 'pumba' || $host === 'localhost' || str_ends_with($host, '.duckdns.org')) $host = 'reqsheet.com';
+        } catch (\Throwable) {
+            $host = 'reqsheet.com';
+        }
+        $base = 'https://' . $host;
+        $image = $base . '/assets/reqsheet-og.png';
+        $description = 'Science requisitions, simplified';
+        $escapedTitle = self::e($title . ' · Reqsheet');
+        $escapedDescription = self::e($description);
+        $escapedImage = self::e($image);
+        $escapedUrl = self::e($base . ($path === '/' ? '/' : $path));
+        return '<meta name="description" content="' . $escapedDescription . '"><link rel="canonical" href="' . $escapedUrl . '"><meta property="og:title" content="' . $escapedTitle . '"><meta property="og:description" content="' . $escapedDescription . '"><meta property="og:type" content="website"><meta property="og:url" content="' . $escapedUrl . '"><meta property="og:image" content="' . $escapedImage . '"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Reqsheet — Science requisitions, simplified"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="' . $escapedTitle . '"><meta name="twitter:description" content="' . $escapedDescription . '"><meta name="twitter:image" content="' . $escapedImage . '">';
     }
 
     private static function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }

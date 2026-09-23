@@ -8,7 +8,7 @@ final class DemoPage
 {
     public static function render(?array $user = null): string
     {
-        $image = static fn (string $name, string $alt, string $class = ''): string => '<figure class="demo-figure ' . $class . '"><img loading="lazy" src="/assets/screenshots/demo/' . rawurlencode($name) . '" alt="' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"><figcaption>' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</figcaption></figure>';
+        $image = static fn (string $name, string $alt, string $class = ''): string => '<figure class="demo-figure ' . $class . '"><img loading="lazy" src="/assets/screenshots/demo/' . rawurlencode($name) . '" alt="' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"></figure>';
         $body = '<article class="demo-page showcase content-wide">'
             . '<header class="showcase-intro"><p class="eyebrow">A quick tour</p><h1>See Reqsheet in action</h1><p>Reqsheet keeps lesson planning, preparation and timetable management in one clear shared view.</p></header>'
             . '<section class="showcase-section"><div class="showcase-section-heading"><p class="eyebrow">Teacher</p><h2>Plan lessons without the paperwork</h2></div>'

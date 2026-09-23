@@ -28,6 +28,7 @@ require __DIR__ . '/TechnicianPageTest.php';
 require __DIR__ . '/RecoveryTest.php';
 require __DIR__ . '/MonitorReportTest.php';
 require __DIR__ . '/DemoHowToTest.php';
+require __DIR__ . '/PersistentLoginTest.php';
 
 use Reqsheet\Database\Database;
 use Reqsheet\Database\DatabaseConfig;
@@ -110,8 +111,8 @@ assertSameValue(false, HealthCheck::databaseIsHealthy($failingDatabase), 'Databa
 $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $ordered = MigrationFile::discover($migrationDirectory);
 assertSameValue('0001', $ordered[0]->version, 'Migration ordering is incorrect.');
-assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
-assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015']), 'Applied migrations were not idempotently selectable.');
+assertSameValue(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015', '0016'], array_map(static fn (MigrationFile $migration): string => $migration->version, $ordered), 'Unexpected migration set.');
+assertSameValue([], MigrationRunner::pending($ordered, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015', '0016']), 'Applied migrations were not idempotently selectable.');
 $domainMigration = file_get_contents($migrationDirectory . '/0002_create_application_domain.sql');
 if ($domainMigration === false) {
     throw new RuntimeException('Domain migration could not be read.');
@@ -150,6 +151,11 @@ if ($dateFormatMigration === false || !str_contains($dateFormatMigration, "date_
 $roomLifecycleMigration = file_get_contents($migrationDirectory . '/0015_add_room_archiving.sql');
 if ($roomLifecycleMigration === false || !str_contains($roomLifecycleMigration, 'archived_at')) {
     throw new RuntimeException('Room lifecycle migration is missing archived_at.');
+}
+$persistentLoginMigration = file_get_contents($migrationDirectory . '/0016_create_persistent_login_tokens.sql');
+if ($persistentLoginMigration === false) throw new RuntimeException('Persistent-login migration is missing.');
+foreach (['persistent_login_tokens', 'selector', 'verifier_hash', 'previous_verifier_hash', 'expires_at', 'persistent_login_tokens_user_fk', 'persistent_login_tokens_organisation_fk'] as $expectedPersistentFragment) {
+    if (!str_contains($persistentLoginMigration, $expectedPersistentFragment)) throw new RuntimeException('Persistent-login migration is missing: ' . $expectedPersistentFragment);
 }
 $tenantMigration = file_get_contents($migrationDirectory . '/0005_add_tenant_slugs.sql');
 if ($tenantMigration === false) throw new RuntimeException('Tenant migration could not be read.');
@@ -319,5 +325,6 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\RecoveryTest::run();
 \Reqsheet\Tests\MonitorReportTest::run();
 \Reqsheet\Tests\DemoHowToTest::run();
+\Reqsheet\Tests\PersistentLoginTest::run();
 
 fwrite(STDOUT, "Checks passed.\n");

@@ -13,7 +13,7 @@ final class HowToPage
             http_response_code(403);
             return PageLayout::render('How-to', '<section class="content-narrow"><h1>How-to</h1><p class="notice error">This guide is not available for your role.</p></section>', $user);
         }
-        $image = static fn (string $name, string $alt): string => '<figure class="how-to-figure"><img loading="lazy" src="/assets/screenshots/demo/' . rawurlencode($name) . '" alt="' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"><figcaption>' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</figcaption></figure>';
+        $image = static fn (string $name, string $alt): string => '<figure class="how-to-figure"><img loading="lazy" src="/assets/screenshots/demo/' . rawurlencode($name) . '" alt="' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"></figure>';
         $links = '<nav class="how-to-sections" aria-label="How-to sections"><p>Choose a guide:</p><ul>' . self::sectionLink('teacher', 'Teacher', $allowed['teacher']) . self::sectionLink('technician', 'Technician', $allowed['technician']) . self::sectionLink('administrator', 'Administrator', $allowed['administrator']) . '</ul></nav>';
         $content = '<article class="how-to content-wide"><header class="showcase-intro"><p class="eyebrow">Practical guides</p><h1>How-to</h1><p>Short, task-focused instructions for using Reqsheet in your department.</p></header>' . $links;
         if ($section === 'teacher') $content .= self::teacher($image);

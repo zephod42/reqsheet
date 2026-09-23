@@ -4,6 +4,7 @@ This is an intentionally small, reviewable roadmap. The near-term priority is ma
 
 Completed foundations:
 
+- Beta usability/security refinement: Demo and How-to screenshots retain meaningful alt text without permanent captions; school login has bounded, tenant-scoped Remember Me authentication; public metadata has a local Open Graph image; tenant navigation hides school signup; and unknown schools receive a styled HTTP 404 page.
 - Pumba fictional-school fixtures: Brackenmere Community School, Ashwick Hall
   School, and Fenmere Academy remain available for development testing and
   Demo screenshots. Their one-off generator has been retired after completing

@@ -80,6 +80,8 @@ input, select, textarea {
 textarea { min-height: 7rem; resize: vertical; }
 label { display: block; margin: var(--space-3) 0; font-weight: 650; }
 label input, label select, label textarea { display: block; margin-top: var(--space-1); font-weight: 400; }
+.checkbox-label { display: flex; align-items: center; gap: .45rem; font-weight: 400; }
+.checkbox-label input { width: auto; margin: 0; }
 fieldset { border: 1px solid var(--rule); margin: var(--space-4) 0; padding: var(--space-3); }
 legend { padding: 0 var(--space-1); font-weight: 700; }
 small { font-size: .82rem; }
@@ -124,7 +126,6 @@ small { font-size: .82rem; }
 .showcase-steps li { margin: .55rem 0; }
 .demo-figure, .how-to-figure { margin: 0; border: 1px solid var(--rule); background: #fff; padding: .45rem; }
 .demo-figure img, .how-to-figure img { display: block; width: 100%; height: auto; }
-.demo-figure figcaption, .how-to-figure figcaption { margin: .35rem .15rem .05rem; color: var(--muted); font-size: .78rem; }
 .showcase-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin-top: 2.5rem; }
 .showcase-secondary-grid > div, .showcase-people > div { min-width: 0; }
 .showcase-secondary-grid .demo-figure { margin-top: .8rem; }
@@ -164,6 +165,9 @@ small { font-size: .82rem; }
 .public-landing-guidance { max-width: 24rem; margin: 1.25rem 0 0; color: var(--muted); font-size: .78rem; }
 .public-landing-warning { max-width: 42rem; margin: 3rem 0 0; border-top: 1px solid var(--rule); padding-top: .8rem; color: var(--muted); font-size: .78rem; letter-spacing: .01em; }
 .public-landing-warning a { font-weight: 700; }
+.not-found-page { margin: 8vh auto 0; text-align: center; }
+.not-found-page h1 { margin: 0 0 1rem; font-size: clamp(2rem, 6vw, 3.5rem); letter-spacing: -.04em; }
+.not-found-page p { margin: 1rem auto; max-width: 34rem; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .technical, .timetable, .lesson-block, .week-grid, .admin-week-grid { font-family: var(--technical); }
 .notice, .message { border: 1px solid var(--rule); padding: .75rem; margin: var(--space-4) 0; }

@@ -12,6 +12,8 @@ use Reqsheet\Account\AccountService;
 use Reqsheet\Account\PdoAccountStore;
 use Reqsheet\Auth\OnboardingHandoffService;
 use Reqsheet\Auth\PdoOnboardingHandoffStore;
+use Reqsheet\Auth\PersistentLoginService;
+use Reqsheet\Auth\PdoPersistentLoginStore;
 use Reqsheet\Http\AdminAccess;
 use Reqsheet\Http\AdminTimetableCsvExport;
 use Reqsheet\Http\AdminTimetableCsvImport;
@@ -26,6 +28,7 @@ use Reqsheet\Http\TeacherClassPage;
 use Reqsheet\Http\AdminPeoplePage;
 use Reqsheet\Http\LoginPage;
 use Reqsheet\Http\MyAccountPage;
+use Reqsheet\Http\NotFoundPage;
 use Reqsheet\Http\AccountRecoveryPage;
 use Reqsheet\Http\RecoveryKeyPage;
 use Reqsheet\Http\HomePage;
@@ -84,6 +87,7 @@ try {
 }
 
 $tenantContext = null;
+$canonicalHost = null;
 try {
     $baseHosts = TenantHostResolver::configuredBaseHosts($environment, $_SERVER);
     $canonicalHost = TenantHostResolver::canonicalPublicHost($environment, $baseHosts);
@@ -104,8 +108,9 @@ try {
     PageLayout::setTenantOrganisation($tenantContext->organisation);
 } catch (TenantHostException $exception) {
     http_response_code(404);
-    header('Content-Type: text/plain; charset=UTF-8');
-    echo "School not found\n";
+    PageLayout::setTenantOrganisation(null);
+    header('Content-Type: text/html; charset=UTF-8');
+    echo NotFoundPage::school($canonicalHost ?? 'reqsheet.com');
     exit;
 } catch (\Throwable $exception) {
     $logRequestFailure('tenant-resolution', $exception);
@@ -117,6 +122,24 @@ try {
 
 $tenantOrganisationId = $tenantContext?->organisation['id'] ?? null;
 $currentUser = SessionAuth::current();
+if ($currentUser === null && $tenantOrganisationId !== null && isset($_COOKIE[PersistentLoginService::COOKIE_NAME])) {
+    try {
+        $rememberDatabase = new Database(DatabaseConfig::fromEnvironment($environment));
+        $rememberAccounts = new PdoAccountStore($rememberDatabase->connection());
+        $remembered = (new PersistentLoginService(new PdoPersistentLoginStore($rememberDatabase->connection()), $rememberAccounts))->restore(
+            (string) $_COOKIE[PersistentLoginService::COOKIE_NAME],
+            (int) $tenantOrganisationId,
+        );
+        if ($remembered !== null) {
+            SessionAuth::login($remembered['account']);
+            if ($remembered['cookie'] !== null) PersistentLoginService::setCookie($remembered['cookie'], time() + PersistentLoginService::MAX_LIFETIME);
+        }
+    } catch (\Throwable $exception) {
+        // A missing or not-yet-applied optional migration must not prevent ordinary login.
+        $logRequestFailure('remembered-login', $exception);
+    }
+    $currentUser = SessionAuth::current();
+}
 if ($currentUser !== null) {
     try {
         $sessionAccount = (new PdoAccountStore((new Database(DatabaseConfig::fromEnvironment($environment)))->connection()))->findUserById((int) $currentUser['id']);
@@ -206,6 +229,18 @@ if ($route === ApplicationRoute::LOGIN) {
             try {
                 $account = $accounts->authenticate($login, (string) ($_POST['password'] ?? ''), $tenantOrganisationId === null ? null : (int) $tenantOrganisationId);
                 SessionAuth::login($account);
+                $remember = ($_POST['remember_me'] ?? '') === '1';
+                $existingRememberCookie = $_COOKIE[PersistentLoginService::COOKIE_NAME] ?? null;
+                if ($remember || $existingRememberCookie !== null) {
+                    $rememberDatabase = new Database($config);
+                    $rememberStore = new PdoAccountStore($rememberDatabase->connection());
+                    $rememberedLogins = new PersistentLoginService(new PdoPersistentLoginStore($rememberDatabase->connection()), $rememberStore);
+                    $rememberedLogins->revokeCookie($existingRememberCookie, (int) ($account['organisation_id'] ?? 0));
+                    if ($remember) PersistentLoginService::setCookie($rememberedLogins->issue($account), time() + PersistentLoginService::MAX_LIFETIME);
+                    else PersistentLoginService::clearCookie();
+                } else {
+                    PersistentLoginService::clearCookie();
+                }
                 header('Location: ' . SessionAuth::landingPath($account), true, 302);
                 exit;
             } catch (\Reqsheet\Account\AccountValidationException $exception) {
@@ -215,7 +250,7 @@ if ($route === ApplicationRoute::LOGIN) {
                     exit;
                 }
                 header('Content-Type: text/html; charset=UTF-8');
-                echo $loginPage->form('Invalid login details.', $login);
+                echo $loginPage->form('Invalid login details.', $login, ($_POST['remember_me'] ?? '') === '1');
                 exit;
             }
         }
@@ -243,6 +278,12 @@ if ($route === ApplicationRoute::ROOT) {
 }
 
 if ($route === ApplicationRoute::SIGNUP) {
+    if ($tenantOrganisationId !== null) {
+        http_response_code(404);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo NotFoundPage::school($canonicalHost ?? 'reqsheet.com');
+        exit;
+    }
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     try {
@@ -437,6 +478,19 @@ HTML;
 }
 
 if ($route === ApplicationRoute::LOGOUT) {
+    if ($tenantOrganisationId !== null && isset($_COOKIE[PersistentLoginService::COOKIE_NAME])) {
+        try {
+            $logoutDatabase = new Database(DatabaseConfig::fromEnvironment($environment));
+            $logoutStore = new PdoAccountStore($logoutDatabase->connection());
+            (new PersistentLoginService(new PdoPersistentLoginStore($logoutDatabase->connection()), $logoutStore))->revokeCookie(
+                (string) $_COOKIE[PersistentLoginService::COOKIE_NAME],
+                (int) $tenantOrganisationId,
+            );
+        } catch (\Throwable $exception) {
+            $logRequestFailure('remembered-logout', $exception);
+        }
+    }
+    PersistentLoginService::clearCookie();
     SessionAuth::logout();
     header('Location: /login', true, 302);
     exit;
@@ -570,8 +624,9 @@ if ($route === ApplicationRoute::MY_ACCOUNT) {
 
 if ($route === ApplicationRoute::NOT_FOUND) {
     http_response_code(404);
-    header('Content-Type: text/plain; charset=UTF-8');
-    echo "Not found\n";
+    PageLayout::setTenantOrganisation(null);
+    header('Content-Type: text/html; charset=UTF-8');
+    echo NotFoundPage::school($canonicalHost ?? 'reqsheet.com');
     exit;
 }
 

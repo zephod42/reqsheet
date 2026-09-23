@@ -8,7 +8,7 @@ final class LoginPage
 {
     public function __construct(private readonly ?array $organisation = null) {}
 
-    public function form(?string $message = null, string $login = ''): string
+    public function form(?string $message = null, string $login = '', bool $remember = false): string
     {
         $notice = $message === null ? '' : '<p class="error">' . $this->e($message) . '</p>';
         $identity = '';
@@ -16,7 +16,7 @@ final class LoginPage
             $identity = '<p class="login-school">' . $this->e((string) ($this->organisation['name'] ?? '')) . ' <span>(' . $this->e((string) ($this->organisation['tenant_slug'] ?? '')) . ')</span></p><p>Please log in below:</p>';
         }
         $recovery = $this->organisation === null ? '' : '<p class="login-recovery"><a class="button secondary" href="/account-recovery">Account Recovery</a></p>';
-        return $this->layout($identity . '<h1>Log in</h1>' . $notice . self::fields($login) . $recovery);
+        return $this->layout($identity . '<h1>Log in</h1>' . $notice . self::fields($login, $remember, $this->organisation !== null) . $recovery);
     }
 
     public function firstLogin(string $login, ?string $message = null): string
@@ -25,7 +25,7 @@ final class LoginPage
         return $this->layout('<h1>Set your first password</h1><p>This account is awaiting its first login password.</p>' . $notice . '<form method="post"><input type="hidden" name="action" value="claim"><input type="hidden" name="login" value="' . $this->e($login) . '"><label>Password<input type="password" name="password" minlength="8" required autofocus></label><label>Confirm password<input type="password" name="password_confirmation" minlength="8" required></label><button>Set password</button></form>');
     }
 
-    public static function fields(string $login = ''): string { return '<form method="post" action="/login"><label>Initials<input class="staff-identifier" name="login" value="' . htmlspecialchars($login, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" maxlength="3" pattern="[A-Za-z]{3}" autocomplete="username" required autofocus></label><label>Password<input type="password" name="password" autocomplete="current-password"><small>Leave blank for your first password setup if your administrator has just created or reset your account.</small></label><button>Log in</button></form>'; }
+    public static function fields(string $login = '', bool $remember = false, bool $showRemember = false): string { return '<form method="post" action="/login"><label>Initials<input class="staff-identifier" name="login" value="' . htmlspecialchars($login, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" maxlength="3" pattern="[A-Za-z]{3}" autocomplete="username" required autofocus></label><label>Password<input type="password" name="password" autocomplete="current-password"><small>Leave blank for your first password setup if your administrator has just created or reset your account.</small></label>' . ($showRemember ? '<label class="checkbox-label"><input type="checkbox" name="remember_me" value="1"' . ($remember ? ' checked' : '') . '> Remember me</label>' : '') . '<button>Log in</button></form>'; }
     private function layout(string $body): string { return PageLayout::render('Login', '<section class="content-narrow">' . $body . '</section>'); }
     private function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 }

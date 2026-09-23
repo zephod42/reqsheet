@@ -30,6 +30,7 @@ use Reqsheet\Teacher\PdoTeacherPlanningStore;
 use Reqsheet\Teacher\TeacherPlanningService;
 
 const TEST_TABLES = [
+    'persistent_login_tokens',
     'requisitions',
     'technician_room_preferences',
     'onboarding_handoffs',
@@ -230,7 +231,7 @@ try {
         integrationAssert((int) $pdo->query("SELECT COUNT(*) FROM schema_migrations WHERE version = '0013'")->fetchColumn() === 0, 'Failed migration 0013 was incorrectly recorded.');
 
         $repairCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($repairCount === 1, 'Partially applied schema did not run exactly the 0013 repair.');
+        integrationAssert($repairCount === 4, 'Partially applied schema did not run exactly the pending 0013-0016 migrations.');
         assertMigration0013Schema($pdo);
         integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM users WHERE id = ' . $partialUser . " AND organisation_id = " . $partialOrganisation . " AND staff_identifier = 'PAR' AND is_admin = TRUE")->fetchColumn() === 1, 'Migration repair changed the preserved user account.');
         integrationAssert((int) $pdo->query('SELECT COUNT(*) FROM account_recovery_flows WHERE user_id = ' . $partialUser . ' AND requested_initials IS NULL')->fetchColumn() === 1, 'Migration repair changed an existing recovery flow.');
@@ -241,7 +242,7 @@ try {
 
     try {
         $migrationCount = (new MigrationRunner($pdo, dirname(__DIR__) . '/database/migrations'))->run();
-        integrationAssert($migrationCount === 14, 'Expected all migrations to apply to the clean test database.');
+        integrationAssert($migrationCount === 16, 'Expected all migrations to apply to the clean test database.');
         assertMigration0013Schema($pdo);
 
         $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
