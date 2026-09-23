@@ -34,6 +34,8 @@ The optional isolated MySQL integration suite exercises migrations and database-
 
 See [SETUP.md](SETUP.md), [PRODUCT_DESIGN.md](PRODUCT_DESIGN.md), [ROADMAP.md](ROADMAP.md), and [SECURITY.md](SECURITY.md) for the initial project direction.
 
-For the Pumba-only fictional-school development dataset, see
-[docs/FICTIONAL_SCHOOLS.md](docs/FICTIONAL_SCHOOLS.md). It requires protected
-administrator configuration and must never be run against production.
+Pumba retains three fictional schools for development testing and Demo
+screenshots: Brackenmere Community School, Ashwick Hall School, and Fenmere
+Academy. Their existing database records are maintained as test fixtures; no
+repository command regenerates or resets them. See
+[docs/DEMO_SCHOOLS.md](docs/DEMO_SCHOOLS.md) for their intended testing use.

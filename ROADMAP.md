@@ -4,6 +4,10 @@ This is an intentionally small, reviewable roadmap. The near-term priority is ma
 
 Completed foundations:
 
+- Pumba fictional-school fixtures: Brackenmere Community School, Ashwick Hall
+  School, and Fenmere Academy remain available for development testing and
+  Demo screenshots. Their one-off generator has been retired after completing
+  its purpose; the existing database records are not regenerated or reset.
 - Reqsheet Monitor: a read-only, SSH-operated CLI produces a private standalone operational HTML snapshot using a separately configured SELECT-only database identity. It reports aggregate tenant/application state without adding a web route, operator account, scheduler or requisition content.
 - Admin configuration foundation: people, rooms, working days, week start, and ordered timetable structure.
 - Timetable-version/admin editor UI: named, manually activated templates, staff-member default view, and validated timetable editing by staff member, room, or day. The current editor is intentionally skeletal and is protected by the authenticated Admin permission.

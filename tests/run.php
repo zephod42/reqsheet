@@ -27,7 +27,6 @@ require __DIR__ . '/TenantDataResetterTest.php';
 require __DIR__ . '/TechnicianPageTest.php';
 require __DIR__ . '/RecoveryTest.php';
 require __DIR__ . '/MonitorReportTest.php';
-require __DIR__ . '/FictionalGeneratorTest.php';
 require __DIR__ . '/DemoHowToTest.php';
 
 use Reqsheet\Database\Database;
@@ -61,7 +60,6 @@ $environment = [
     'DB_USER' => 'runtime',
     'DB_PASSWORD' => 'not-a-real-secret',
 ];
-\Reqsheet\Tests\FictionalGeneratorTest::run();
 $config = DatabaseConfig::fromEnvironment($environment);
 assertSameValue(3307, $config->port, 'Database port was not parsed.');
 assertSameValue('reqsheet_test', $config->name, 'Database name was not parsed.');
