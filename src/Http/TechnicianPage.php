@@ -16,6 +16,7 @@ final class TechnicianPage
     public function handle(string $method, array $query, array $input): string
     {
         if (!$this->store->technicianBelongsToOrganisation($this->userId, $this->organisationId)) { http_response_code(403); return PageLayout::render('Technician', '<p class="error">Technician access is not available.</p>', $this->user); }
+        $highlighting = $this->store->technicianHighlighting($this->organisationId);
         $message = null;
         $date = $this->date((string) ($query['date'] ?? ($input['date'] ?? 'today')));
         if ($method === 'POST' && (string) ($input['action'] ?? '') === 'set_prepared') {
@@ -31,6 +32,13 @@ final class TechnicianPage
                 $message = $state === 'yes' ? 'Lesson marked as prepped.' : 'Lesson marked as not prepped.';
             }
         }
+        if ($method === 'POST' && (string) ($input['action'] ?? '') === 'set_highlighting') {
+            if (!CsrfToken::valid($input['csrf_token'] ?? null)) { http_response_code(403); return PageLayout::render('Technician', '<p class="error">The form expired. Please try again.</p>', $this->user); }
+            $occurrenceId = filter_var($input['occurrence_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            $colour = filter_var($input['colour'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 5]]);
+            if ($occurrenceId === false || !$this->store->setHighlighting($this->organisationId, $this->userId, (int) $occurrenceId, $colour === false ? null : (int) $colour)) $message = 'That lesson highlighting could not be updated.';
+            else $message = 'Lesson highlighting updated.';
+        }
         if (isset($query['teacher']) || isset($query['room'])) {
             $rows = isset($query['teacher']) ? $this->store->weekForTeacher($this->organisationId, (int) $query['teacher'], $this->weekStart($date)) : $this->store->weekForRoom($this->organisationId, (int) $query['room'], $this->weekStart($date));
             return PageLayout::render('Technician inspection', $this->inspectionPage($date, $rows), $this->user);
@@ -42,7 +50,7 @@ final class TechnicianPage
         $selected = $hasSelection ? $this->orderedRoomIds($availableRoomIds, $requestedRoomIds) : $availableRoomIds;
         $vertical = $this->flag($query['printer_vertical'] ?? false);
         $horizontal = $this->flag($query['printer_horizontal'] ?? false);
-        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected, $vertical, $horizontal), $this->user);
+        if (($query['print'] ?? '') === 'week') return PageLayout::render('Technician print view', $this->weekPrint($date, $selected, $vertical, $horizontal, $highlighting), $this->user);
         $data = $this->store->daily($this->organisationId, $date, $selected);
         $roomQuery = $this->roomQuery($selected, $vertical, $horizontal);
         $body = '<section class="page-header"><div><p class="eyebrow">Technician</p><h1>Day View</h1></div><div class="form-actions"><button type="button" onclick="window.print()">Print Selected Day</button><a class="button secondary" target="_blank" rel="noopener" href="/technician?date=' . $date->format('Y-m-d') . $roomQuery . '&print=week">Print Selected Week</a></div></section>';
@@ -51,7 +59,7 @@ final class TechnicianPage
         if ($rooms === []) $body .= '<p class="notice">No rooms have been configured for this school yet. Add rooms in the timetable settings to use the technician grid.</p>';
         elseif (($data['version'] ?? null) === null) $body .= '<p class="notice">No active timetable is configured for this school yet.</p>';
         $body .= $this->roomControls($rooms, $selected, $hasSelection, $date, $vertical, $horizontal);
-        $body .= $this->daySheets($date, $rooms, $selected, $data['slots'], $data['occurrences'], false, $vertical, $horizontal);
+        $body .= $this->daySheets($date, $rooms, $selected, $data['slots'], $data['occurrences'], false, $vertical, $horizontal, $highlighting);
         if ($rooms !== [] && $selected === []) $body .= '<p class="notice">No rooms selected. Select one or more rooms above to display the technician timetable.</p>';
         $body .= $this->inspectionLinks($date);
         return PageLayout::render('Technician daily preparation', $body . $this->requisitionInteractionScript(), $this->user);
@@ -67,17 +75,17 @@ final class TechnicianPage
         return $html . $this->roomPreferenceScript($key, !$hasSelection) . $this->printerPreferenceScript($printerKey, !$vertical && !$horizontal);
     }
 
-    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false, string $layout = 'default', int $groupNumber = 0, int $groupCount = 1, string $printStyle = ''): string
+    private function grid(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly = false, string $layout = 'default', int $groupNumber = 0, int $groupCount = 1, string $printStyle = '', array $highlighting = ['enabled' => false, 'colours' => []]): string
     {
         $rooms = array_values(array_filter($rooms, static fn (array $room): bool => in_array((int) $room['id'], $selected, true)));
         $byRoom = []; foreach ($occurrences as $occurrence) $byRoom[(string) $occurrence['snapshot_room_code']][] = $occurrence;
         $groupLabel = $groupCount > 1 ? ' · Room group ' . $groupNumber . ' of ' . $groupCount : '';
         $html = '<section class="technician-sheet" data-print-layout="' . $this->e($layout) . '" style="' . $this->e($printStyle) . '"><h2 class="print-date">Day View · ' . $this->e($date->format('l j F Y')) . $this->e($groupLabel) . '</h2><div class="timetable-scroll"><table class="technician-grid"><thead><tr><th>P</th>'; foreach ($rooms as $room) $html .= '<th>' . $this->e($room['code']) . '</th>'; $html .= '</tr></thead><tbody>';
-        foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $content = $separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence, $readOnly)); $html .= '<td><div class="technician-print-cell">' . $content . '</div></td>'; } $html .= '</tr>'; }
+        foreach ($slots as $slot) { $separator = ($slot['kind'] ?? '') !== 'teaching'; $html .= '<tr' . ($separator ? ' class="technician-separator"' : '') . '><th>' . $this->e((string) $slot['label']) . '</th>'; foreach ($rooms as $room) { $occurrence = $separator ? null : $this->occurrenceForSlot($byRoom[$room['code']] ?? [], $slot, $slots); $content = $separator ? '' : ($occurrence === null ? '<span class="room-free">ROOM FREE</span>' : $this->cell($occurrence, $readOnly, $highlighting)); $html .= '<td><div class="technician-print-cell">' . $content . '</div></td>'; } $html .= '</tr>'; }
         return $html . '</tbody></table></div></section>';
     }
 
-    private function daySheets(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly, bool $vertical, bool $horizontal): string
+    private function daySheets(DateTimeImmutable $date, array $rooms, array $selected, array $slots, array $occurrences, bool $readOnly, bool $vertical, bool $horizontal, array $highlighting = ['enabled' => false, 'colours' => []]): string
     {
         $selectedRooms = array_values(array_filter($rooms, static fn (array $room): bool => in_array((int) $room['id'], $selected, true)));
         $groups = $horizontal ? array_chunk($selectedRooms, 6) : [$selectedRooms];
@@ -85,7 +93,7 @@ final class TechnicianPage
         $layout = $vertical && $horizontal ? 'vertical-horizontal' : ($vertical ? 'vertical' : ($horizontal ? 'horizontal' : 'default'));
         $printStyle = $this->printStyle($slots);
         $html = '';
-        foreach ($groups as $index => $group) $html .= $this->grid($date, $rooms, array_column($group, 'id'), $slots, $occurrences, $readOnly, $layout, $index + 1, count($groups), $printStyle);
+        foreach ($groups as $index => $group) $html .= $this->grid($date, $rooms, array_column($group, 'id'), $slots, $occurrences, $readOnly, $layout, $index + 1, count($groups), $printStyle, $highlighting);
         return $html;
     }
 
@@ -130,7 +138,7 @@ final class TechnicianPage
         return $html . '</tbody></table></div>';
     }
 
-    private function cell(array $occurrence, bool $readOnly = false): string
+    private function cell(array $occurrence, bool $readOnly = false, array $highlighting = ['enabled' => false, 'colours' => []]): string
     {
         $text = (string) ($occurrence['requirements_text'] ?? '');
         $hasText = trim($text) !== '';
@@ -139,15 +147,25 @@ final class TechnicianPage
         $marker = $prepared ? '<span class="technician-prepped" aria-label="Prepared" title="Prepared">✓</span>' : '<span class="technician-prepped technician-prepped-empty" aria-hidden="true"></span>';
         $csrf = $this->e(CsrfToken::value());
         $toggle = $readOnly ? '' : '<form method="post" class="technician-prep-form"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="action" value="set_prepared"><input type="hidden" name="occurrence_id" value="' . (int) $occurrence['id'] . '"><input type="hidden" name="prepared" value="' . ($prepared ? 'no' : 'yes') . '"><input type="hidden" name="date" value="' . $this->e((string) $occurrence['lesson_date']) . '"><button type="submit" class="secondary">' . ($prepared ? 'Mark as Not Prepped' : 'Mark as Prepped') . '</button></form>';
+        $activeColour = (int) ($occurrence['technician_highlighting_colour'] ?? 0);
+        $highlightClass = !empty($highlighting['enabled']) && $activeColour > 0 && $activeColour <= count((array) ($highlighting['colours'] ?? [])) ? ' technician-highlight-' . $activeColour : '';
+        $highlightControls = '';
+        if (!$readOnly && !empty($highlighting['enabled'])) {
+            foreach (array_values((array) ($highlighting['colours'] ?? [])) as $index => $label) {
+                $colour = $index + 1;
+                $accessible = trim((string) $label) !== '' ? (string) $label : 'Colour ' . $colour;
+                $highlightControls .= '<form method="post" class="technician-highlight-form"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="action" value="set_highlighting"><input type="hidden" name="occurrence_id" value="' . (int) $occurrence['id'] . '"><input type="hidden" name="colour" value="' . ($activeColour === $colour ? '' : $colour) . '"><button type="submit" class="technician-highlight-control technician-highlight-' . $colour . ($activeColour === $colour ? ' is-active' : '') . '" aria-label="' . $this->e($accessible) . '" title="' . $this->e($accessible) . '"></button></form>';
+            }
+        }
         $requisitionId = 'technician-requisition-' . (int) $occurrence['id'];
         $requisition = $hasText && ($occurrence['state'] ?? '') !== 'nothing_required'
             ? '<span class="technician-requisition-control" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-describedby="' . $this->e($requisitionId) . '"><span class="technician-requisition" title="' . $this->e($text) . '">' . $this->e($text) . '</span><span class="technician-requisition-popout" id="' . $this->e($requisitionId) . '" role="tooltip">' . $this->e($text) . '</span></span>'
             : '<span class="technician-requisition technician-requisition-static" title="' . $this->e($label) . '">' . $this->e($label) . '</span>';
-        $details = '<strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e(!$hasText ? 'No requisition has been entered.' : $text)) . '</p>' . $toggle . '<details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details>';
-        return '<details tabindex="0" class="technician-cell class-tone-' . ClassTone::forCode((string) $occurrence['snapshot_class_code']) . '"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span>' . $requisition . '</summary><div class="technician-detail">' . $details . '</div></details>';
+        $details = '<strong>' . $this->e((string) $occurrence['teacher_name']) . '</strong> · ' . $this->e((string) $occurrence['snapshot_class_code']) . ' · ' . $this->e((string) $occurrence['snapshot_room_code']) . '<br>' . $this->e((string) $occurrence['lesson_date']) . ' · ' . $this->e((string) ($occurrence['period_label'] ?? '')) . '<p>' . nl2br($this->e(!$hasText ? 'No requisition has been entered.' : $text)) . '</p><details><summary>Lesson details</summary><p>Lesson outline: ' . nl2br($this->e((string) ($occurrence['planning_notes'] ?? 'Not entered.'))) . '</p><p>Risk assessment: ' . nl2br($this->e((string) ($occurrence['risk_assessment_text'] ?? 'Not entered.'))) . '</p></details>';
+        return '<details tabindex="0" class="technician-cell class-tone-' . ClassTone::forCode((string) $occurrence['snapshot_class_code']) . $highlightClass . '"><summary><span class="technician-cell-heading"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong>' . $marker . '<span>' . $this->e((string) ($occurrence['teacher_initials'] ?? $occurrence['teacher_name'])) . '</span></span>' . $requisition . '</summary><div class="technician-detail"><div class="technician-actions">' . $toggle . $highlightControls . '</div>' . $details . '</div></details>';
     }
 
-    private function weekPrint(DateTimeImmutable $date, array $selected, bool $vertical, bool $horizontal): string
+    private function weekPrint(DateTimeImmutable $date, array $selected, bool $vertical, bool $horizontal, array $highlighting): string
     {
         $days = method_exists($this->store, 'workingDays') ? $this->store->workingDays($this->organisationId) : [1, 2, 3, 4, 5];
         $first = (int) ($days[0] ?? 1);
@@ -155,7 +173,7 @@ final class TechnicianPage
         $backUrl = '/technician?date=' . $this->e($date->format('Y-m-d')) . $this->roomQuery($selected, $vertical, $horizontal);
         $html = '<main class="technician-week-print"><header class="page-header technician-print-header"><div><p class="eyebrow">Technician</p><h1>Print View</h1></div><a class="button secondary" href="' . $backUrl . '">Back to Technician View</a></header>';
         $rooms = $this->store->roomsForOrganisation($this->organisationId);
-        foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->daySheets($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true, $vertical, $horizontal); }
+        foreach ($days as $day) { $dayDate = $start->modify('+' . (((int) $day - $first + 7) % 7) . ' days'); $data = $this->store->daily($this->organisationId, $dayDate, $selected); $html .= $this->daySheets($dayDate, $rooms, $selected, $data['slots'], $data['occurrences'], true, $vertical, $horizontal, $highlighting); }
         return $html . '</main>' . $this->requisitionInteractionScript() . '<script>window.addEventListener("load",function(){if(window.__reqsheetWeekPrint)return;window.__reqsheetWeekPrint=true;window.print();});</script>';
     }
 

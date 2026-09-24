@@ -19,6 +19,15 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
         $s->execute(['id' => $userId, 'organisation_id' => $organisationId]); return $s->fetchColumn() !== false;
     }
 
+    public function technicianHighlighting(int $organisationId): array
+    {
+        $s = $this->pdo->prepare('SELECT technician_highlighting_enabled, technician_highlighting_colours FROM organisation_settings WHERE organisation_id = :id');
+        $s->execute(['id' => $organisationId]);
+        $row = $s->fetch();
+        $colours = $row === false || $row['technician_highlighting_colours'] === null ? [] : json_decode((string) $row['technician_highlighting_colours'], true);
+        return ['enabled' => $row !== false && (bool) $row['technician_highlighting_enabled'], 'colours' => is_array($colours) ? array_values(array_map('strval', $colours)) : []];
+    }
+
     public function roomsForOrganisation(int $organisationId): array
     {
         $s = $this->pdo->prepare('SELECT id, room_code AS code FROM organisation_rooms WHERE organisation_id = :organisation_id AND archived_at IS NULL ORDER BY room_code, id');
@@ -72,6 +81,26 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
         return true;
     }
 
+    public function setHighlighting(int $organisationId, int $userId, int $occurrenceId, ?int $colour): bool
+    {
+        if (!$this->technicianBelongsToOrganisation($userId, $organisationId)) return false;
+        $config = $this->technicianHighlighting($organisationId);
+        if (!$config['enabled'] || ($colour !== null && ($colour < 1 || $colour > count($config['colours'])))) return false;
+        $s = $this->pdo->prepare('UPDATE lesson_occurrences SET technician_highlighting_colour = :colour WHERE id = :occurrence_id AND organisation_id = :organisation_id');
+        $s->bindValue('colour', $colour, $colour === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $s->bindValue('occurrence_id', $occurrenceId, PDO::PARAM_INT);
+        $s->bindValue('organisation_id', $organisationId, PDO::PARAM_INT);
+        $s->execute();
+        return $s->rowCount() > 0 || $this->occurrenceExists($organisationId, $occurrenceId);
+    }
+
+    private function occurrenceExists(int $organisationId, int $occurrenceId): bool
+    {
+        $s = $this->pdo->prepare('SELECT 1 FROM lesson_occurrences WHERE id = :occurrence_id AND organisation_id = :organisation_id');
+        $s->execute(['occurrence_id' => $occurrenceId, 'organisation_id' => $organisationId]);
+        return $s->fetchColumn() !== false;
+    }
+
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array
     {
         $version = $this->version($organisationId, $date);
@@ -85,7 +114,7 @@ final class PdoTechnicianPlanningStore implements TechnicianPlanningStore
             foreach ($this->roomsForOrganisation($organisationId) as $room) if (in_array((int) $room['id'], $roomIds, true)) $codes[] = $room['code'];
             $roomSql = $codes === [] ? ' AND 1 = 0' : ' AND o.snapshot_room_code IN (' . implode(',', array_fill(0, count($codes), '?')) . ')';
         } else $codes = [];
-        $sql = "SELECT o.id, o.lesson_date, o.snapshot_teacher_user_id, CASE WHEN u.is_active = TRUE THEN u.staff_identifier ELSE '???' END AS teacher_name, CASE WHEN u.is_active = TRUE THEN u.staff_identifier ELSE '???' END AS teacher_initials, o.snapshot_class_code, o.snapshot_room_code, o.snapshot_start_slot_id, o.snapshot_duration_periods, o.prepared_at, s.sequence_number, s.label AS period_label, r.state, r.requirements_text, r.planning_notes, r.risk_assessment_text FROM lesson_occurrences o LEFT JOIN users u ON u.id = o.snapshot_teacher_user_id JOIN timetable_slots s ON s.id = o.snapshot_start_slot_id LEFT JOIN requisitions r ON r.lesson_occurrence_id = o.id WHERE o.organisation_id = ? AND o.lesson_date = ?" . $roomSql . ' ORDER BY s.sequence_number, o.snapshot_room_code, o.id';
+        $sql = "SELECT o.id, o.lesson_date, o.snapshot_teacher_user_id, CASE WHEN u.is_active = TRUE THEN u.staff_identifier ELSE '???' END AS teacher_name, CASE WHEN u.is_active = TRUE THEN u.staff_identifier ELSE '???' END AS teacher_initials, o.snapshot_class_code, o.snapshot_room_code, o.snapshot_start_slot_id, o.snapshot_duration_periods, o.prepared_at, o.technician_highlighting_colour, s.sequence_number, s.label AS period_label, r.state, r.requirements_text, r.planning_notes, r.risk_assessment_text FROM lesson_occurrences o LEFT JOIN users u ON u.id = o.snapshot_teacher_user_id JOIN timetable_slots s ON s.id = o.snapshot_start_slot_id LEFT JOIN requisitions r ON r.lesson_occurrence_id = o.id WHERE o.organisation_id = ? AND o.lesson_date = ?" . $roomSql . ' ORDER BY s.sequence_number, o.snapshot_room_code, o.id';
         $statement = $this->pdo->prepare($sql); $statement->execute(array_merge([$organisationId, $date->format('Y-m-d')], $codes));
         return ['version' => $version, 'slots' => $slots, 'occurrences' => $statement->fetchAll()];
     }

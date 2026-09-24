@@ -405,6 +405,19 @@ dialog .close { float: right; }
 .technician-detail p { margin: .45rem 0; }
 .technician-prep-form { margin: .65rem 0; }
 .technician-prep-form button { font-size: .8rem; }
+.technician-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; margin: .65rem 0; }
+.technician-actions .technician-prep-form { margin: 0 .35rem 0 0; }
+.technician-highlight-form { margin: 0; }
+.technician-highlight-control, .technician-highlight-swatch { display: inline-block; width: 1.1rem; height: 1.1rem; box-sizing: border-box; border: 2px solid #555; border-radius: 50%; padding: 0; }
+.technician-highlight-control { cursor: pointer; }
+.technician-highlight-control.is-active { outline: 2px solid var(--ink); outline-offset: 2px; }
+.technician-highlight-setting { display: flex; align-items: center; gap: .6rem; margin-top: .55rem; }
+.technician-highlight-1 { --highlight-bg: #fff0b8; background: #fff0b8; color: #4d3b00; }
+.technician-highlight-2 { --highlight-bg: #d9f2df; background: #d9f2df; color: #174d29; }
+.technician-highlight-3 { --highlight-bg: #dcecff; background: #dcecff; color: #163d68; }
+.technician-highlight-4 { --highlight-bg: #f5dded; background: #f5dded; color: #642143; }
+.technician-highlight-5 { --highlight-bg: #eadfff; background: #eadfff; color: #3e2866; }
+.technician-cell[class*="technician-highlight-"] { background: var(--highlight-bg); }
 .technician-secondary { margin-top: var(--space-4); }
 .technician-sheet[data-print-layout="vertical"] .technician-grid td, .technician-sheet[data-print-layout="vertical"] .technician-cell,
 .technician-sheet[data-print-layout="vertical-horizontal"] .technician-grid td, .technician-sheet[data-print-layout="vertical-horizontal"] .technician-cell { height: auto; overflow: visible; }

@@ -11,6 +11,7 @@ final class SettingsService
 {
     private const DAYS = [1, 2, 3, 4, 5, 6, 7];
     private const SEPARATOR_TYPES = ['Break', 'Lunchtime', 'Other'];
+    public const TECHNICIAN_HIGHLIGHTING_MAX = 5;
 
     public function __construct(private readonly OrganisationSettingsStore $store)
     {
@@ -22,6 +23,10 @@ final class SettingsService
         $settings = $this->store->find($organisationId);
         if (trim((string) ($settings['start_time'] ?? '')) === '') $settings['start_time'] = '08:00';
         if (!in_array((string) ($settings['date_format'] ?? ''), DateDisplay::FORMATS, true)) $settings['date_format'] = DateDisplay::DEFAULT_FORMAT;
+        $settings['technician_highlighting_enabled'] = !empty($settings['technician_highlighting_enabled']);
+        $colours = (array) ($settings['technician_highlighting_colours'] ?? []);
+        $settings['technician_highlighting_colours'] = array_values(array_map(static fn (mixed $label): string => trim((string) $label), $colours));
+        $settings['technician_highlighting_count'] = max(1, min(self::TECHNICIAN_HIGHLIGHTING_MAX, count($settings['technician_highlighting_colours'])));
         return $settings;
     }
 
@@ -49,6 +54,19 @@ final class SettingsService
             ? trim((string) $input['date_format'])
             : (string) ($current['date_format'] ?? DateDisplay::DEFAULT_FORMAT);
         if (!in_array($dateFormat, DateDisplay::FORMATS, true)) $errors[] = 'Date format is invalid.';
+
+        $currentHighlighting = (array) $this->store->find($organisationId);
+        $highlightingEnabled = array_key_exists('technician_highlighting_enabled', $input)
+            ? isset($input['technician_highlighting_enabled'])
+            : !empty($currentHighlighting['technician_highlighting_enabled']);
+        $highlightingCount = array_key_exists('technician_highlighting_count', $input)
+            ? (int) $input['technician_highlighting_count']
+            : max(1, min(self::TECHNICIAN_HIGHLIGHTING_MAX, count((array) ($currentHighlighting['technician_highlighting_colours'] ?? []))));
+        if ($highlightingEnabled && ($highlightingCount < 1 || $highlightingCount > self::TECHNICIAN_HIGHLIGHTING_MAX)) $errors[] = 'Choose between 1 and 5 technician highlighting colours.';
+        $highlightingLabels = (array) ($input['technician_highlighting_label'] ?? $currentHighlighting['technician_highlighting_colours'] ?? []);
+        $highlightingLabels = array_values(array_map(static fn (mixed $label): string => trim((string) $label), array_slice($highlightingLabels, 0, self::TECHNICIAN_HIGHLIGHTING_MAX)));
+        if (count($highlightingLabels) < $highlightingCount) $highlightingLabels = array_pad($highlightingLabels, $highlightingCount, '');
+        foreach (array_slice($highlightingLabels, 0, $highlightingCount) as $label) if (strlen($label) > 100) $errors[] = 'Technician highlighting labels must be 100 characters or fewer.';
 
         $rooms = null;
         if (array_key_exists('rooms', $input)) {
@@ -98,6 +116,8 @@ final class SettingsService
             'standard_period_minutes' => $periodLength, 'custom_day_settings' => $customDays,
             'separators' => $separators, 'allow_double_periods' => isset($input['allow_conjoined_periods']) || isset($input['allow_double_periods']),
             'date_format' => $dateFormat,
+            'technician_highlighting_enabled' => $highlightingEnabled,
+            'technician_highlighting_colours' => array_slice($highlightingLabels, 0, $highlightingCount),
         ], $rooms);
     }
 

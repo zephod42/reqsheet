@@ -22,7 +22,8 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
 
         $settings = $this->prepare(
             'SELECT working_days, first_day_of_week, periods_per_day, start_time,
-                    standard_period_minutes, custom_day_settings, separators, allow_double_periods, date_format
+                    standard_period_minutes, custom_day_settings, separators, allow_double_periods, date_format,
+                    technician_highlighting_enabled, technician_highlighting_colours
              FROM organisation_settings WHERE organisation_id = :id',
         );
         $settings->execute(['id' => $organisationId]);
@@ -42,6 +43,8 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
             'separators' => $row === false ? [] : self::jsonList($row['separators']),
             'allow_double_periods' => $row !== false && (bool) $row['allow_double_periods'],
             'date_format' => $row === false ? 'DD/MM/YYYY' : (string) ($row['date_format'] ?? 'DD/MM/YYYY'),
+            'technician_highlighting_enabled' => $row !== false && (bool) ($row['technician_highlighting_enabled'] ?? false),
+            'technician_highlighting_colours' => $row === false ? [] : self::jsonListStrings($row['technician_highlighting_colours'] ?? null),
             'rooms' => $roomCodes,
             'complete' => $row !== false,
         ];
@@ -56,13 +59,15 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
             $statement = $this->prepare(
                 'INSERT INTO organisation_settings
                     (organisation_id, working_days, first_day_of_week, periods_per_day, start_time,
-                     standard_period_minutes, custom_day_settings, separators, allow_double_periods, date_format)
-                 VALUES (:id, :days, :first_day, :periods, :start_time, :period_length, :custom_days, :separators, :double_periods, :date_format)
+                     standard_period_minutes, custom_day_settings, separators, allow_double_periods, date_format,
+                     technician_highlighting_enabled, technician_highlighting_colours)
+                 VALUES (:id, :days, :first_day, :periods, :start_time, :period_length, :custom_days, :separators, :double_periods, :date_format, :highlighting_enabled, :highlighting_colours)
                  ON DUPLICATE KEY UPDATE
                     working_days = VALUES(working_days), first_day_of_week = VALUES(first_day_of_week),
                     periods_per_day = VALUES(periods_per_day), start_time = VALUES(start_time),
                     standard_period_minutes = VALUES(standard_period_minutes), custom_day_settings = VALUES(custom_day_settings),
-                    separators = VALUES(separators), allow_double_periods = VALUES(allow_double_periods), date_format = VALUES(date_format)',
+                    separators = VALUES(separators), allow_double_periods = VALUES(allow_double_periods), date_format = VALUES(date_format),
+                    technician_highlighting_enabled = VALUES(technician_highlighting_enabled), technician_highlighting_colours = VALUES(technician_highlighting_colours)',
             );
             $statement->execute([
                 'id' => $organisationId,
@@ -75,7 +80,12 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
                 'separators' => json_encode($settings['separators'], JSON_THROW_ON_ERROR),
                 'double_periods' => $settings['allow_double_periods'] ? 1 : 0,
                 'date_format' => $settings['date_format'] ?? 'DD/MM/YYYY',
+                'highlighting_enabled' => !empty($settings['technician_highlighting_enabled']) ? 1 : 0,
+                'highlighting_colours' => json_encode(array_values((array) ($settings['technician_highlighting_colours'] ?? [])), JSON_THROW_ON_ERROR),
             ]);
+            $count = count((array) ($settings['technician_highlighting_colours'] ?? []));
+            $clear = $this->prepare('UPDATE lesson_occurrences SET technician_highlighting_colour = NULL WHERE organisation_id = :id AND (technician_highlighting_colour IS NOT NULL AND technician_highlighting_colour > :count)');
+            $clear->execute(['id' => $organisationId, 'count' => $count]);
             if ($rooms !== null) {
                 $existingRoomCodes = $this->prepare('SELECT room_code FROM organisation_rooms WHERE organisation_id = :id ORDER BY room_code');
                 $existingRoomCodes->execute(['id' => $organisationId]);
@@ -115,6 +125,14 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
         $decoded = $value === null ? [] : json_decode($value, true);
         if (!is_array($decoded)) return [];
         return array_values(array_filter($decoded, 'is_array'));
+    }
+
+    /** @return list<string> */
+    private static function jsonListStrings(?string $value): array
+    {
+        $decoded = $value === null ? [] : json_decode($value, true);
+        if (!is_array($decoded)) return [];
+        return array_values(array_map('strval', $decoded));
     }
 
     private function prepare(string $sql): PDOStatement

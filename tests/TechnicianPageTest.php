@@ -89,6 +89,20 @@ final class TechnicianPageTest
         assertContainsValue('Lesson marked as prepped', $prepared, 'Technician preparation update did not report success.');
         assertSameValue([1, 20, 50, true], $store->preparationUpdate, 'Technician preparation update was not tenant/user scoped.');
 
+        $store->highlighting = ['enabled' => true, 'colours' => ['Needs checking', 'Ready for collection', 'Delayed']];
+        $highlighted = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
+        assertContainsValue('aria-label="Needs checking"', $highlighted, 'Configured technician highlighting label was not exposed accessibly.');
+        assertContainsValue('class="technician-highlight-control technician-highlight-1', $highlighted, 'Configured technician highlighting control was not rendered.');
+        $page->handle('POST', [], ['action' => 'set_highlighting', 'occurrence_id' => 50, 'colour' => 1, 'csrf_token' => CsrfToken::value()]);
+        assertSameValue([1, 20, 50, 1], $store->highlightingUpdate, 'Technician highlighting update was not tenant/user scoped.');
+        $store->highlightingColour = 1;
+        assertContainsValue('technician-cell class-tone-', $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []), 'Highlighted technician lesson was not rendered.');
+        $page->handle('POST', [], ['action' => 'set_highlighting', 'occurrence_id' => 50, 'colour' => 2, 'csrf_token' => CsrfToken::value()]);
+        assertSameValue([1, 20, 50, 2], $store->highlightingUpdate, 'Selecting a new highlighting colour did not replace the previous selection.');
+        $page->handle('POST', [], ['action' => 'set_highlighting', 'occurrence_id' => 50, 'colour' => '', 'csrf_token' => CsrfToken::value()]);
+        assertSameValue([1, 20, 50, null], $store->highlightingUpdate, 'Selecting the active highlighting colour did not clear it.');
+        assertSameValue(true, $store->preparationUpdate[3], 'Changing highlighting altered prepared status.');
+
         $print = $page->handle('GET', ['date' => '2026-09-23', 'print' => 'week'], []);
         assertSameValue(3, substr_count($print, 'class="technician-sheet"'), 'Selected-week print did not use the configured working days.');
         assertContainsValue('window.print()', $print, 'Selected-week print did not invoke the native print dialog.');
@@ -209,12 +223,17 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
     public int $teachingPeriodCount = 2;
     public array $preparationUpdate = [];
     public array $dailyCalls = [];
+    public array $highlightingUpdate = [];
+    public array $highlighting = ['enabled' => false, 'colours' => []];
+    public ?int $highlightingColour = null;
+    public function technicianHighlighting(int $organisationId): array { return $this->highlighting; }
     public function technicianBelongsToOrganisation(int $userId, int $organisationId): bool { return $userId === 20 && $organisationId === 1; }
     public function roomsForOrganisation(int $organisationId): array { return $this->rooms; }
     public function teachersForOrganisation(int $organisationId): array { return [['id' => 10, 'name' => 'John Smith']]; }
     public function defaultRoomIds(int $organisationId, int $userId): array { return [1]; }
     public function saveDefaultRoomIds(int $organisationId, int $userId, array $roomIds): void {}
     public function setPrepared(int $organisationId, int $userId, int $occurrenceId, bool $prepared): bool { $this->preparationUpdate = [$organisationId, $userId, $occurrenceId, $prepared]; return true; }
+    public function setHighlighting(int $organisationId, int $userId, int $occurrenceId, ?int $colour): bool { $this->highlightingUpdate = [$organisationId, $userId, $occurrenceId, $colour]; $this->highlightingColour = $colour; return true; }
     public function workingDays(int $organisationId): array { return [1, 4, 5]; }
     public function workingWeekStart(int $organisationId, DateTimeImmutable $date): DateTimeImmutable { return new DateTimeImmutable('2026-09-21'); }
     public function daily(int $organisationId, DateTimeImmutable $date, array $roomIds): array
@@ -227,14 +246,14 @@ final class TechnicianPageStoreFake implements TechnicianPlanningStore
                 'id' => 50, 'lesson_date' => $date->format('Y-m-d'), 'snapshot_teacher_user_id' => 10,
                 'teacher_name' => $this->deletedTeacher ? '???' : 'John Smith', 'teacher_initials' => $this->deletedTeacher ? '???' : 'JSM', 'snapshot_class_code' => '9A/Sc1',
                 'snapshot_room_code' => 'LAB-A', 'snapshot_start_slot_id' => 1, 'snapshot_duration_periods' => 2,
-                'prepared_at' => null,
+                'prepared_at' => null, 'technician_highlighting_colour' => $this->highlightingColour,
                 'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => "Very long requisition text\nLine two\nLine three\nLine four\nLine five",
                 'planning_notes' => null, 'risk_assessment_text' => null,
             ], [
                 'id' => 51, 'lesson_date' => $date->format('Y-m-d'), 'snapshot_teacher_user_id' => 10,
                 'teacher_name' => $this->deletedTeacher ? '???' : 'John Smith', 'teacher_initials' => $this->deletedTeacher ? '???' : 'JSM', 'snapshot_class_code' => '10B/Sc1',
                 'snapshot_room_code' => 'LAB-B', 'snapshot_start_slot_id' => 1, 'snapshot_duration_periods' => 1,
-                'prepared_at' => null, 'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => 'LAB-B requisition',
+                'prepared_at' => null, 'technician_highlighting_colour' => null, 'period_label' => 'P1', 'state' => 'requirements_entered', 'requirements_text' => 'LAB-B requisition',
                 'planning_notes' => null, 'risk_assessment_text' => null,
             ]],
         ];
