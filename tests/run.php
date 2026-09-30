@@ -236,18 +236,18 @@ foreach ([
         throw new RuntimeException('Public page content is missing: ' . $publicFragment);
     }
 }
-$alphaFragments = [
+$betaFragments = [
     "public const ALPHA = 'alpha'",
     "if (\$path === '/alpha') return self::ALPHA",
-    'Reqsheet α — Alpha testing',
-    'What does alpha mean for you?',
+    'Reqsheet β — Beta testing',
+    'What does beta mean for you?',
     'If you are using Reqsheet in your department',
-    'What comes next? Beta testing',
+    'Features and behaviour may change.',
     'href="mailto:feedback@reqsheet.com"',
 ];
-foreach ($alphaFragments as $alphaFragment) {
-    if (!str_contains($publicIndex, $alphaFragment) && !str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Http/ApplicationRoute.php'), $alphaFragment)) {
-        throw new RuntimeException('Alpha page content or routing is missing: ' . $alphaFragment);
+foreach ($betaFragments as $betaFragment) {
+    if (!str_contains($publicIndex, $betaFragment) && !str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Http/ApplicationRoute.php'), $betaFragment)) {
+        throw new RuntimeException('Beta page content or routing is missing: ' . $betaFragment);
     }
 }
 if (!preg_match('/<section class="donation-section".*?<\/section>/s', $publicIndex, $donationMatch) || str_contains($donationMatch[0], 'private') || str_contains($donationMatch[0], 'seed')) {
@@ -275,8 +275,8 @@ $publicCss = file_get_contents(dirname(__DIR__) . '/public/assets/app.css');
 if ($publicCss === false || !str_contains($publicCss, '.about-page { max-width: 44rem; text-align: left;') || !str_contains($publicCss, '.about-wordmark { margin: 0 0 2rem; text-align: center;')) {
     throw new RuntimeException('About page reading-layout styles are missing.');
 }
-if ($publicCss === false || !str_contains($publicCss, '.alpha-banner') || !str_contains($publicCss, '.site-nav, .alpha-banner, .page-header a')) {
-    throw new RuntimeException('Global alpha banner styling or print exclusion is missing.');
+if ($publicCss === false || !str_contains($publicCss, '.beta-banner') || !str_contains($publicCss, '.site-nav, .beta-banner, .page-header a')) {
+    throw new RuntimeException('Global beta banner styling or print exclusion is missing.');
 }
 $synthetic = MigrationFile::ordered([
     new MigrationFile('0010', 'later', 'later.sql', ''),

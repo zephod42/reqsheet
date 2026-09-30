@@ -21,7 +21,7 @@ final class PageLayout
         $assetVersion = is_file($assetPath) ? (string) filemtime($assetPath) : '1';
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $active = static fn (string $path): string => ($path === '/teacher' ? in_array($currentPath, ['/teacher', '/teacher/week'], true) : ($path === '/how-to' ? str_starts_with($currentPath, '/how-to') : $currentPath === $path)) ? ' class="active" aria-current="page"' : '';
-        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet α</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null && self::$tenantOrganisation === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
+        $nav = '<nav class="site-nav"><a class="wordmark" href="/">Reqsheet β</a><ul><li><a' . $active('/about') . ' href="/about">About</a></li><li><a' . $active('/demo') . ' href="/demo">Demo</a></li>' . ($user === null && self::$tenantOrganisation === null ? '<li><a' . $active('/signup') . ' href="/signup">Sign up</a></li>' : '') . '<li><a' . $active('/contact') . ' href="/contact">Contact</a></li>';
         if ($user !== null) {
             $nav .= '<li class="nav-separator" role="separator" aria-hidden="true"></li>';
             $landing = SessionAuth::landingPath($user);
@@ -45,12 +45,18 @@ final class PageLayout
         $nav .= '</ul></nav>';
         $tenant = self::$tenantOrganisation === null ? '' : '<p class="tenant-name">' . self::e(self::$tenantOrganisation['name']) . '</p>';
         $metadata = self::metadata($title, $currentPath);
-        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title>' . $metadata . '<link rel="stylesheet" href="/assets/app.css?v=' . rawurlencode($assetVersion) . '"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . self::alphaBanner() . $tenant . $body . '</main></div></body></html>';
+        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . self::e($title) . ' · Reqsheet</title>' . $metadata . '<link rel="stylesheet" href="/assets/app.css?v=' . rawurlencode($assetVersion) . '"></head><body><div class="site-shell">' . $nav . '<main class="site-main">' . self::betaBanner() . $tenant . $body . '</main></div></body></html>';
     }
 
+    public static function betaBanner(): string
+    {
+        return '<aside class="beta-banner" role="note">Reqsheet is currently in beta testing and remains under active development. Features and behaviour may change; please exercise appropriate caution and report problems. Read more about what this means <a href="/alpha">here</a>.</aside>';
+    }
+
+    /** @deprecated Kept for compatibility with the standalone setup renderer. */
     public static function alphaBanner(): string
     {
-        return '<aside class="alpha-banner" role="note">Reqsheet is currently in alpha testing. Do not rely solely on Reqsheet at this stage. Read more about what this means <a href="/alpha">here</a>.</aside>';
+        return self::betaBanner();
     }
 
     private static function metadata(string $title, string $path): string

@@ -58,6 +58,7 @@ final class SettingsTest
         $settingsPage = new SettingsPage(new SettingsService($transitionStore), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]);
         $beforeSetup = $settingsPage->handle('GET', []);
         assertContainsValue('Complete the organisation settings', $beforeSetup, 'Incomplete organisation did not render the setup form.');
+        assertContainsValue('name="technician_highlighting_enabled"', $beforeSetup, 'Normal organisation Settings did not render technician highlighting configuration.');
         $afterSetup = $settingsPage->handle('POST', [
             'school_name' => 'Transition School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
             'periods_per_day' => 6,
@@ -73,7 +74,7 @@ final class SettingsTest
         $initialSetupAccounts = new \Reqsheet\Account\AccountService(new \Reqsheet\Tests\AccountStoreFake());
         $initialSetup = new SetupPage($initialSetupAccounts, 'reqsheet.test', new OnboardingHandoffService(new OnboardingHandoffStoreFake()));
         $initialSetupView = $initialSetup->handle('GET', []);
-        assertContainsValue('class="alpha-banner"', $initialSetupView, 'First-run setup did not render the global alpha banner.');
+        assertContainsValue('class="beta-banner"', $initialSetupView, 'First-run setup did not render the global beta banner.');
         assertNotContainsValue('name="rooms[]"', $initialSetupView, 'Initial setup still offered room creation.');
         assertContainsValue('You will be able to include additional settings such as the length of lessons from the settings menu after initial setup.', $initialSetupView, 'Initial setup did not explain later settings.');
         $initialSetupComplete = $initialSetup->handle('POST', [
@@ -115,6 +116,7 @@ final class SettingsTest
         assertContainsValue('Edit timetable template', $fullEditor, 'Template editing did not open after creation.');
         assertNotContainsValue('name="school_name"', $fullEditor, 'Timetable editing exposed the organisation school-name field.');
         assertContainsValue('name="standard_period_minutes"', $fullEditor, 'Full timetable editing lost timing controls.');
+        assertNotContainsValue('name="technician_highlighting_enabled"', $fullEditor, 'Timetable editor still exposed organisation-level technician highlighting settings.');
         assertNotContainsValue('custom_day_start', $fullEditor, 'Timetable editor still exposed custom day timing inputs.');
         assertNotContainsValue('Custom day timings', $fullEditor, 'Timetable editor still exposed custom day timing controls.');
         $settingsBeforeFailedTemplateSave = $templateSettings->saved;
@@ -162,7 +164,7 @@ final class SettingsTest
         assertContainsValue('Fast. Clean. Simple.', $home, 'Public homepage tagline was not rendered.');
         assertContainsValue('href="/signup"', $home, 'Public homepage signup action was not rendered.');
         assertContainsValue('Already have an account?', $home, 'Public homepage account guidance was not rendered.');
-        assertContainsValue('Reqsheet alpha. Testing phase. Expect the unexpected. Do not rely upon this resource (yet). Feedback appreciated', $home, 'Public homepage alpha warning was not rendered.');
+        assertContainsValue('Reqsheet beta. Under active development.', $home, 'Public homepage beta warning was not rendered.');
         assertContainsValue('mailto:feedback@reqsheet.com', $home, 'Public homepage feedback address was not a mailto link.');
         assertNotContainsValue('action="/login"', $home, 'Public homepage still renders the login form.');
         $authenticatedHome = (new HomePage())->render(['id' => 2, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => false, 'roles' => ['teacher']]);
@@ -176,9 +178,9 @@ final class SettingsTest
         assertContainsValue('href="/settings"', $adminNav, 'Admin navigation did not expose Settings.');
         assertContainsValue('My Account', $adminNav, 'Authenticated navigation did not expose My Account.');
         assertContainsValue('View My Timetable', $adminNav, 'Teacher navigation label was not updated.');
-        assertContainsValue('Reqsheet α', $adminNav, 'Shared application branding did not include the alpha marker.');
-        assertContainsValue('class="alpha-banner"', $adminNav, 'Authenticated layout did not render the global alpha banner.');
-        assertContainsValue('href="/alpha">here</a>', $adminNav, 'Authenticated alpha banner did not link to the information page.');
+        assertContainsValue('Reqsheet β', $adminNav, 'Shared application branding did not include the beta marker.');
+        assertContainsValue('class="beta-banner"', $adminNav, 'Authenticated layout did not render the global beta banner.');
+        assertContainsValue('href="/alpha">here</a>', $adminNav, 'Authenticated beta banner did not link to the information page.');
         assertContainsValue('nav-separator', $adminNav, 'Authenticated navigation did not render its general/application separator.');
         assertNotContainsValue('href="/signup"', $adminNav, 'Sign up remained in authenticated navigation.');
         assertContainsValue('href="/settings"', \Reqsheet\Http\PageLayout::render('About', '<p>About</p>', ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true]), 'Authenticated informational layout lost Settings.');

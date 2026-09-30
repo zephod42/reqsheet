@@ -49,7 +49,7 @@ final class TechnicianPageTest
         assertContainsValue('No active timetable is configured', $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []), 'Technician view did not provide an inactive-timetable state.');
         $store->hasActiveTimetable = true;
         $day = $page->handle('GET', ['date' => '2026-09-21', 'rooms' => 'all'], []);
-        assertContainsValue('class="alpha-banner"', $day, 'Authenticated technician view did not render the global alpha banner.');
+        assertContainsValue('class="beta-banner"', $day, 'Authenticated technician view did not render the global beta banner.');
         assertContainsValue('JSM', $day, 'Technician grid did not show teacher initials.');
         assertContainsValue('class="technician-cell class-tone-', $day, 'Technician lesson did not receive a deterministic class colour.');
         assertContainsValue('tabindex="0" class="technician-cell', $day, 'Occupied technician cells were not keyboard focusable.');
@@ -106,7 +106,7 @@ final class TechnicianPageTest
         $print = $page->handle('GET', ['date' => '2026-09-23', 'print' => 'week'], []);
         assertSameValue(3, substr_count($print, 'class="technician-sheet"'), 'Selected-week print did not use the configured working days.');
         assertContainsValue('window.print()', $print, 'Selected-week print did not invoke the native print dialog.');
-        assertContainsValue('class="alpha-banner"', $print, 'Technician print page did not retain the global alpha banner in the screen document.');
+        assertContainsValue('class="beta-banner"', $print, 'Technician print page did not retain the global beta banner in the screen document.');
         assertContainsValue('<h1>Print View</h1>', $print, 'Selected-week print did not identify the read-only print view.');
         assertContainsValue('Back to Technician View', $print, 'Selected-week print did not provide a return link.');
         assertContainsValue('href="/technician?date=2026-09-23&room_selection=1&room_ids[]=1&room_ids[]=2"', $print, 'Selected-week print did not preserve the selected date and rooms.');
@@ -122,7 +122,7 @@ final class TechnicianPageTest
         assertContainsValue('.technician-grid th:first-child { width: 3.25rem; min-width: 3.25rem;', $css, 'Technician period column was not compacted.');
         assertContainsValue('.technician-cell-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .35rem; font-size: .9em; }', $css, 'Technician class and teacher labels were not compacted consistently.');
         assertContainsValue('.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }', $css, 'Technician print day heading was not centred.');
-        assertContainsValue('.site-nav, .alpha-banner, .page-header a, dialog', $css, 'Alpha banner was not excluded from print output.');
+        assertContainsValue('.site-nav, .beta-banner, .page-header a, dialog', $css, 'Beta banner was not excluded from print output.');
         assertContainsValue('height: var(--technician-print-teaching-height);', $css, 'Non-vertical print rows were not assigned a strict teaching-period height.');
         assertContainsValue('max-height: 100%; overflow: hidden;', $css, 'Non-vertical print cell content was not clipped inside its cell.');
         assertContainsValue('[data-print-layout="vertical"] .technician-grid td', $css, 'Vertical print mode no longer has its expandable-row rule.');
