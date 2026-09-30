@@ -50,7 +50,7 @@ final class PageLayout
 
     public static function betaBanner(): string
     {
-        return '<aside class="beta-banner" role="note">Reqsheet is currently in beta testing and remains under active development. Features and behaviour may change; please exercise appropriate caution and report problems. Read more about what this means <a href="/alpha">here</a>.</aside>';
+        return '<aside class="beta-banner" role="note">Reqsheet is currently in beta. It is stable but remains under active evaluation. Read more about what this means <a href="/alpha">here</a>.</aside>';
     }
 
     /** @deprecated Kept for compatibility with the standalone setup renderer. */

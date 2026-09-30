@@ -370,17 +370,9 @@ if (in_array($route, [ApplicationRoute::ABOUT, ApplicationRoute::ALPHA, Applicat
 <section class="content-narrow public-copy beta-page">
     <h1>Reqsheet β — Beta testing</h1>
     <h2>Introduction</h2>
-    <p>Reqsheet is currently in beta testing. The application remains under active development while we improve reliability and the experience of using it in real departments.</p>
-    <p>We are making Reqsheet available so that teachers and technicians can test it, identify problems and help improve the application.</p>
+    <p>Reqsheet is stable but continues to be actively evaluated. New features will be introduced periodically and, where appropriate, advertised in advance. Database changes are designed to preserve existing data.</p>
     <h2>What does beta mean for you?</h2>
-    <h3>Features and behaviour may change.</h3>
-    <p>Features may appear, disappear or change as development continues, and some functionality may not work as expected.</p>
-    <h3>Use appropriate caution.</h3>
-    <p>Reqsheet is not yet a finished product. Keep appropriate departmental records and arrangements available while you evaluate it.</p>
-    <h2>If you are using Reqsheet in your department</h2>
-    <p>Do not rely on Reqsheet as your only source of departmental organisation during beta testing.</p>
-    <p>If you use it for real departmental planning, maintain an independent record of essential information.</p>
-    <p>Print and securely store your timetables and requisitions regularly.</p>
+    <p>As Reqsheet remains in beta, the possibility of feature changes or data loss cannot be completely excluded. If you rely on Reqsheet for day-to-day operations, do so with appropriate caution. Regular backups are recommended.</p>
     <h2>Feedback</h2>
     <p>Please report problems and unexpected behaviour so that we can improve Reqsheet.</p>
     <p><a href="mailto:feedback@reqsheet.com">feedback@reqsheet.com</a></p>

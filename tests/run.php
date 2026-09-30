@@ -241,8 +241,7 @@ $betaFragments = [
     "if (\$path === '/alpha') return self::ALPHA",
     'Reqsheet β — Beta testing',
     'What does beta mean for you?',
-    'If you are using Reqsheet in your department',
-    'Features and behaviour may change.',
+    'Database changes are designed to preserve existing data.',
     'href="mailto:feedback@reqsheet.com"',
 ];
 foreach ($betaFragments as $betaFragment) {
