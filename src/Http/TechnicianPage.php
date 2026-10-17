@@ -102,10 +102,10 @@ final class TechnicianPage
         $teaching = 0;
         $separators = 0;
         foreach ($slots as $slot) (($slot['kind'] ?? '') === 'teaching' ? $teaching++ : $separators++);
-        // A4 landscape is 210mm high with 8mm margins. Reserve space for the
-        // date heading, table heading, and a small browser rounding allowance.
-        $bodyBudget = 170.0;
-        $separatorRow = 6.0;
+        // A4 landscape is 210mm high. The print stylesheet uses 4mm margins,
+        // leaving 202mm for the compact date heading and timetable.
+        $bodyBudget = 202.0;
+        $separatorRow = 4.0;
         $teachingRow = $teaching > 0 ? max(1.0, ($bodyBudget - ($separators * $separatorRow)) / $teaching) : 1.0;
         $separatorContent = max(1.0, $separatorRow - 3.0);
         $teachingContent = max(1.0, $teachingRow - 3.0);
@@ -179,7 +179,7 @@ final class TechnicianPage
 
     private function requisitionInteractionScript(): string
     {
-        return '<script>(function(){function close(control){control.classList.remove("is-open");control.setAttribute("aria-expanded","false");}document.querySelectorAll(".technician-cell").forEach(function(cell){cell.addEventListener("click",function(event){if(event.target.closest("summary,button,a,form,input,select,textarea,.technician-requisition-control"))return;cell.open=true;});cell.addEventListener("keydown",function(event){if((event.key==="Enter"||event.key===" ")&&event.target===cell){event.preventDefault();cell.open=true;}});});document.querySelectorAll(".technician-requisition-control").forEach(function(control){control.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();var open=control.classList.contains("is-open");document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);if(!open){control.classList.add("is-open");control.setAttribute("aria-expanded","true");}});control.addEventListener("keydown",function(event){if(event.key==="Enter"||event.key===" "){event.preventDefault();control.click();}if(event.key==="Escape")close(control);});});document.addEventListener("click",function(event){if(!event.target.closest(".technician-requisition-control"))document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);});document.addEventListener("keydown",function(event){if(event.key==="Escape")document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);});})();</script>';
+        return '<script>(function(){function close(control){control.classList.remove("is-open");control.setAttribute("aria-expanded","false");}document.querySelectorAll(".technician-cell").forEach(function(cell){cell.addEventListener("click",function(event){if(event.target.closest("summary,button,a,form,input,select,textarea,.technician-requisition-control"))return;cell.open=true;});cell.addEventListener("keydown",function(event){if((event.key==="Enter"||event.key===" ")&&event.target===cell){event.preventDefault();cell.open=true;}});});document.querySelectorAll(".technician-requisition-control").forEach(function(control){control.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();var open=control.classList.contains("is-open");document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);if(!open){control.classList.add("is-open");control.setAttribute("aria-expanded","true");}});control.addEventListener("keydown",function(event){if(event.key==="Enter"||event.key===" "){event.preventDefault();control.click();}if(event.key==="Escape")close(control);});});document.addEventListener("click",function(event){if(!event.target.closest(".technician-requisition-control"))document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);});document.addEventListener("keydown",function(event){if(event.key==="Escape")document.querySelectorAll(".technician-requisition-control.is-open").forEach(close);});})();</script><script>(function(){function fitPrintSheets(){var root=document.documentElement,sheets=Array.from(document.querySelectorAll(".technician-sheet"));if(!sheets.length)return;root.classList.add("technician-print-measuring");try{sheets.forEach(function(sheet){var layout=sheet.dataset.printLayout||"default";var natural=sheet.getBoundingClientRect().height;var scale=(layout==="default"||layout==="horizontal")?Math.min(1,((210-8)*96/25.4)/natural):1;sheet.style.setProperty("--technician-print-scale",scale.toFixed(4));});}finally{root.classList.remove("technician-print-measuring");}}window.addEventListener("load",fitPrintSheets);})();</script>';
     }
 
     private function roomQuery(array $selected, bool $vertical = false, bool $horizontal = false): string

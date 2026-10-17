@@ -123,10 +123,10 @@ final class TechnicianPageTest
         assertContainsValue('.technician-cell-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .35rem; font-size: .9em; }', $css, 'Technician class and teacher labels were not compacted consistently.');
         assertContainsValue('.print-date { margin: 0 0 .7rem; font-size: 1rem; text-align: center; }', $css, 'Technician print day heading was not centred.');
         assertContainsValue('.site-nav, .beta-banner, .page-header a, dialog', $css, 'Beta banner was not excluded from print output.');
-        assertContainsValue('height: var(--technician-print-teaching-height);', $css, 'Non-vertical print rows were not assigned a strict teaching-period height.');
-        assertContainsValue('max-height: 100%; overflow: hidden;', $css, 'Non-vertical print cell content was not clipped inside its cell.');
-        assertContainsValue('[data-print-layout="vertical"] .technician-grid td', $css, 'Vertical print mode no longer has its expandable-row rule.');
-        assertContainsValue('-webkit-line-clamp: 4;', $css, 'Compact technician print requisitions were not limited to four lines.');
+        assertContainsValue('zoom: var(--technician-print-scale, 1);', $css, 'Compact print sheets did not receive their calculated fit scale.');
+        assertContainsValue('.technician-grid th, .technician-grid td { height: auto; padding: .7mm;', $css, 'Print rows did not use compact natural heights.');
+        assertContainsValue('.technician-requisition, .technician-requisition-control { display: block; max-height: none; overflow: visible;', $css, 'Print requisitions were still constrained or clipped.');
+        assertContainsValue('.technician-print-measuring .site-main { width: 1092px; padding: 0; }', $css, 'Print measurement geometry was missing.');
         assertContainsValue('.technician-requisition-popout, .technician-cell summary::marker { display: none !important; }', $css, 'Full requisition popouts were not excluded from print output.');
         $store->dailyCalls = [];
         $customDay = $page->handle('GET', ['date' => '2026-09-23', 'room_selection' => '1', 'room_ids' => ['2']], []);
