@@ -131,7 +131,7 @@ final class TeacherPlanningService
             throw new TimetableValidationException(['Choose a valid lesson section.']);
         }
         $value = trim($value);
-        if ($section === 'requisitions' && $nothingRequired) $value = 'Nothing required';
+        if ($section === 'requisitions' && $nothingRequired && $value === '') $value = 'Nothing required';
         return $this->store->savePlanningSection($occurrenceId, $section, $value, $nothingRequired);
     }
 

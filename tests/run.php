@@ -13,6 +13,7 @@ require __DIR__ . '/BlankTimetableCsvExporterTest.php';
 require __DIR__ . '/TimetableCsvImportTest.php';
 require __DIR__ . '/TimetableCsvConfirmTest.php';
 require __DIR__ . '/TeacherWeekPageTest.php';
+require __DIR__ . '/TeacherWeekInlineEditingTest.php';
 require __DIR__ . '/TeacherDisplayTest.php';
 require __DIR__ . '/PdoTeacherPlanningStoreTest.php';
 require __DIR__ . '/AccountTest.php';
@@ -317,6 +318,7 @@ foreach (['operational_role', 'is_admin', 'password_hash', 'account_state', 'use
 \Reqsheet\Tests\TimetableCsvImportTest::run();
 \Reqsheet\Tests\TimetableCsvConfirmTest::run();
 \Reqsheet\Tests\TeacherDisplayTest::run();
+\Reqsheet\Tests\TeacherWeekInlineEditingTest::run();
 \Reqsheet\Tests\AccountTest::run();
 \Reqsheet\Tests\TenantTest::run();
 \Reqsheet\Tests\SettingsTest::run();

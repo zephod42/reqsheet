@@ -47,7 +47,7 @@
     var picker = document.getElementById('duplicate-picker');
     var overwriteDialog = document.getElementById('overwrite-dialog');
     var status = document.querySelector('[data-copy-status]');
-    var csrf = editor ? editor.querySelector('[name=csrf_token]') : null;
+    var csrf = editor ? editor.querySelector('[name=csrf_token]') : document.querySelector('[data-week-csrf]');
     var weekDate = document.querySelector('[data-week-date]');
     var source = null;
     var target = null;
@@ -62,6 +62,82 @@
         if (!status) return;
         status.textContent = message || '';
         status.classList.toggle('error', !!error);
+    }
+
+    var activeRequisition = null;
+
+    function renderRequisition(cell, value, nothingRequired, error) {
+        cell.dataset.savedValue = value || '';
+        cell.dataset.nothingRequired = nothingRequired ? 'true' : 'false';
+        delete cell.dataset.pendingValue;
+        cell.classList.remove('is-editing');
+        cell.replaceChildren();
+        var text = document.createElement('span');
+        text.className = 'week-requisition-text' + (!value && !nothingRequired ? ' muted' : '');
+        text.textContent = nothingRequired ? 'Nothing required' : (value || 'No requisitions entered');
+        cell.appendChild(text);
+        if (error) {
+            var message = document.createElement('span');
+            message.className = 'week-save-error';
+            message.setAttribute('role', 'status');
+            message.textContent = error;
+            cell.appendChild(message);
+            var retry = document.createElement('button');
+            retry.type = 'button'; retry.className = 'week-save-retry'; retry.textContent = 'Retry';
+            retry.addEventListener('click', function () { saveRequisition(cell); });
+            cell.appendChild(retry);
+        }
+    }
+
+    function saveRequisition(cell) {
+        if (!cell || !cell.classList.contains('is-editing')) return Promise.resolve();
+        if (cell.dataset.saving === 'true') return Promise.resolve();
+        var area = cell.querySelector('textarea');
+        var value = area ? area.value : '';
+        if (value === (cell.dataset.savedValue || '')) {
+            renderRequisition(cell, cell.dataset.savedValue || '', cell.dataset.nothingRequired === 'true', '');
+            if (activeRequisition === cell) activeRequisition = null;
+            return Promise.resolve();
+        }
+        cell.dataset.saving = 'true';
+        var data = new FormData();
+        data.set('csrf_token', csrf ? csrf.value : '');
+        data.set('occurrence_id', cell.closest('[data-lesson-id]').dataset.lessonId);
+        data.set('section', 'requisitions');
+        data.set('value', value);
+        data.set('_async', '1');
+        return fetch(window.location.pathname + window.location.search, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (response) { return response.json().then(function (payload) { if (!response.ok || !payload.ok) throw new Error(payload.message || 'The requisitions could not be saved.'); return payload; }); })
+            .then(function (payload) {
+                renderRequisition(cell, payload.value || '', !!payload.nothing_required, '');
+                if (activeRequisition === cell) activeRequisition = null;
+            })
+            .catch(function (error) {
+                cell.dataset.pendingValue = value;
+                cell.classList.add('is-editing');
+                var message = cell.querySelector('.week-save-error') || document.createElement('span');
+                message.className = 'week-save-error'; message.setAttribute('role', 'status'); message.textContent = error.message || 'Save failed. Try again.';
+                if (!message.parentNode) cell.appendChild(message);
+            })
+            .finally(function () { delete cell.dataset.saving; });
+    }
+
+    function openRequisition(cell) {
+        if (activeRequisition && activeRequisition !== cell) saveRequisition(activeRequisition);
+        activeRequisition = cell;
+        cell.classList.add('is-editing');
+        var area = document.createElement('textarea');
+        area.className = 'week-requisition-editor';
+        area.value = cell.dataset.pendingValue !== undefined ? cell.dataset.pendingValue : (cell.dataset.savedValue || '');
+        area.setAttribute('aria-label', 'Requisitions');
+        var error = document.createElement('span');
+        error.className = 'week-save-error'; error.hidden = true;
+        cell.replaceChildren(area, error);
+        area.addEventListener('input', function () { area.style.height = 'auto'; area.style.height = area.scrollHeight + 'px'; });
+        area.addEventListener('blur', function () { saveRequisition(cell); });
+        area.addEventListener('keydown', function (event) { if (event.key === 'Tab') saveRequisition(cell); });
+        area.focus(); area.setSelectionRange(area.value.length, area.value.length);
+        area.style.height = 'auto'; area.style.height = area.scrollHeight + 'px';
     }
 
     function openEditor(link, event) {
@@ -248,9 +324,18 @@
         link.draggable = false;
         link.addEventListener('dragstart', function (event) { event.preventDefault(); });
         link.addEventListener('contextmenu', function (event) { event.preventDefault(); });
-        link.addEventListener('selectstart', function (event) { event.preventDefault(); });
-        link.addEventListener('click', function (event) { openEditor(link, event); });
+        link.addEventListener('selectstart', function (event) { if (!event.target.closest || !event.target.closest('[data-week-requisition]')) event.preventDefault(); });
+        link.addEventListener('click', function (event) {
+            var cell = event.target.closest ? event.target.closest('[data-week-requisition]') : null;
+            if (cell) {
+                event.preventDefault();
+                if (!event.target.closest('textarea')) openRequisition(cell);
+                return;
+            }
+            event.preventDefault();
+        });
         link.addEventListener('pointerdown', function (event) {
+            if (event.target.closest && event.target.closest('textarea')) return;
             if (busy || event.button !== 0 || !gestures.down({ id: event.pointerId, type: event.pointerType, x: event.clientX, y: event.clientY, link: link })) return;
             if (event.pointerType !== 'mouse') {
                 longPressTimer = window.setTimeout(function () {
@@ -259,6 +344,10 @@
                 }, 500);
             }
         });
+    });
+
+    document.addEventListener('pointerdown', function (event) {
+        if (activeRequisition && !event.target.closest('[data-week-requisition]')) saveRequisition(activeRequisition);
     });
 
     document.addEventListener('pointermove', function (event) {

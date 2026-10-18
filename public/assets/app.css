@@ -231,7 +231,7 @@ small { font-size: .82rem; }
 .inline-lesson-form textarea { box-sizing: border-box; width: 100%; min-height: 5rem; max-width: 100%; resize: none; overflow-y: hidden; }
 .inline-lesson-form .form-actions { flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
 .inline-save-status { margin-left: .4rem; color: var(--muted); font-size: .85rem; }
-.inline-lesson-form .requisition-editor { min-height: 10rem; }
+.inline-lesson-form .requisition-editor { min-height: 5rem; }
 .template-summary-row { margin: .35rem 0; }
 .empty-cell { background: #fff; }
 .account-identity { display: grid; grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr); gap: .45rem 1rem; }
@@ -271,6 +271,12 @@ small { font-size: .82rem; }
 .lesson-header > span { flex: 0 0 auto; color: var(--room-code); white-space: nowrap; }
 .lesson-body { overflow: hidden; padding: .45rem; color: var(--ink); font-size: .82rem; line-height: 1.3; font-family: Arial, Helvetica, sans-serif; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .lesson-body .muted { color: var(--muted); font-family: var(--sans); font-style: italic; }
+.lesson-body[data-week-requisition] { position: relative; }
+.week-requisition-text { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
+.lesson-body.is-editing { display: block; overflow: visible; text-overflow: clip; -webkit-line-clamp: unset; }
+.week-requisition-editor { box-sizing: border-box; display: block; width: 100%; min-height: 1.3rem; padding: 0; border: 0; outline: 1px solid var(--primary-accent); background: transparent; color: inherit; font: inherit; line-height: inherit; resize: none; overflow: hidden; user-select: text; -webkit-user-select: text; }
+.week-save-error { display: block; margin-top: .2rem; color: #8c1d2c; font-family: var(--sans); font-size: .68rem; }
+.week-save-retry { margin: .15rem 0 0; border: 0; padding: 0; background: transparent; color: #8c1d2c; font-family: var(--sans); font-size: .68rem; text-decoration: underline; }
 .class-tone-0 { --lesson-accent: var(--class-tone-0); --class-border: var(--class-border-0); }
 .class-tone-1 { --lesson-accent: var(--class-tone-1); --class-border: var(--class-border-1); }
 .class-tone-2 { --lesson-accent: var(--class-tone-2); --class-border: var(--class-border-2); }

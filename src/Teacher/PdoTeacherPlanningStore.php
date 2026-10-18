@@ -291,7 +291,7 @@ final class PdoTeacherPlanningStore implements TeacherPlanningStore
             $upsert = $this->prepare('INSERT INTO requisitions (lesson_occurrence_id, state, requirements_text, planning_notes, risk_assessment_text) VALUES (:occurrence_id, :state, :requirements, :outline, :risk) ON DUPLICATE KEY UPDATE state = VALUES(state), requirements_text = VALUES(requirements_text), planning_notes = VALUES(planning_notes), risk_assessment_text = VALUES(risk_assessment_text)');
             $upsert->execute(['occurrence_id' => $occurrenceId, 'state' => $state, 'requirements' => $requirements === '' ? null : $requirements, 'outline' => $outline === '' ? null : $outline, 'risk' => $risk === '' ? null : $risk]);
             $this->pdo->commit();
-            return ['value' => $section === 'requisitions' ? $requirements : ($section === 'outline' ? $outline : $risk), 'nothing_required' => $state === 'nothing_required'];
+            return ['value' => $section === 'requisitions' && $state === 'nothing_required' ? 'Nothing required' : ($section === 'requisitions' ? $requirements : ($section === 'outline' ? $outline : $risk)), 'nothing_required' => $state === 'nothing_required'];
         } catch (\Throwable $exception) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             throw $exception;

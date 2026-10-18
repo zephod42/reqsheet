@@ -68,6 +68,20 @@ final class TeacherWeekPage
                 if (!CsrfToken::valid($input['csrf_token'] ?? null)) {
                     throw new TimetableValidationException(['Your request expired. Please try again.']);
                 }
+                if (($input['_async'] ?? '') === '1') {
+                    if (($input['section'] ?? '') !== 'requisitions') {
+                        throw new TimetableValidationException(['Choose a valid lesson section.']);
+                    }
+                    $saved = $this->service->saveSection(
+                        $this->organisationId,
+                        $this->teacherId,
+                        (int) ($input['occurrence_id'] ?? 0),
+                        'requisitions',
+                        (string) ($input['value'] ?? ''),
+                        ($input['nothing_required'] ?? '') === 'yes',
+                    );
+                    return $this->json(['ok' => true] + $saved, 200);
+                }
                 $this->service->save(
                     $this->organisationId,
                     $this->teacherId,
@@ -78,7 +92,15 @@ final class TeacherWeekPage
                 );
                 $message = 'Lesson planning saved.';
             } catch (TimetableValidationException $exception) {
+                if (($input['_async'] ?? '') === '1') {
+                    return $this->json(['ok' => false, 'message' => implode(' ', $exception->errors())], 422);
+                }
                 $message = implode(' ', $exception->errors());
+            } catch (\Throwable) {
+                if (($input['_async'] ?? '') === '1') {
+                    return $this->json(['ok' => false, 'message' => 'The requisitions could not be saved. Please try again.'], 500);
+                }
+                $message = 'The requisitions could not be saved. Please try again.';
             }
         }
 
@@ -153,7 +175,6 @@ final class TeacherWeekPage
             $body .= '</tr>';
         }
         $body .= '</tbody></table></div>';
-        $body .= $this->modal($editing);
         $body .= $this->duplicationDialogs($week);
         return PageLayout::render('Teacher week', $body . '<script src="/assets/teacher-week.js" defer></script>', $this->user);
     }
@@ -167,7 +188,10 @@ final class TeacherWeekPage
         $state = (string) ($occurrence['state'] ?? 'not_completed');
         $period = $this->periodLabel($slot) . ($occurrence['snapshot_duration_periods'] > 1 ? '–' . $occurrence['snapshot_duration_periods'] : '');
         $targetLabel = (string) $occurrence['snapshot_class_code'] . ' · ' . (string) $occurrence['snapshot_room_code'] . ' · ' . $this->dateDisplay->format($date) . ' · ' . $period;
-        return '<a class="lesson-block class-tone-' . $tone . '" href="?date=' . $date->format('Y-m-d') . '&edit=' . (int) $occurrence['id'] . '" data-lesson-id="' . (int) $occurrence['id'] . '" data-class="' . $this->e((string) $occurrence['snapshot_class_code']) . '" data-class-id="' . (int) ($occurrence['class_id'] ?? 0) . '" data-room="' . $this->e((string) $occurrence['snapshot_room_code']) . '" data-date="' . $date->format('Y-m-d') . '" data-period="' . $this->e($period) . '" data-outline="' . $this->e($outline) . '" data-requisitions="' . $this->e($requirements) . '" data-risk="' . $this->e($risk) . '" data-state="' . $this->e($state) . '" data-planning-populated="' . (TeacherPlanningService::planningPopulated($occurrence) ? 'true' : 'false') . '" data-planning-revision="' . TeacherPlanningService::planningRevision($occurrence) . '" data-target-label="' . $this->e($targetLabel) . '"><span class="lesson-header"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) $occurrence['snapshot_room_code']) . '</span></span><span class="lesson-body">' . ($requirements === '' ? '<span class="muted">No requisitions entered</span>' : $this->e($requirements)) . '</span></a>';
+        $nothingRequired = $state === 'nothing_required';
+        $displayRequirements = $nothingRequired ? 'Nothing required' : $requirements;
+        $body = $displayRequirements === '' ? '<span class="muted">No requisitions entered</span>' : nl2br($this->e($displayRequirements));
+        return '<a class="lesson-block class-tone-' . $tone . '" href="?date=' . $date->format('Y-m-d') . '&edit=' . (int) $occurrence['id'] . '" data-lesson-id="' . (int) $occurrence['id'] . '" data-class="' . $this->e((string) $occurrence['snapshot_class_code']) . '" data-class-id="' . (int) ($occurrence['class_id'] ?? 0) . '" data-room="' . $this->e((string) $occurrence['snapshot_room_code']) . '" data-date="' . $date->format('Y-m-d') . '" data-period="' . $this->e($period) . '" data-outline="' . $this->e($outline) . '" data-requisitions="' . $this->e($requirements) . '" data-risk="' . $this->e($risk) . '" data-state="' . $this->e($state) . '" data-planning-populated="' . (TeacherPlanningService::planningPopulated($occurrence) ? 'true' : 'false') . '" data-planning-revision="' . TeacherPlanningService::planningRevision($occurrence) . '" data-target-label="' . $this->e($targetLabel) . '"><span class="lesson-header"><strong>' . $this->e((string) $occurrence['snapshot_class_code']) . '</strong><span>' . $this->e((string) $occurrence['snapshot_room_code']) . '</span></span><span class="lesson-body" data-week-requisition data-saved-value="' . $this->e($requirements) . '" data-nothing-required="' . ($nothingRequired ? 'true' : 'false') . '" tabindex="0" role="button" aria-label="Edit requisitions">' . $body . '</span></a>';
     }
 
     /** @param array<string, mixed>|null $editing */
@@ -188,6 +212,7 @@ final class TeacherWeekPage
         return '<dialog id="duplicate-picker" class="compact-dialog"><form method="dialog"><button type="button" class="close secondary" data-close>Close</button><p class="eyebrow">Copy planning</p><h2>Duplicate lesson</h2><p>Choose another lesson in this week.</p><label>Target lesson<select data-duplicate-target></select></label><div class="form-actions"><button type="button" data-copy-selected>Copy planning</button><button type="button" class="secondary" data-close>Cancel</button></div></form></dialog>'
             . '<dialog id="overwrite-dialog" class="compact-dialog"><form method="dialog"><p class="eyebrow">Confirm overwrite</p><h2>Overwrite target lesson?</h2><p data-overwrite-target></p><p>This action will overwrite the contents of the target lesson. Are you sure you want to proceed?</p><p class="notice warning" data-target-changed hidden>The target lesson changed after it was selected. Review the target and confirm again to overwrite its latest contents.</p><div class="form-actions"><button type="button" data-confirm-overwrite>Yes, overwrite</button><button type="button" class="secondary" data-close>Cancel</button></div></form></dialog>'
             . '<div class="copy-status" data-copy-status role="status" aria-live="polite"></div>'
+            . '<input type="hidden" data-week-csrf value="' . $this->e(CsrfToken::value()) . '">'
             . '<span class="visually-hidden" data-week-date>' . $week->start->format('Y-m-d') . '</span>';
     }
 
