@@ -30,6 +30,7 @@ final class TimetableConfigurationTest
         $store = self::store();
         $service = new TimetableVersionService($store);
         \assertSameValue(1, $service->create(1, 'Autumn', '2026-09-01', '2026-12-20'), 'Bounded version was not created.');
+        \assertSameValue(1, $store->activeVersionId(1), 'The first timetable version was not activated automatically.');
         \assertSameValue(2, $service->create(1, null, '2026-12-20', null), 'Adjacent open-ended version was not created.');
         \assertSameValue(3, $service->create(2, null, '2026-09-01', '2026-12-20'), 'Other organisation version was not created.');
         self::expectValidation(static fn () => $service->create(99, null, '2027-01-01', null));
@@ -96,14 +97,19 @@ final class TimetableConfigurationTest
         assertSameValue(9, count(array_filter($store->slotsForVersion($version), static fn (TimetableSlot $slot): bool => $slot->isTeaching() && $slot->dayOfWeek === 1)), 'Template did not seed nine teaching periods.');
         $lunch = array_values(array_filter($store->slotsForVersion($version), static fn (TimetableSlot $slot): bool => $slot->kind === 'lunch'))[0] ?? null;
         assertSameValue('Lunch', $lunch?->label, 'Template did not preserve the Lunch label.');
-        assertSameValue(null, $service->activeTemplate(1), 'A timetable became active without explicit selection.');
+        assertSameValue($version, $service->activeTemplate(1)['version']->id, 'The only timetable did not become active automatically.');
         $service->activate(1, $version);
         $active = $service->activeTemplate(1);
         assertSameValue('Autumn 2026', $active['version']->label, 'Manual activation selected the wrong timetable.');
         $successor = $service->create(1, $version, 'Spring 2027', null, ['working_days' => [1], 'first_day_of_week' => 1, 'periods_per_day' => 2, 'start_time' => '08:00', 'standard_period_minutes' => '60', 'custom_day_settings' => [], 'separators' => []]);
+        assertSameValue($version, $service->activeTemplate(1)['version']->id, 'Creating an additional timetable changed the active timetable.');
         assertSameValue(null, $service->activeTemplate(1)['version']->effectiveTo, 'Activating a timetable changed historical version dates.');
         $service->activate(1, $successor);
         assertSameValue($successor, $service->activeTemplate(1)['version']->id, 'A second activation did not replace the organisation active template.');
+        $singleStore = self::store();
+        $singleVersion = (new TimetableTemplateService($singleStore))->create(2, null, 'Only timetable', null, ['working_days' => [1], 'first_day_of_week' => 1, 'periods_per_day' => 1]);
+        $singleStore->active = [];
+        assertSameValue($singleVersion, (new TimetableTemplateService($singleStore))->activeTemplate(2)['version']->id, 'An inactive single timetable was not repaired as active.');
         self::expectValidation(fn () => $service->activate(2, $version));
         self::expectValidation(fn () => $service->create(1, null, 'Autumn 2026', null, ['working_days' => [1], 'first_day_of_week' => 1, 'periods_per_day' => 2]));
         self::expectValidation(fn () => $service->create(1, null, 'Invalid', null, ['working_days' => [], 'first_day_of_week' => 1, 'periods_per_day' => 2]));

@@ -936,6 +936,7 @@ if ($route === ApplicationRoute::ADMIN_TIMETABLE) {
             $user['organisation_id'],
             (new SettingsService(new PdoOrganisationSettingsStore($database->connection())))->load($user['organisation_id']),
             $user,
+            new AccountService(new PdoAccountStore($database->connection())),
         );
         header('Content-Type: text/html; charset=UTF-8');
         echo $page->handle($method, $_GET, $_POST);

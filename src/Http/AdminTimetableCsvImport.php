@@ -104,8 +104,7 @@ final class AdminTimetableCsvImport
                 }
                 $message = 'Teacher ' . $code . ' is ready. They can set a password on first login.';
             } elseif ($type === 'teacher') {
-                $service->createTeacher($this->organisationId, $code);
-                $message = 'Teacher ' . $code . ' is ready. They can set a password on first login.';
+                throw new AccountValidationException(['Teacher account creation is unavailable. Validate the CSV again.']);
             } elseif ($type === 'room' && $operation === 'restore') {
                 $room = null;
                 foreach ($this->resources->roomsForOrganisation($this->organisationId, true) as $candidate) if (strcasecmp((string) $candidate['code'], $code) === 0) { $room = $candidate; break; }

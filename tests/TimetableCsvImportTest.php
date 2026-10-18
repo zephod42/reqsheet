@@ -267,6 +267,15 @@ final class TimetableCsvImportTest
         $teacherAccount = $teacherAccountsStore->findLogin('ANO', 1);
         assertSameValue(['teacher'], $teacherAccount['roles'] ?? null, 'Inline teacher creation did not create a Teacher-only account.');
         assertSameValue('awaiting_first_login', $teacherAccount['account_state'] ?? null, 'Inline teacher creation did not preserve the first-login lifecycle.');
+        try {
+            (new AccountService($teacherAccountsStore))->authenticate('ANO', '', 1);
+            throw new \RuntimeException('Imported teacher was incorrectly authenticated without a password.');
+        } catch (\Reqsheet\Account\AccountValidationException $exception) {
+            assertSameValue(['This account is awaiting its first login password.'], $exception->errors(), 'Imported teacher was rejected with generic invalid credentials before first password setup.');
+        }
+        $importedAccounts = new AccountService($teacherAccountsStore);
+        $importedAccounts->claimFirstLogin('ANO', 'import-pass', 'import-pass', 1);
+        assertSameValue('ANO', $importedAccounts->authenticate('ANO', 'import-pass', 1)['staff_identifier'], 'Imported teacher could not authenticate after first password setup.');
     }
 
     private static function resourceReferenceCsv(): void

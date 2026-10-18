@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Reqsheet\Http;
 
+use Reqsheet\Account\AccountService;
+use Reqsheet\Account\AccountValidationException;
 use Reqsheet\Http\CsrfToken;
 use Reqsheet\Timetable\RecurringLesson;
 use Reqsheet\Timetable\RecurringLessonService;
@@ -23,7 +25,7 @@ use Reqsheet\Timetable\ClassTone;
 final class AdminTimetablePage
 {
     /** @param array<string, mixed> $settings @param array<string, mixed> $user */
-    public function __construct(private readonly TimetableConfigurationStore $store, private readonly int $organisationId, private readonly array $settings = [], private readonly array $user = [])
+    public function __construct(private readonly TimetableConfigurationStore $store, private readonly int $organisationId, private readonly array $settings = [], private readonly array $user = [], private readonly ?AccountService $accounts = null)
     {
     }
 
@@ -72,7 +74,9 @@ final class AdminTimetablePage
                     $resource = new TimetableResourceService($store);
                     $type = (string) ($input['resource_type'] ?? '');
                     $id = match ($type) {
-                        'teacher' => $resource->createTeacher($this->organisationId, (string) ($input['code'] ?? '')),
+                        'teacher' => $this->accounts === null
+                            ? throw new AccountValidationException(['Teacher account creation is unavailable.'])
+                            : $this->accounts->createPerson($this->organisationId, (string) ($input['code'] ?? ''), ['teacher']),
                         'room' => $resource->createRoom($this->organisationId, (string) ($input['code'] ?? '')),
                         'class' => $resource->createClass($this->organisationId, (string) ($input['code'] ?? '')),
                         default => throw new TimetableValidationException(['Resource type is invalid.']),
@@ -106,8 +110,8 @@ final class AdminTimetablePage
                     $query = array_replace($query, ['version' => $id]);
                     $message = 'Timetable version created: ' . $id;
                 }
-            } catch (TimetableValidationException | \PDOException $exception) {
-                $message = $exception instanceof TimetableValidationException ? implode(' ', $exception->errors()) : 'That resource already exists or could not be saved.';
+            } catch (TimetableValidationException | AccountValidationException | \PDOException $exception) {
+                $message = $exception instanceof TimetableValidationException || $exception instanceof AccountValidationException ? implode(' ', $exception->errors()) : 'That resource already exists or could not be saved.';
             }
         }
         $versions = $store->versionsForOrganisation($this->organisationId);

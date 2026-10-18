@@ -69,6 +69,9 @@ final class AccountTest
         assertSameValue('claimed', $resetClaim['account_state'], 'Reset account could not choose a replacement password.');
         self::expectValidation(static fn () => $accounts->authenticate('NTE', 'new-pass', 1));
 
+        $peopleTeacher = $accounts->createPerson(1, 'PTH', ['teacher']);
+        self::assertFirstLoginFlow($accounts, 'PTH', $peopleTeacher, 1, 'people-pass');
+
         if (session_status() !== PHP_SESSION_ACTIVE) session_save_path(sys_get_temp_dir());
         SessionAuth::login($account);
         assertSameValue($account['id'], SessionAuth::current()['id'], 'Authenticated session did not retain the user.');
@@ -85,6 +88,18 @@ final class AccountTest
     {
         try { $operation(); } catch (AccountValidationException) { return; }
         throw new \RuntimeException('Invalid account operation was accepted.');
+    }
+
+    private static function assertFirstLoginFlow(AccountService $accounts, string $login, int $userId, int $organisationId, string $password): void
+    {
+        try {
+            $accounts->authenticate($login, '', $organisationId);
+        } catch (AccountValidationException $exception) {
+            assertSameValue(['This account is awaiting its first login password.'], $exception->errors(), 'Blank first login was rejected as invalid credentials.');
+        }
+        $claimed = $accounts->claimFirstLogin($login, $password, $password, $organisationId);
+        assertSameValue($userId, $claimed['id'], 'First-login claim targeted the wrong account.');
+        assertSameValue($userId, $accounts->authenticate($login, $password, $organisationId)['id'], 'Claimed teacher could not authenticate normally.');
     }
 }
 

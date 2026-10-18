@@ -26,6 +26,13 @@ final class SettingsTest
             'periods_per_day' => 6,
         ]);
         assertSameValue([], $store->rooms, 'Settings unexpectedly created rooms during a minimal setup save.');
+        assertSameValue(true, $store->saved['allow_double_periods'], 'New settings did not default conjoined periods to enabled.');
+        $store->saved['allow_double_periods'] = false;
+        $service->save(1, [
+            'school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
+            'periods_per_day' => 6,
+        ]);
+        assertSameValue(false, $store->saved['allow_double_periods'], 'An explicitly disabled conjoined-period setting was overwritten.');
         $service->save(1, [
             'school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1,
             'periods_per_day' => 6, 'rooms' => ['LAB-A'], 'allow_double_periods' => '1',
@@ -101,7 +108,7 @@ final class SettingsTest
             'action' => 'save_template', 'csrf_token' => \Reqsheet\Http\CsrfToken::value(), 'template_label' => 'Autumn settings template',
             'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => 6,
         ]);
-        assertContainsValue('No active timetable template exists yet.', $templateSaved, 'A template became active without explicit selection.');
+        assertContainsValue('Current active timetable template', $templateSaved, 'The only created timetable was not activated automatically.');
         assertContainsValue('Autumn settings template', $templateSaved, 'Active template name was not summarized.');
         $activated = $templatePage->handle('POST', ['action' => 'activate_template', 'version_id' => 1, 'csrf_token' => \Reqsheet\Http\CsrfToken::value()]);
         assertContainsValue('Timetable activated.', $activated, 'Manual timetable activation did not complete.');
@@ -209,7 +216,7 @@ final class SettingsStoreFake implements OrganisationSettingsStore
 
     public function find(int $organisationId): array
     {
-        return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => $this->saved['periods_per_day'] ?? 6, 'start_time' => $this->saved['start_time'] ?? '', 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => $this->saved['separators'] ?? [], 'allow_double_periods' => $this->saved['allow_double_periods'] ?? false, 'date_format' => $this->saved['date_format'] ?? 'DD/MM/YYYY'];
+        return ['school_name' => 'Test School', 'working_days' => [1, 2, 3, 4, 5], 'first_day_of_week' => 1, 'periods_per_day' => $this->saved['periods_per_day'] ?? 6, 'start_time' => $this->saved['start_time'] ?? '', 'rooms' => $this->rooms, 'custom_day_settings' => [], 'separators' => $this->saved['separators'] ?? [], 'allow_double_periods' => $this->saved['allow_double_periods'] ?? true, 'date_format' => $this->saved['date_format'] ?? 'DD/MM/YYYY'];
     }
 
     public function activeVersionId(int $organisationId): ?int { return $this->active[$organisationId] ?? null; }
@@ -238,7 +245,7 @@ final class SettingsTransitionStoreFake implements OrganisationSettingsStore
             'rooms' => $this->rooms,
             'custom_day_settings' => [],
             'separators' => [],
-            'allow_double_periods' => false,
+            'allow_double_periods' => $this->settings['allow_double_periods'] ?? true,
             'complete' => $this->complete,
         ];
     }

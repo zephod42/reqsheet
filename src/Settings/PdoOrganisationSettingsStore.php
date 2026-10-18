@@ -41,7 +41,7 @@ final class PdoOrganisationSettingsStore implements OrganisationSettingsStore
             'standard_period_minutes' => $row === false || $row['standard_period_minutes'] === null ? '' : (string) $row['standard_period_minutes'],
             'custom_day_settings' => $row === false ? [] : self::jsonObject($row['custom_day_settings']),
             'separators' => $row === false ? [] : self::jsonList($row['separators']),
-            'allow_double_periods' => $row !== false && (bool) $row['allow_double_periods'],
+            'allow_double_periods' => $row === false ? true : (bool) $row['allow_double_periods'],
             'date_format' => $row === false ? 'DD/MM/YYYY' : (string) ($row['date_format'] ?? 'DD/MM/YYYY'),
             'technician_highlighting_enabled' => $row !== false && (bool) ($row['technician_highlighting_enabled'] ?? false),
             'technician_highlighting_colours' => $row === false ? [] : self::jsonListStrings($row['technician_highlighting_colours'] ?? null),

@@ -110,11 +110,15 @@ final class SettingsService
         }
         if ($errors !== []) throw new SettingsValidationException(array_values(array_unique($errors)));
 
+        $allowConjoinedPeriods = array_key_exists('allow_conjoined_periods', $input) || array_key_exists('allow_double_periods', $input)
+            ? isset($input['allow_conjoined_periods']) || isset($input['allow_double_periods'])
+            : (bool) ($current['allow_double_periods'] ?? true);
+
         $this->store->save($organisationId, [
             'school_name' => $schoolName, 'working_days' => $days, 'first_day_of_week' => $firstDay,
             'periods_per_day' => $periods, 'start_time' => $startTime,
             'standard_period_minutes' => $periodLength, 'custom_day_settings' => $customDays,
-            'separators' => $separators, 'allow_double_periods' => isset($input['allow_conjoined_periods']) || isset($input['allow_double_periods']),
+            'separators' => $separators, 'allow_double_periods' => $allowConjoinedPeriods,
             'date_format' => $dateFormat,
             'technician_highlighting_enabled' => $highlightingEnabled,
             'technician_highlighting_colours' => array_slice($highlightingLabels, 0, $highlightingCount),

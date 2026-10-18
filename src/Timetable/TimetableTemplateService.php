@@ -16,10 +16,11 @@ final class TimetableTemplateService
     public function create(int $organisationId, ?int $sourceVersionId, ?string $label, ?string $effectiveFrom, array $settings): int
     {
         if (!$this->store->organisationExists($organisationId)) throw new TimetableValidationException(['Organisation does not exist.']);
+        $existingVersions = $this->store->versionsForOrganisation($organisationId);
         $name = trim((string) $label);
         if ($name === '') throw new TimetableValidationException(['Timetable name is required.']);
         if (mb_strlen($name) > 255) throw new TimetableValidationException(['Timetable name must be 255 characters or fewer.']);
-        foreach ($this->store->versionsForOrganisation($organisationId) as $existing) {
+        foreach ($existingVersions as $existing) {
             if (strcasecmp((string) $existing->label, $name) === 0) throw new TimetableValidationException(['A timetable with this name already exists for this organisation.']);
         }
         $days = array_values(array_unique(array_filter(array_map('intval', (array) ($settings['working_days'] ?? [])), static fn (int $day): bool => $day >= 1 && $day <= 7)));
@@ -40,6 +41,7 @@ final class TimetableTemplateService
             // original validation/storage failure rather than hiding it.
             throw $exception;
         }
+        if ($existingVersions === []) $this->store->activateVersion($organisationId, $versionId);
         return $versionId;
     }
 
@@ -66,6 +68,13 @@ final class TimetableTemplateService
     public function activeTemplate(int $organisationId): ?array
     {
         $id = $this->store->activeVersionId($organisationId);
+        if ($id === null) {
+            $versions = $this->store->versionsForOrganisation($organisationId);
+            if (count($versions) === 1) {
+                $id = $versions[0]->id;
+                $this->store->activateVersion($organisationId, $id);
+            }
+        }
         if ($id === null) return null;
         $active = $this->store->findVersion($id);
         if ($active === null || $active->organisationId !== $organisationId) return null;
