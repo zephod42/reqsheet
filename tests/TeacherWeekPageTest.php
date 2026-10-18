@@ -62,7 +62,27 @@ final class TeacherWeekPageTest
         assertContainsValue('overflow-wrap: anywhere; word-break: break-word;', $css, 'Teacher day/class context codes were not configured to wrap.');
         assertContainsValue('.lesson-date-box { display: inline-flex; flex-direction: column;', $css, 'Teacher day/class views did not style the combined date box.');
         assertContainsValue('.day-lesson-value { margin-top: .3rem; overflow-wrap: anywhere; white-space: pre-wrap;', $css, 'Teacher day/class planning text was not configured to wrap in full.');
+        assertContainsValue('.week-grid td.past-date-cell, .week-grid td.past-lesson-cell, .teacher-day-table tr.past-lesson-row > th, .teacher-day-table tr.past-lesson-row > td { background: #edf7ed; }', $css, 'Past date highlighting was not scoped to the outer timetable cells and rows.');
+        assertContainsValue('background: #fff !important;', $css, 'Print styling did not preserve white timetable backgrounds.');
         assertNotContainsValue('.day-lesson-section.is-editing { outline', $css, 'Teacher editing cells still had an outer editing outline.');
+
+        $store->slots[] = new TimetableSlot(301, 1, 3, 1, 'teaching', 1, 'Period One');
+        $store->slots[] = new TimetableSlot(302, 1, 3, 2, 'teaching', 2, 'Period Two');
+        $store->slots[] = new TimetableSlot(401, 1, 4, 1, 'teaching', 1, 'Period One');
+        $store->slots[] = new TimetableSlot(402, 1, 4, 2, 'teaching', 2, 'Period Two');
+        $store->occurrences[501] = $store->occurrences[500] + [
+            'id' => 501, 'lesson_date' => '2026-09-09', 'snapshot_start_slot_id' => 301,
+        ];
+        $store->occurrences[502] = $store->occurrences[500] + [
+            'id' => 502, 'lesson_date' => '2026-09-10', 'snapshot_start_slot_id' => 401,
+        ];
+        $datedWeek = $page->handle('GET', ['date' => '2026-09-09'], []);
+        assertContainsValue('class="past-lesson-cell" rowspan="2"', $datedWeek, 'Week View did not mark a lesson before today at the outer cell.');
+        assertContainsValue('class="past-date-cell empty-cell"', $datedWeek, 'Week View did not mark an empty past-date cell.');
+        assertContainsValue('<td rowspan="2"><a class="lesson-block', $datedWeek, 'Week View changed the current lesson outer-cell appearance.');
+        assertContainsValue('<td class="empty-cell"></td>', $datedWeek, 'Week View changed the current empty-cell appearance.');
+        assertContainsValue('data-date="2026-09-09"', $datedWeek, 'Week View did not retain the current lesson.');
+        assertContainsValue('data-date="2026-09-10"', $datedWeek, 'Week View did not retain the future lesson.');
 
         $store->firstDay = 3;
         $alternateWeek = new TeacherWeekPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-23'), ['staff_identifier' => 'NEV']);
@@ -130,6 +150,11 @@ final class TeacherWeekPageTest
         assertNotContainsValue('href="/teacher?date=2026-09-07&edit=500"', $day, 'Day view still redirected to the week editor.');
         assertContainsValue('Previous day', $day, 'Day view did not render previous-day navigation.');
         assertContainsValue('type="date"', $day, 'Day view did not render a date picker.');
+        $datedDayPage = new TeacherDayPage(new TeacherPlanningService($store), 1, 10, new DateTimeImmutable('2026-09-09'), ['roles' => ['teacher']]);
+        $datedDay = $datedDayPage->handle('GET', ['date' => '2026-09-07']);
+        assertContainsValue('<tr class="past-lesson-row"><th scope="row"><span class="lesson-date-box">', $datedDay, 'Day View did not mark a lesson before today at the outer row.');
+        $currentDay = $datedDayPage->handle('GET', ['date' => '2026-09-09']);
+        assertContainsValue('<tr><th scope="row"><span class="lesson-date-box">', $currentDay, 'Day View changed the current lesson row appearance.');
         $savedDayResponse = $dayPage->handle('POST', [], [
             'csrf_token' => CsrfToken::value(), 'date' => '2026-09-07', 'occurrence_id' => 500,
             'section' => 'outline', 'value' => 'Updated directly in day view',
@@ -191,6 +216,8 @@ final class TeacherWeekPageTest
         assertContainsValue('data-inline-planning-cell data-section="requisitions"', $class, 'Class View requisitions cell was not directly interactive.');
         assertContainsValue('data-inline-planning-cell data-section="outline"', $class, 'Class View outline cell was not directly interactive.');
         assertContainsValue('data-inline-planning-cell data-section="risk"', $class, 'Class View risk cell was not directly interactive.');
+        assertContainsValue('<tr class="past-lesson-row"><th scope="row"><span class="lesson-date-box">', $class, 'Class View did not mark a lesson before today at the outer row.');
+        assertSameValue(2, substr_count($class, '<tr><th scope="row"><span class="lesson-date-box">'), 'Class View did not preserve current and future lesson rows without past highlighting.');
         assertNotContainsValue('>Edit</summary>', $class, 'Class View retained a separate Edit control.');
         assertNotContainsValue('lesson-edit-control', $class, 'Class View retained an anchored editor control.');
         assertColumnHeadings($class, ['Day / period / date', 'Room', 'Requisitions', 'Lesson outline', 'Risk assessment'], 'Class View column order changed unexpectedly.');

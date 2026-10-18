@@ -1,7 +1,8 @@
 'use strict';
 
 var assert = require('assert');
-var createGestureTracker = require('../public/assets/teacher-week.js').createGestureTracker;
+var teacherWeek = require('../public/assets/teacher-week.js');
+var createGestureTracker = teacherWeek.createGestureTracker;
 
 function touch(id, x, y) {
     return { id: id, type: 'touch', x: x, y: y, link: { id: 'lesson' } };
@@ -36,3 +37,18 @@ foreignPointer.down(touch(5, 0, 0));
 assert.strictEqual(foreignPointer.move(99, 50, 50), 'ignore', 'A different pointer altered the active gesture.');
 
 console.log('Teacher Week gesture checks passed.');
+
+var lesson = { dataset: { planningSaving: 'true', planningPending: 'true', planningPopulated: 'false' } };
+assert.strictEqual(teacherWeek.planningCopyAllowed(lesson), false, 'A pending planning save was available as a copy source.');
+teacherWeek.applyPlanningState(lesson, {
+    state: 'requirements_entered', requisitions: 'Latest requisitions', outline: 'Latest outline', risk: 'Latest risk',
+    populated: true, planning_revision: 'authoritative-revision'
+});
+assert.strictEqual(lesson.dataset.requisitions, 'Latest requisitions', 'Saved requisitions were not synchronized to the lesson card.');
+assert.strictEqual(lesson.dataset.planningPopulated, 'true', 'Saved populated state was not synchronized to the lesson card.');
+assert.strictEqual(lesson.dataset.planningRevision, 'authoritative-revision', 'Saved planning revision was not synchronized to the lesson card.');
+assert.strictEqual(teacherWeek.planningCopyAllowed(lesson), true, 'A successfully saved planning state remained blocked from copying.');
+lesson.dataset.planningPending = 'true';
+assert.strictEqual(teacherWeek.planningCopyAllowed(lesson), false, 'A failed/pending planning state was available for copying.');
+
+console.log('Teacher Week planning synchronization checks passed.');

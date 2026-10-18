@@ -123,7 +123,7 @@ final class TeacherPlanningService
         $this->store->savePlanning($occurrenceId, $state, $lessonOutline, $requisitions, $riskAssessment);
     }
 
-    /** @return array{value:string,nothing_required:bool} */
+    /** @return array{value:string,nothing_required:bool,state:string,requisitions:string,outline:string,risk:string,populated:bool,planning_revision:string} */
     public function saveSection(int $organisationId, int $teacherId, int $occurrenceId, string $section, string $value, bool $nothingRequired = false): array
     {
         $this->occurrenceForEdit($organisationId, $teacherId, $occurrenceId);
@@ -132,7 +132,22 @@ final class TeacherPlanningService
         }
         $value = trim($value);
         if ($section === 'requisitions' && $nothingRequired && $value === '') $value = 'Nothing required';
-        return $this->store->savePlanningSection($occurrenceId, $section, $value, $nothingRequired);
+        $this->store->savePlanningSection($occurrenceId, $section, $value, $nothingRequired);
+        $saved = $this->occurrenceForEdit($organisationId, $teacherId, $occurrenceId);
+        $requisitions = (string) ($saved['requirements_text'] ?? '');
+        $outline = (string) ($saved['planning_notes'] ?? '');
+        $risk = (string) ($saved['risk_assessment_text'] ?? '');
+        $state = (string) ($saved['state'] ?? 'not_completed');
+        return [
+            'value' => $section === 'requisitions' && $state === 'nothing_required' ? 'Nothing required' : ($section === 'requisitions' ? $requisitions : ($section === 'outline' ? $outline : $risk)),
+            'nothing_required' => $state === 'nothing_required',
+            'state' => $state,
+            'requisitions' => $requisitions,
+            'outline' => $outline,
+            'risk' => $risk,
+            'populated' => self::planningPopulated($saved),
+            'planning_revision' => self::planningRevision($saved),
+        ];
     }
 
     /** @return array<string,mixed> */

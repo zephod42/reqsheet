@@ -38,7 +38,7 @@
     }
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { createGestureTracker: createGestureTracker };
+        module.exports = { createGestureTracker: createGestureTracker, applyPlanningState: applyPlanningState, planningCopyAllowed: planningCopyAllowed };
         return;
     }
 
@@ -89,17 +89,36 @@
         }
     }
 
+    function applyPlanningState(lesson, payload) {
+        if (!lesson || !lesson.dataset) return;
+        lesson.dataset.outline = payload.outline || '';
+        lesson.dataset.requisitions = payload.requisitions !== undefined ? (payload.requisitions || '') : (payload.value || '');
+        lesson.dataset.risk = payload.risk || '';
+        lesson.dataset.state = payload.state || (payload.nothing_required ? 'nothing_required' : 'not_completed');
+        lesson.dataset.planningPopulated = payload.populated ? 'true' : 'false';
+        lesson.dataset.planningRevision = payload.planning_revision || '';
+        delete lesson.dataset.planningSaving;
+        delete lesson.dataset.planningPending;
+    }
+
+    function planningCopyAllowed(lesson) {
+        return !!lesson && lesson.dataset.planningSaving !== 'true' && lesson.dataset.planningPending !== 'true';
+    }
+
     function saveRequisition(cell) {
         if (!cell || !cell.classList.contains('is-editing')) return Promise.resolve();
         if (cell.dataset.saving === 'true') return Promise.resolve();
         var area = cell.querySelector('textarea');
         var value = area ? area.value : '';
+        var lesson = cell.closest('[data-lesson-id]');
         if (value === (cell.dataset.savedValue || '')) {
             renderRequisition(cell, cell.dataset.savedValue || '', cell.dataset.nothingRequired === 'true', '');
+            if (lesson) { delete lesson.dataset.planningSaving; delete lesson.dataset.planningPending; }
             if (activeRequisition === cell) activeRequisition = null;
             return Promise.resolve();
         }
         cell.dataset.saving = 'true';
+        if (lesson) { lesson.dataset.planningSaving = 'true'; lesson.dataset.planningPending = 'true'; }
         var data = new FormData();
         data.set('csrf_token', csrf ? csrf.value : '');
         data.set('occurrence_id', cell.closest('[data-lesson-id]').dataset.lessonId);
@@ -110,6 +129,8 @@
             .then(function (response) { return response.json().then(function (payload) { if (!response.ok || !payload.ok) throw new Error(payload.message || 'The requisitions could not be saved.'); return payload; }); })
             .then(function (payload) {
                 renderRequisition(cell, payload.value || '', !!payload.nothing_required, '');
+                applyPlanningState(lesson, payload);
+                if (lesson) { delete lesson.dataset.planningSaving; delete lesson.dataset.planningPending; }
                 if (activeRequisition === cell) activeRequisition = null;
             })
             .catch(function (error) {
@@ -168,6 +189,11 @@
 
     function beginDrag(link, x, y) {
         if (busy || !gestures.isDragging()) return;
+        if (!planningCopyAllowed(link)) {
+            gestures.reset();
+            setStatus('Save the latest requisition before copying its planning.', true);
+            return;
+        }
         clearLongPress();
         source = link;
         source.classList.add('copy-source');
@@ -231,6 +257,10 @@
         if (busy || !from || !to || from === to) return;
         source = from;
         target = to;
+        if (!planningCopyAllowed(source)) {
+            setStatus('Save the latest requisition before copying its planning.', true);
+            return;
+        }
         if (source.dataset.planningPopulated !== 'true') {
             setStatus('The source lesson has no planning information to copy.', true);
             return;
@@ -336,6 +366,11 @@
         });
         link.addEventListener('pointerdown', function (event) {
             if (event.target.closest && event.target.closest('textarea')) return;
+            if (activeRequisition || !planningCopyAllowed(link)) {
+                if (activeRequisition && activeRequisition !== link) saveRequisition(activeRequisition);
+                setStatus('Save the latest requisition before copying its planning.', true);
+                return;
+            }
             if (busy || event.button !== 0 || !gestures.down({ id: event.pointerId, type: event.pointerType, x: event.clientX, y: event.clientY, link: link })) return;
             if (event.pointerType !== 'mouse') {
                 longPressTimer = window.setTimeout(function () {

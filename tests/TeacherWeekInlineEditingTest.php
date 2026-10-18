@@ -31,6 +31,10 @@ final class TeacherWeekInlineEditingTest
         ]), true);
         assertSameValue(true, $saved['ok'] ?? false, 'Week inline save failed.');
         assertSameValue("Bring goggles\nWear gloves", $store->occurrences[500]['requirements_text'], 'Week inline save did not preserve multiline text.');
+        assertSameValue('requirements_entered', $saved['state'] ?? null, 'Week inline save did not return the authoritative planning state.');
+        assertSameValue(true, $saved['populated'] ?? false, 'Week inline save did not return populated planning state.');
+        assertSameValue("Bring goggles\nWear gloves", $saved['requisitions'] ?? null, 'Week inline save did not return the saved requisitions.');
+        assertSameValue(TeacherPlanningService::planningRevision($store->occurrences[500]), $saved['planning_revision'] ?? null, 'Week inline save did not return the authoritative planning revision.');
 
         $nr = json_decode($page->handle('POST', [], [
             '_async' => '1', 'csrf_token' => CsrfToken::value(), 'occurrence_id' => 500,
@@ -44,6 +48,8 @@ final class TeacherWeekInlineEditingTest
         assertContainsValue("area.addEventListener('blur'", $script, 'Week editor did not save on blur.');
         assertContainsValue("event.key === 'Tab'", $script, 'Week editor did not save on Tab.');
         assertNotContainsValue('data.set(\'nothing_required\'', $script, 'Week editor still submits the removed NR control.');
+        assertContainsValue('applyPlanningState', $script, 'Week inline save did not synchronize lesson planning attributes.');
+        assertContainsValue('planningCopyAllowed', $script, 'Week drag-and-drop did not guard pending planning saves.');
 
         $css = (string) file_get_contents(__DIR__ . '/../public/assets/app.css');
         assertContainsValue('.week-requisition-editor', $css, 'Week editor styling was not added.');

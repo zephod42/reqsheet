@@ -203,6 +203,7 @@ small { font-size: .82rem; }
 .day-label a:hover, .day-label a:focus-visible { text-decoration: underline; }
 .today-row .day-label { background: var(--primary-pale); font-weight: 750; }
 .week-grid td { height: 7rem; padding: .3rem; vertical-align: top; }
+.week-grid td.past-date-cell, .week-grid td.past-lesson-cell, .teacher-day-table tr.past-lesson-row > th, .teacher-day-table tr.past-lesson-row > td { background: #edf7ed; }
 .week-grid tr.separator-row th, .week-grid tr.separator-row td { height: 1.5rem; padding-top: .12rem; padding-bottom: .12rem; }
 .day-view-heading { margin: .25rem 0 0; font-size: 1rem; font-weight: 500; }
 .day-picker { display: flex; align-items: end; flex-wrap: wrap; gap: .6rem; margin: var(--space-4) 0; }
@@ -459,7 +460,7 @@ dialog .close { float: right; }
     .tenant-name { display: none !important; }
     .site-shell { display: block; }
     .site-main { width: 100%; padding: 0; }
-    .lesson-block, .admin-lesson, .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td { background: #fff !important; color: #000 !important; box-shadow: none !important; }
+    .lesson-block, .admin-lesson, .week-grid th, .week-grid td, .admin-week-grid th, .admin-week-grid td, .teacher-day-table tr.past-lesson-row > th, .teacher-day-table tr.past-lesson-row > td { background: #fff !important; color: #000 !important; box-shadow: none !important; }
     .lesson-block, .admin-lesson { border-color: #000 !important; }
     .lesson-header strong, .lesson-header > span { color: #000 !important; }
     @page { size: A4 landscape; margin: 4mm; }

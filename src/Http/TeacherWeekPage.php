@@ -150,6 +150,7 @@ final class TeacherWeekPage
             $body .= '<tr' . ($axisSlot->isTeaching() ? '' : ' class="separator-row"') . '><th scope="row" class="period-label ' . ($axisSlot->isTeaching() ? '' : 'separator-axis') . '">' . $this->e($axisSlot->isTeaching() ? $this->periodLabel($axisSlot) : $this->separatorLabel($axisSlot)) . '</th>';
             foreach ($week->days as $day) {
                 $date = $day['date'];
+            $pastDateClass = $date < $this->today ? ' class="past-date-cell"' : '';
             $bySequence = [];
             foreach ($day['slots'] as $slot) $bySequence[$slot->sequenceNumber] = $slot;
             $byStart = [];
@@ -165,12 +166,13 @@ final class TeacherWeekPage
                 }
             }
             if ($covered) continue;
-            if ($slot === null) { $body .= '<td></td>'; continue; }
-            if (!$slot->isTeaching()) { $body .= '<td class="separator-cell" aria-label="' . $this->e($this->separatorLabel($slot)) . '"></td>'; continue; }
+            if ($slot === null) { $body .= '<td' . $pastDateClass . '></td>'; continue; }
+            if (!$slot->isTeaching()) { $body .= '<td' . ($pastDateClass !== '' ? ' class="past-date-cell separator-cell"' : ' class="separator-cell"') . ' aria-label="' . $this->e($this->separatorLabel($slot)) . '"></td>'; continue; }
                 $occurrence = $byStart[$slot->id] ?? null;
-                if ($occurrence === null) { $body .= '<td class="empty-cell"></td>'; continue; }
+                if ($occurrence === null) { $body .= '<td' . ($pastDateClass !== '' ? ' class="past-date-cell empty-cell"' : ' class="empty-cell"') . '></td>'; continue; }
                 $duration = max(1, (int) $occurrence['snapshot_duration_periods']);
-                $body .= '<td rowspan="' . $duration . '">' . $this->lessonBlock($occurrence, $date, $slot, $classTones[(string) $occurrence['snapshot_class_code']]) . '</td>';
+                $pastClass = $pastDateClass !== '' ? ' class="past-lesson-cell"' : '';
+                $body .= '<td' . $pastClass . ' rowspan="' . $duration . '">' . $this->lessonBlock($occurrence, $date, $slot, $classTones[(string) $occurrence['snapshot_class_code']]) . '</td>';
             }
             $body .= '</tr>';
         }
