@@ -50,6 +50,21 @@ final class SettingsPage
             if ($action === 'edit_template') { $editor = 'warning'; $targetVersionId = (int) ($input['source_version_id'] ?? 0); }
             elseif ($action === 'continue_edit_template') { $editor = 'edit'; $targetVersionId = (int) ($input['source_version_id'] ?? 0); }
             elseif ($action === 'create_template') $editor = 'create';
+            elseif ($action === 'save_technician_highlighting') {
+                try {
+                    if (!CsrfToken::valid($input['csrf_token'] ?? null)) throw new SettingsValidationException(['The form expired. Please try again.']);
+                    $current = $this->settings->load($this->organisationId);
+                    $settings = array_replace($current, $input);
+                    $settings['allow_conjoined_periods'] = !empty($current['allow_double_periods']) ? '1' : null;
+                    $separators = (array) ($current['separators'] ?? []);
+                    $settings['separator_type'] = array_map(static fn (array $separator): string => (string) ($separator['type'] ?? ''), $separators);
+                    $settings['separator_after'] = array_map(static fn (array $separator): int => (int) ($separator['after_period'] ?? 0), $separators);
+                    $settings['separator_duration'] = array_map(static fn (array $separator): string => (string) ($separator['duration_minutes'] ?? ''), $separators);
+                    $settings['separator_label'] = array_map(static fn (array $separator): string => (string) ($separator['label'] ?? ''), $separators);
+                    $this->settings->save($this->organisationId, $settings);
+                    $message = 'Technician highlighting settings saved.';
+                } catch (SettingsValidationException $exception) { $message = implode(' ', $exception->errors()); }
+            }
             elseif ($action === 'activate_template') {
                 try {
                     if (!CsrfToken::valid($input['csrf_token'] ?? null)) throw new TimetableValidationException(['Your request expired. Please try again.']);
@@ -111,7 +126,7 @@ final class SettingsPage
         $timetable = $this->timetable;
         $templateService = new TimetableTemplateService($timetable);
         $active = $templateService->activeTemplate($this->organisationId);
-        $notice = $message === null ? '' : '<p class="notice ' . (str_starts_with($message, 'Timetable saved') || $message === 'Timetable activated.' ? '' : 'error') . '">' . $this->e($message) . '</p>';
+        $notice = $message === null ? '' : '<p class="notice ' . (str_starts_with($message, 'Timetable saved') || $message === 'Timetable activated.' || $message === 'Technician highlighting settings saved.' ? '' : 'error') . '">' . $this->e($message) . '</p>';
         $body = '<section class="content-narrow"><h1>Settings</h1><p>Organisation settings and timetable templates.</p>' . $notice;
         if ($editor === 'warning') {
             $target = $targetVersionId > 0 ? $timetable->findVersion($targetVersionId) : ($active['version'] ?? null);
@@ -124,6 +139,7 @@ final class SettingsPage
         } else {
             $body .= $this->templateSummary($active, $data);
             $body .= $this->templateList($timetable->versionsForOrganisation($this->organisationId), $active['version']->id ?? null);
+            $body .= '<section class="settings-section"><h2>Organisation settings</h2>' . $this->technicianHighlightingForm($data) . '</section>';
             $body .= '<div class="form-actions"><form method="post"><input type="hidden" name="action" value="create_template"><button>Create new timetable template</button></form></div>';
         }
         return $body . $this->accountSection() . '</section>';
@@ -230,6 +246,12 @@ final class SettingsPage
             $rows .= '<div class="technician-highlight-setting" data-highlight-option><span class="technician-highlight-swatch technician-highlight-' . $number . '" aria-hidden="true"></span><label>Colour ' . $number . ' label<input name="technician_highlighting_label[]" maxlength="100" value="' . $this->e((string) ($labels[$index] ?? '')) . '" placeholder="For example: Waiting for equipment"></label></div>';
         }
         return '<div class="settings-section"><h2>Technician highlighting</h2><p>Optionally highlight whole technician lesson cells. Each school defines what its colours and labels mean; highlighting is independent of the prepared status.</p><label class="check-label"><input type="checkbox" name="technician_highlighting_enabled" value="1" data-highlight-enabled' . ($enabled ? ' checked' : '') . '> Enable technician highlighting</label><label>Number of available colours<select name="technician_highlighting_count" data-highlight-count>' . implode('', array_map(static fn (int $number): string => '<option value="' . $number . '"' . ($number === $count ? ' selected' : '') . '>' . $number . '</option>', range(1, SettingsService::TECHNICIAN_HIGHLIGHTING_MAX))) . '</select></label><div data-highlight-options>' . $rows . '</div></div>';
+    }
+
+    /** @param array<string, mixed> $data */
+    private function technicianHighlightingForm(array $data): string
+    {
+        return '<form method="post"><input type="hidden" name="csrf_token" value="' . $this->e(CsrfToken::value()) . '"><input type="hidden" name="action" value="save_technician_highlighting">' . $this->technicianHighlightingSection($data) . '<div class="form-actions"><button>Save technician highlighting</button></div></form>';
     }
 
     private function separatorRow(string $type = '', string $label = '', int $after = 0, string $duration = '', string $periodOptions = ''): string

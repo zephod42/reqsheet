@@ -91,10 +91,22 @@ final class SettingsTest
         assertContainsValue('https://minimalschl.reqsheet.test/onboarding?token=', $initialSetupComplete, 'Initial setup did not continue to tenant-bound recovery-key onboarding.');
 
         $templateSettings = new SettingsStoreFake();
+        $templateSettings->saved['separators'] = [['type' => 'Break', 'label' => 'Break', 'after_period' => 2, 'duration_minutes' => '10']];
         $templatePage = new SettingsPage(new SettingsService($templateSettings), 1, ['id' => 1, 'organisation_id' => 1, 'operational_role' => 'teacher', 'is_admin' => true], new ConfigurationStore());
         $templateEmpty = $templatePage->handle('GET', []);
         assertContainsValue('No active timetable template exists yet.', $templateEmpty, 'Settings did not show the empty active-template state.');
+        assertContainsValue('name="technician_highlighting_enabled"', $templateEmpty, 'Main Settings page did not render technician highlighting configuration.');
+        assertContainsValue('name="action" value="save_technician_highlighting"', $templateEmpty, 'Technician highlighting settings did not have a dedicated save action.');
         assertNotContainsValue('name="periods_per_day"', $templateEmpty, 'Read-only template summary exposed the large editor by default.');
+        $highlightingSaved = $templatePage->handle('POST', [
+            'action' => 'save_technician_highlighting', 'csrf_token' => \Reqsheet\Http\CsrfToken::value(),
+            'technician_highlighting_enabled' => '1', 'technician_highlighting_count' => '2',
+            'technician_highlighting_label' => ['Needs checking', 'Ready for collection'],
+        ]);
+        assertContainsValue('Technician highlighting settings saved.', $highlightingSaved, 'Main Settings page did not save technician highlighting settings.');
+        assertSameValue(true, $templateSettings->saved['technician_highlighting_enabled'], 'Technician highlighting was not enabled from the main Settings page.');
+        assertSameValue(['Needs checking', 'Ready for collection'], $templateSettings->saved['technician_highlighting_colours'], 'Technician highlighting labels were not saved from the main Settings page.');
+        assertSameValue('Break', $templateSettings->saved['separators'][0]['type'], 'Saving technician highlighting changed existing separator settings.');
         $templateEditor = $templatePage->handle('POST', ['action' => 'create_template']);
         assertContainsValue('Create new timetable template', $templateEditor, 'Create-template workflow did not open from Settings.');
         assertContainsValue('name="template_label"', $templateEditor, 'Template creation did not ask for a timetable name.');
